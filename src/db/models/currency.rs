@@ -22,7 +22,7 @@ mod currency_builder;
 
 use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::{DefaultHasher, LruCache};
@@ -46,66 +46,6 @@ pub enum CurrencyError {
     AlreadyExists,
     #[error("Database error")]
     DatabaseError,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum CurrencyUpdate {
-    Name(String),
-    Symbol(String),
-    Visible(bool),
-    Base(bool),
-    BaseValue(f64),
-    Pay(bool),
-    EarnByChat(bool),
-    ChannelsIsWhitelist(bool),
-    RolesIsWhitelist(bool),
-    ChannelsWhitelistAdd(DbChannelId),
-    ChannelsWhitelistRemove(DbChannelId),
-    ChannelsWhitelistOverwrite(Vec<DbChannelId>),
-    RolesWhitelistAdd(DbRoleId),
-    RolesWhitelistRemove(DbRoleId),
-    RolesWhitelistOverwrite(Vec<DbRoleId>),
-    ChannelsBlacklistAdd(DbChannelId),
-    ChannelsBlacklistRemove(DbChannelId),
-    ChannelsBlacklistOverwrite(Vec<DbChannelId>),
-    RolesBlacklistAdd(DbRoleId),
-    RolesBlacklistRemove(DbRoleId),
-    RolesBlacklistOverwrite(Vec<DbRoleId>),
-    EarnMin(f64),
-    EarnMax(f64),
-    EarnTimeout(i64),
-}
-
-impl ToString for CurrencyUpdate {
-    fn to_string(&self) -> String {
-        match self {
-            CurrencyUpdate::Name(_) => "CurrName",
-            CurrencyUpdate::Symbol(_) => "Symbol",
-            CurrencyUpdate::Visible(_) => "Visible",
-            CurrencyUpdate::Base(_) => "Base",
-            CurrencyUpdate::BaseValue(_) => "BaseValue",
-            CurrencyUpdate::Pay(_) => "Pay",
-            CurrencyUpdate::EarnByChat(_) => "EarnByChat",
-            CurrencyUpdate::ChannelsIsWhitelist(_) => "ChannelsIsWhitelist",
-            CurrencyUpdate::RolesIsWhitelist(_) => "RolesIsWhitelist",
-            CurrencyUpdate::ChannelsWhitelistAdd(_) => "ChannelsWhitelist",
-            CurrencyUpdate::ChannelsWhitelistRemove(_) => "ChannelsWhitelist",
-            CurrencyUpdate::ChannelsWhitelistOverwrite(_) => "ChannelsWhitelist",
-            CurrencyUpdate::RolesWhitelistAdd(_) => "RolesWhitelist",
-            CurrencyUpdate::RolesWhitelistRemove(_) => "RolesWhitelist",
-            CurrencyUpdate::RolesWhitelistOverwrite(_) => "RolesWhitelist",
-            CurrencyUpdate::ChannelsBlacklistAdd(_) => "ChannelsBlacklist",
-            CurrencyUpdate::ChannelsBlacklistRemove(_) => "ChannelsBlacklist",
-            CurrencyUpdate::ChannelsBlacklistOverwrite(_) => "ChannelsBlacklist",
-            CurrencyUpdate::RolesBlacklistAdd(_) => "RolesBlacklist",
-            CurrencyUpdate::RolesBlacklistRemove(_) => "RolesBlacklist",
-            CurrencyUpdate::RolesBlacklistOverwrite(_) => "RolesBlacklist",
-            CurrencyUpdate::EarnMin(_) => "EarnMin",
-            CurrencyUpdate::EarnMax(_) => "EarnMax",
-            CurrencyUpdate::EarnTimeout(_) => "EarnTimeout",
-        }
-        .to_string()
-    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -206,232 +146,649 @@ impl Currency {
             if cfg!(test) || cfg!(debug_assertions) {
                 println!("Cache miss!");
             }
-            cache.put((guild_id, curr_name), Arc::new(Mutex::new(curr.clone())));
-            drop(cache);
-            Some(Arc::new(Mutex::new(curr)))
+            cache.put(
+                (guild_id.clone(), curr_name.clone()),
+                Arc::new(Mutex::new(curr)),
+            );
+            Some(cache.get(&(guild_id, curr_name)).unwrap().clone())
         } else {
             if cfg!(test) || cfg!(debug_assertions) {
                 println!("Cache miss and not found in database!");
             }
-            drop(cache);
             None
         }
     }
 
-    /// Updates the specified field of a currency in the database, making sure it will not have the same name as another currency from the same guild.
-    ///
-    /// # Arguments
-    ///
-    /// - `new_name` - The new name for the currency.
-    ///
-    /// # Errors
-    ///
-    /// If the currency with the new name already exists in the database.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// let guild_id: u64 = 1234567890;
-    /// let curr_name = "ConeCoin";
-    /// let new_name = "NewCoin";
-    /// let currency: Currency = Currency::try_from_name(guild_id, CurrencyUpdate::Name(new_name.to_string())).await.unwrap();
-    /// currency.update_field(new_name.to_string()).await.unwrap();
-    /// ```
-    pub async fn update_field(&mut self, update_type: CurrencyUpdate) -> Result<()> {
-        let mut cache = CACHE_CURRENCY.lock().await;
+    /// Updates the name of the currency in the database, pops it from
+    /// the cache and adds it back because the name changed.
+    pub async fn update_name(self, new_name: String) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "CurrName": new_name.clone(),
+            },
+        };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
-        match update_type.clone() {
-            CurrencyUpdate::ChannelsWhitelistAdd(channel_id)
-            | CurrencyUpdate::ChannelsBlacklistAdd(channel_id) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$push": {
-                        update_type.to_string(): channel_id.to_string(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::RolesWhitelistAdd(role_id)
-            | CurrencyUpdate::RolesBlacklistAdd(role_id) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$push": {
-                        update_type.to_string(): role_id.to_string(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::ChannelsWhitelistRemove(channel_id)
-            | CurrencyUpdate::ChannelsBlacklistRemove(channel_id) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$pull": {
-                        update_type.to_string(): channel_id.to_string(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::RolesWhitelistRemove(role_id)
-            | CurrencyUpdate::RolesBlacklistRemove(role_id) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$pull": {
-                        update_type.to_string(): role_id.to_string(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::ChannelsWhitelistOverwrite(channel_ids)
-            | CurrencyUpdate::ChannelsBlacklistOverwrite(channel_ids) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): mongodb::bson::to_bson(&channel_ids).unwrap(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::RolesWhitelistOverwrite(roles_ids)
-            | CurrencyUpdate::RolesBlacklistOverwrite(roles_ids) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): mongodb::bson::to_bson(&roles_ids).unwrap(),
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::Symbol(st) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): st,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::Base(b)
-            | CurrencyUpdate::Visible(b)
-            | CurrencyUpdate::Pay(b)
-            | CurrencyUpdate::EarnByChat(b)
-            | CurrencyUpdate::ChannelsIsWhitelist(b)
-            | CurrencyUpdate::RolesIsWhitelist(b) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): b,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::EarnMin(f) | CurrencyUpdate::EarnMax(f) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): f,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::BaseValue(of) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): of,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::EarnTimeout(i) => {
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        update_type.to_string(): i,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
-            CurrencyUpdate::Name(name) => {
-                // check if currency with new name exists
-                let res = coll
-                    .find_one(
-                        doc! {
-                            "GuildId": self.guild_id.clone().to_string(),
-                            "CurrName": name.clone(),
-                        },
-                        None,
-                    )
-                    .await?;
-                if res.is_some() {
-                    return Err(anyhow::anyhow!(
-                        "Currency with name {} already exists",
-                        name
-                    ));
-                }
-                let filterdoc = doc! {
-                    "GuildId": self.guild_id.clone().to_string(),
-                    "CurrName": self.curr_name.clone(),
-                };
-                let updatedoc = doc! {
-                    "$set": {
-                        "CurrName": name,
-                    },
-                };
-                coll.update_one(filterdoc, updatedoc, None).await?;
-            }
+
+        // check if the new name already exists in the guild
+        let filterdoc2 = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": new_name.clone(),
+        };
+        if coll.find_one(filterdoc2, None).await?.is_some() {
+            return Err(anyhow!(
+                "Currency with name {} already exists in guild {}",
+                new_name,
+                self.guild_id.to_string()
+            ));
         }
+
+        let mut cache = CACHE_CURRENCY.lock().await;
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        cache.pop(&(self.guild_id.to_string(), self.curr_name.clone()));
+        cache.put(
+            (self.guild_id.to_string(), new_name),
+            Arc::new(Mutex::new(self.clone())),
+        );
         Ok(())
     }
 
-    pub async fn delete_currency(guild_id: String, curr_name: String) -> Result<()> {
+    /// Updates the symbol of the currency in the database.
+    pub async fn update_symbol(&mut self, new_symbol: String) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "Symbol": new_symbol.clone(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.symbol = new_symbol;
+
+        Ok(())
+    }
+
+    /// Updates whether the currency is visible to members of the guild.
+    pub async fn update_visible(&mut self, new_visible: bool) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "Visible": new_visible,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.visible = new_visible;
+
+        Ok(())
+    }
+
+    /// Updates whether the currency is the base currency of the guild.
+    /// If there is already a base currency and the value passed is true,
+    /// the already existing base currency will be set to false and the
+    /// new base currency will be set to true.
+    pub async fn update_base(&mut self, new_base: bool) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "Base": new_base,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        // check if there is already a base currency in the guild
+        // if it is, set it to false
+        if new_base {
+            let filterdoc2 = doc! {
+                "GuildId": self.guild_id.to_string(),
+                "Base": true,
+            };
+            let updatedoc2 = doc! {
+                "$set": {
+                    "Base": false,
+                },
+            };
+            coll.update_one(filterdoc2, updatedoc2, None).await?;
+        }
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.base = new_base;
+
+        Ok(())
+    }
+
+    /// Updates the value of the currrency in terms of the base currency.
+    pub async fn update_base_value(&mut self, new_base_value: Option<f64>) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "BaseValue": new_base_value,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.base_value = new_base_value;
+
+        Ok(())
+    }
+
+    /// Updates whether the members can pay eachother with the currency.
+    pub async fn update_pay(&mut self, new_pay: bool) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "Pay": new_pay,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.pay = new_pay;
+
+        Ok(())
+    }
+
+    /// Updates whether the members can earn the currency by chatting.
+    pub async fn update_earn_by_chat(&mut self, new_earn_by_chat: bool) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "EarnByChat": new_earn_by_chat,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.earn_by_chat = new_earn_by_chat;
+
+        Ok(())
+    }
+
+    /// Updates whether the channels filter is in whitelist mode.
+    pub async fn update_channels_is_whitelist(
+        &mut self,
+        new_channels_is_whitelist: bool,
+    ) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "ChannelsIsWhitelist": new_channels_is_whitelist,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_is_whitelist = new_channels_is_whitelist;
+
+        Ok(())
+    }
+
+    /// Updates whether the roles filter is in whitelist mode.
+    pub async fn update_roles_is_whitelist(&mut self, new_roles_is_whitelist: bool) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "RolesIsWhitelist": new_roles_is_whitelist,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_is_whitelist = new_roles_is_whitelist;
+
+        Ok(())
+    }
+
+    /// Adds a channel to the list of whitelisted channels.
+    pub async fn add_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$push": {
+                "ChannelsWhitelist": channel_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        // check if that channel is present in the whitelist
+        let filterdoc2 = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "ChannelsWhitelist": {
+                "$in": [channel_id.to_string()],
+            }
+        };
+        let res = coll.find_one(filterdoc2, None).await?;
+        if res.is_some() {
+            return Err(anyhow!("Channel already whitelisted"));
+        }
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_whitelist.push(channel_id);
+
+        Ok(())
+    }
+
+    /// Removes a channel from the list of whitelisted channels.
+    pub async fn remove_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "ChannelsWhitelist": {
+                "$in": [channel_id.to_string()],
+            }
+        };
+        let updatedoc = doc! {
+            "$pull": {
+                "ChannelsWhitelist": channel_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_whitelist.retain(|x| x != &channel_id);
+
+        Ok(())
+    }
+
+    /// Adds a role to the list of whitelisted roles.
+    pub async fn add_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$push": {
+                "RolesWhitelist": role_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        // check if that role is present in the whitelist
+        let filterdoc2 = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "RolesWhitelist": {
+                "$in": [role_id.to_string()],
+            }
+        };
+        let res = coll.find_one(filterdoc2, None).await?;
+        if res.is_some() {
+            return Err(anyhow!("Role already whitelisted"));
+        }
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_whitelist.push(role_id);
+
+        Ok(())
+    }
+
+    /// Removes a role from the list of whitelisted roles.
+    pub async fn remove_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "RolesWhitelist": {
+                "$in": [role_id.to_string()],
+            }
+        };
+        let updatedoc = doc! {
+            "$pull": {
+                "RolesWhitelist": role_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_whitelist.retain(|x| x != &role_id);
+
+        Ok(())
+    }
+
+    /// Add a channel to the list of blacklisted channels.
+    pub async fn add_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$push": {
+                "ChannelsBlacklist": channel_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        // check if that channel is present in the blacklist
+        let filterdoc2 = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "ChannelsBlacklist": {
+                "$in": [channel_id.to_string()],
+            }
+        };
+        let res = coll.find_one(filterdoc2, None).await?;
+        if res.is_some() {
+            return Err(anyhow!("Channel already blacklisted"));
+        }
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_blacklist.push(channel_id);
+
+        Ok(())
+    }
+
+    /// Removes a channel from the list of blacklisted channels.
+    pub async fn remove_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "ChannelsBlacklist": {
+                "$in": [channel_id.to_string()],
+            }
+        };
+        let updatedoc = doc! {
+            "$pull": {
+                "ChannelsBlacklist": channel_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_blacklist.retain(|x| x != &channel_id);
+
+        Ok(())
+    }
+
+    /// Adds a role to the list of blacklisted roles.
+    pub async fn add_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$push": {
+                "RolesBlacklist": role_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        // check if that role is present in the blacklist
+        let filterdoc2 = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "RolesBlacklist": {
+                "$in": [role_id.to_string()],
+            }
+        };
+        let res = coll.find_one(filterdoc2, None).await?;
+        if res.is_some() {
+            return Err(anyhow!("Role already blacklisted"));
+        }
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_blacklist.push(role_id);
+
+        Ok(())
+    }
+
+    /// Removes a role from the list of blacklisted roles.
+    pub async fn remove_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+            "RolesBlacklist": {
+                "$in": [role_id.to_string()],
+            }
+        };
+        let updatedoc = doc! {
+            "$pull": {
+                "RolesBlacklist": role_id.to_string(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_blacklist.retain(|x| x != &role_id);
+
+        Ok(())
+    }
+
+    /// Overwrites the entire list of whitelisted channels.
+    pub async fn overwrite_whitelisted_channels(
+        &mut self,
+        channels: Vec<DbChannelId>,
+    ) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "ChannelsWhitelist": channels.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_whitelist = channels;
+
+        Ok(())
+    }
+
+    /// Overwrites the entire list of whitelisted roles.
+    pub async fn overwrite_whitelisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "RolesWhitelist": roles.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_whitelist = roles;
+
+        Ok(())
+    }
+
+    /// Overwrites the entire list of blacklisted channels.
+    pub async fn overwrite_blacklisted_channels(
+        &mut self,
+        channels: Vec<DbChannelId>,
+    ) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "ChannelsBlacklist": channels.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.channels_blacklist = channels;
+
+        Ok(())
+    }
+
+    /// Overwrites the entire list of blacklisted roles.
+    pub async fn overwrite_blacklisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "RolesBlacklist": roles.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.roles_blacklist = roles;
+
+        Ok(())
+    }
+
+    /// Updates the minimum amount of currency that can be earned from a single message.
+    pub async fn update_earn_min(&mut self, new_earn_min: f64) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "EarnMin": new_earn_min,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.earn_min = new_earn_min;
+
+        Ok(())
+    }
+
+    /// Updates the maximum amount of currency that can be earned from a single message.
+    pub async fn update_earn_max(&mut self, new_earn_max: f64) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "EarnMax": new_earn_max,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.earn_max = new_earn_max;
+
+        Ok(())
+    }
+
+    /// Updates the amount of time (in seconds) that must pass before a user can earn currency again.
+    pub async fn update_earn_timeout(&mut self, new_earn_timeout: i64) -> Result<()> {
+        let filterdoc = doc! {
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
+        };
+        let updatedoc = doc! {
+            "$set": {
+                "EarnTimeout": new_earn_timeout,
+            },
+        };
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Currency> = db.collection("currencies");
+
+        coll.update_one(filterdoc, updatedoc, None).await?;
+
+        self.earn_timeout = new_earn_timeout;
+
+        Ok(())
+    }
+
+    /// Deletes the currency from the database and removes it from the cache.
+    pub async fn delete_currency(self) -> Result<()> {
         let mut cache = CACHE_CURRENCY.lock().await;
 
         // Delete the currency from the database.
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
         let filterdoc = doc! {
-            "GuildId": guild_id.clone(),
-            "CurrName": curr_name.clone(),
+            "GuildId": self.guild_id.to_string(),
+            "CurrName": self.curr_name.clone(),
         };
         coll.delete_one(filterdoc, None).await?;
         drop(db);
 
         // Remove the currency from the cache.
-        cache.pop(&(guild_id.clone(), curr_name.clone()));
+        cache.pop(&(self.guild_id.to_string(), self.curr_name));
         Ok(())
     }
 }
