@@ -861,4 +861,36 @@ mod test {
         assert_eq!(currency.guild_id, DbGuildId::from(guild_id.to_string()));
         assert_eq!(currency.curr_name, curr_name);
     }
+
+    #[tokio::test]
+    async fn try_create_delete() {
+        crate::init_env().await;
+        let curr = super::currency_builder::CurrencyBuilder::new(
+            DbGuildId::from(12),
+            "testNo".to_string(),
+            "Tt".to_string(),
+        )
+        .guild_id(DbGuildId::from(123))
+        .curr_name("test2".to_string())
+        .symbol("T".to_string())
+        .base(false)
+        .base_value(Some(1.0))
+        .pay(Some(true))
+        .earn_by_chat(Some(true))
+        .channels_is_whitelist(Some(true))
+        .roles_is_whitelist(Some(true))
+        .channels_whitelist(vec![DbChannelId::from(123)])
+        .channels_whitelist_add(DbChannelId::from(456))
+        .channels_blacklist(Some(vec![DbChannelId::from(789)]))
+        .channels_blacklist_add(DbChannelId::from(101112))
+        .roles_whitelist(Some(vec![DbRoleId::from(123)]))
+        .roles_whitelist_add(DbRoleId::from(456))
+        .roles_blacklist(Some(vec![DbRoleId::from(789)]))
+        .roles_blacklist_add(DbRoleId::from(101112))
+        .earn_min(Some(10.0))
+        .earn_max(Some(100.0))
+        .earn_timeout(Duration::seconds(60));
+        todo!();
+        ()
+    }
 }

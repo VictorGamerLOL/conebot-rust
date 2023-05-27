@@ -148,24 +148,24 @@ impl CurrencyBuilder {
 
     /// Sets the guild_id field.
     /// If `None` is passed, the value provided with the `new()` method will be used.
-    pub fn guild_id(mut self, guild_id: Option<DbGuildId>) -> Self {
-        if let Some(guild_id) = guild_id {
+    pub fn guild_id(mut self, guild_id: impl Into<Option<DbGuildId>>) -> Self {
+        if let Some(guild_id) = guild_id.into() {
             self.guild_id = guild_id;
         }
         self
     }
     /// Sets the curr_name field.
     /// If `None` is passed, the value provided with the `new()` method will be used.
-    pub fn curr_name(mut self, curr_name: Option<String>) -> Self {
-        if let Some(curr_name) = curr_name {
+    pub fn curr_name(mut self, curr_name: impl Into<Option<String>>) -> Self {
+        if let Some(curr_name) = curr_name.into() {
             self.curr_name = curr_name;
         }
         self
     }
     /// Sets the symbol field.
     /// If `None` is passed, the value provided with the `new()` method will be used.
-    pub fn symbol(mut self, symbol: Option<String>) -> Self {
-        if let Some(symbol) = symbol {
+    pub fn symbol(mut self, symbol: impl Into<Option<String>>) -> Self {
+        if let Some(symbol) = symbol.into() {
             self.symbol = symbol;
         }
         self
@@ -174,50 +174,50 @@ impl CurrencyBuilder {
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `true`
     /// upon calling the `build()` method.
-    pub fn visible(mut self, visible: Option<bool>) -> Self {
-        self.visible = visible;
+    pub fn visible(mut self, visible: impl Into<Option<bool>>) -> Self {
+        self.visible = visible.into();
         self
     }
     /// Sets the base field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
-    pub fn base(mut self, base: Option<bool>) -> Self {
-        self.base = base;
+    pub fn base(mut self, base: impl Into<Option<bool>>) -> Self {
+        self.base = base.into();
         self
     }
     /// Sets the base_value field.
     /// If the method is not called, it falls back to `None`
     /// and shows up as `null` in the database.
-    pub fn base_value(mut self, base_value: Option<f64>) -> Self {
-        self.base_value = base_value;
+    pub fn base_value(mut self, base_value: impl Into<Option<f64>>) -> Self {
+        self.base_value = base_value.into();
         self
     }
     /// Sets the pay field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `true`
-    pub fn pay(mut self, pay: Option<bool>) -> Self {
-        self.pay = pay;
+    pub fn pay(mut self, pay: impl Into<Option<bool>>) -> Self {
+        self.pay = pay.into();
         self
     }
     /// Sets the earn_by_chat field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
-    pub fn earn_by_chat(mut self, earn_by_chat: Option<bool>) -> Self {
-        self.earn_by_chat = earn_by_chat;
+    pub fn earn_by_chat(mut self, earn_by_chat: impl Into<Option<bool>>) -> Self {
+        self.earn_by_chat = earn_by_chat.into();
         self
     }
     /// Sets the channels_is_whitelist field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
-    pub fn channels_is_whitelist(mut self, channels_is_whitelist: Option<bool>) -> Self {
-        self.channels_is_whitelist = channels_is_whitelist;
+    pub fn channels_is_whitelist(mut self, channels_is_whitelist: impl Into<Option<bool>>) -> Self {
+        self.channels_is_whitelist = channels_is_whitelist.into();
         self
     }
     /// Sets the roles_is_whitelist field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
-    pub fn roles_is_whitelist(mut self, roles_is_whitelist: Option<bool>) -> Self {
-        self.roles_is_whitelist = roles_is_whitelist;
+    pub fn roles_is_whitelist(mut self, roles_is_whitelist: impl Into<Option<bool>>) -> Self {
+        self.roles_is_whitelist = roles_is_whitelist.into();
         self
     }
     /// Sets the channels_whitelist field.
@@ -226,8 +226,11 @@ impl CurrencyBuilder {
     /// And if the method is not called,
     /// it falls back to anything provided
     /// with calls to `channels_whitelist_add()`..
-    pub fn channels_whitelist(mut self, channels_whitelist: Option<Vec<DbChannelId>>) -> Self {
-        if let Some(channels_whitelist) = channels_whitelist {
+    pub fn channels_whitelist(
+        mut self,
+        channels_whitelist: impl Into<Option<Vec<DbChannelId>>>,
+    ) -> Self {
+        if let Some(channels_whitelist) = channels_whitelist.into() {
             self.channels_whitelist = channels_whitelist;
         } else {
             self.channels_whitelist = vec![];
@@ -247,8 +250,8 @@ impl CurrencyBuilder {
     /// And if the method is not called,
     /// it falls back to anything provided
     /// with calls to `roles_whitelist_add()`.
-    pub fn roles_whitelist(mut self, roles_whitelist: Option<Vec<DbRoleId>>) -> Self {
-        if let Some(roles_whitelist) = roles_whitelist {
+    pub fn roles_whitelist(mut self, roles_whitelist: impl Into<Option<Vec<DbRoleId>>>) -> Self {
+        if let Some(roles_whitelist) = roles_whitelist.into() {
             self.roles_whitelist = roles_whitelist;
         } else {
             self.roles_whitelist = vec![];
@@ -268,8 +271,11 @@ impl CurrencyBuilder {
     /// And if the method is not called,
     /// it falls back to anything provided
     /// with calls to `channels_blacklist_add()`.
-    pub fn channels_blacklist(mut self, channels_blacklist: Option<Vec<DbChannelId>>) -> Self {
-        if let Some(channels_blacklist) = channels_blacklist {
+    pub fn channels_blacklist(
+        mut self,
+        channels_blacklist: impl Into<Option<Vec<DbChannelId>>>,
+    ) -> Self {
+        if let Some(channels_blacklist) = channels_blacklist.into() {
             self.channels_blacklist = channels_blacklist;
         } else {
             self.channels_blacklist = vec![];
@@ -289,8 +295,8 @@ impl CurrencyBuilder {
     /// And if the method is not called,
     /// it falls back to anything provided
     /// with calls to `roles_blacklist_add()`.
-    pub fn roles_blacklist(mut self, roles_blacklist: Option<Vec<DbRoleId>>) -> Self {
-        if let Some(roles_blacklist) = roles_blacklist {
+    pub fn roles_blacklist(mut self, roles_blacklist: impl Into<Option<Vec<DbRoleId>>>) -> Self {
+        if let Some(roles_blacklist) = roles_blacklist.into() {
             self.roles_blacklist = roles_blacklist;
         } else {
             self.roles_blacklist = vec![];
@@ -307,22 +313,22 @@ impl CurrencyBuilder {
     /// Sets the earn_min field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `1.0`
-    pub fn earn_min(mut self, earn_min: Option<f64>) -> Self {
-        self.earn_min = earn_min;
+    pub fn earn_min(mut self, earn_min: impl Into<Option<f64>>) -> Self {
+        self.earn_min = earn_min.into();
         self
     }
     /// Sets the earn_max field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `10.0`
-    pub fn earn_max(mut self, earn_max: Option<f64>) -> Self {
-        self.earn_max = earn_max;
+    pub fn earn_max(mut self, earn_max: impl Into<Option<f64>>) -> Self {
+        self.earn_max = earn_max.into();
         self
     }
     /// Sets the earn_timeout field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `30`
-    pub fn earn_timeout(mut self, earn_timeout: Option<Duration>) -> Self {
-        self.earn_timeout = earn_timeout;
+    pub fn earn_timeout(mut self, earn_timeout: impl Into<Option<Duration>>) -> Self {
+        self.earn_timeout = earn_timeout.into();
         self
     }
 }
