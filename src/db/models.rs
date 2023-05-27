@@ -19,8 +19,10 @@ pub use store_entry::StoreEntry;
 
 use once_cell::sync::OnceCell;
 
+use super::id::DbGuildId;
+
 pub struct BotGuild {
-    guild_id: String,
+    guild_id: DbGuildId,
     // Since we do not need to compute everything from the beginning as no command uses everything at once,
     // we use OnceCell to lazily initialize the data.
     pub(self) currencies: OnceCell<()>,
@@ -34,7 +36,7 @@ pub struct BotGuild {
 impl BotGuild {
     pub fn new<T>(guild_id: T) -> Self
     where
-        T: Into<String>,
+        T: Into<DbGuildId>,
     {
         Self {
             guild_id: guild_id.into(),

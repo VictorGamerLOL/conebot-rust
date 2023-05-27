@@ -23,6 +23,7 @@ mod currency_builder;
 use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
 
 use anyhow::{anyhow, Result};
+use chrono::Duration;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::{DefaultHasher, LruCache};
@@ -33,6 +34,7 @@ use mongodb::{
 use once_cell::sync::OnceCell;
 use parking_lot::FairMutex;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -47,7 +49,8 @@ pub enum CurrencyError {
     #[error("Database error")]
     DatabaseError,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 /// A struct representing a currency entity in the database.
 pub struct Currency {
@@ -92,7 +95,8 @@ pub struct Currency {
     /// The maximum amount of currency that may be earned per message assuming earn_by_chat is true.
     earn_max: f64,
     /// The amount of time in seconds that must pass before a member can earn currency again via a chat message.
-    earn_timeout: i64, // Should not go into negatives, enforce at runtime.
+    #[serde_as(as = "DurationSeconds<i64>")]
+    earn_timeout: Duration,
 }
 
 lazy_static! {
@@ -753,14 +757,14 @@ impl Currency {
     }
 
     /// Updates the amount of time (in seconds) that must pass before a user can earn currency again.
-    pub async fn update_earn_timeout(&mut self, new_earn_timeout: i64) -> Result<()> {
+    pub async fn update_earn_timeout(&mut self, new_earn_timeout: Duration) -> Result<()> {
         let filterdoc = doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
         let updatedoc = doc! {
             "$set": {
-                "EarnTimeout": new_earn_timeout,
+                "EarnTimeout": new_earn_timeout.num_seconds(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -808,6 +812,7 @@ mod test {
             .await
             .unwrap();
         let currency = currency.lock().await;
+        dbg!(&currency);
         assert_eq!(currency.guild_id, DbGuildId::from(guild_id.to_string()));
         assert_eq!(currency.curr_name, curr_name);
     }

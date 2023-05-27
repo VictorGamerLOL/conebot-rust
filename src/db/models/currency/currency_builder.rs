@@ -5,6 +5,7 @@ use crate::db::{
     ArcTokioMutex,
 };
 use anyhow::{Ok, Result};
+use chrono::Duration;
 use mongodb::{bson::doc, Collection};
 
 use super::Currency;
@@ -27,7 +28,7 @@ pub struct CurrencyBuilder {
     roles_blacklist: Vec<DbRoleId>,
     earn_min: Option<f64>,
     earn_max: Option<f64>,
-    earn_timeout: Option<i64>,
+    earn_timeout: Option<Duration>,
 }
 
 impl CurrencyBuilder {
@@ -114,7 +115,7 @@ impl CurrencyBuilder {
         let roles_blacklist = self.roles_blacklist;
         let earn_min = self.earn_min.unwrap_or(0.0);
         let earn_max = self.earn_max.unwrap_or(0.0);
-        let earn_timeout = self.earn_timeout.unwrap_or(30);
+        let earn_timeout = self.earn_timeout.unwrap_or(Duration::seconds(30));
 
         let curr = Currency {
             guild_id,
@@ -135,13 +136,14 @@ impl CurrencyBuilder {
             earn_max,
             earn_timeout,
         };
+        let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
         let arccurr: super::ArcTokioMutex<Currency> = Arc::new(tokio::sync::Mutex::new(curr));
-        super::CACHE_CURRENCY
-            .lock()
-            .await
-            .push((self.guild_id.to_string(), self.curr_name), arccurr.clone());
-        Ok(arccurr)
+        cache.push((self.guild_id.to_string(), self.curr_name.clone()), arccurr);
+        cache
+            .get(&(self.guild_id.to_string(), self.curr_name))
+            .cloned()
+            .ok_or(anyhow::anyhow!("Currency not found in cache"))
     }
 
     /// Sets the guild_id field.
@@ -319,7 +321,7 @@ impl CurrencyBuilder {
     /// Sets the earn_timeout field.
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `30`
-    pub fn earn_timeout(mut self, earn_timeout: Option<i64>) -> Self {
+    pub fn earn_timeout(mut self, earn_timeout: Option<Duration>) -> Self {
         self.earn_timeout = earn_timeout;
         self
     }
@@ -349,7 +351,7 @@ async fn test_currency_builder() {
         .roles_blacklist_add(DbRoleId::from(456))
         .earn_min(Some(1.0))
         .earn_max(Some(10.0))
-        .earn_timeout(Some(60))
+        .earn_timeout(Some(Duration::seconds(60)))
         .build()
         .await
         .unwrap();
@@ -386,5 +388,5 @@ async fn test_currency_builder() {
     );
     assert_eq!(curr.earn_min, 1.0);
     assert_eq!(curr.earn_max, 10.0);
-    assert_eq!(curr.earn_timeout, 60);
+    assert_eq!(curr.earn_timeout, Duration::seconds(60));
 }
