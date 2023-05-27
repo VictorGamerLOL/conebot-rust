@@ -1,0 +1,149 @@
+/**
+ * This files defines how the database will be laid out overall. This database will
+ * be responsible for storing a lot of the data the bot will rely on to actually function
+ * and that needs to be persistent across restarts, crashes or is too large to be stored
+ * in mass in RAM. Things such as the balances of every user, the items in every user's
+ * inventory, the drop tables for every item, the store entries, etc.
+ */
+/**
+ * Notes about MongoDB:
+ * - There are NO foreign keys in MongoDB, so we have to handle them ourselves.
+ * - There is no schema for any collection, so it can be in any format in any collection.
+ * - Arrays are slow to update, so we should avoid using them for data that is updated often.
+ * - There is a document size limit of 16MB, so we should avoid having too much data in one document
+ * and also another reason to avoid using arrays that can grow too big, even if it means repeating data.
+ */
+{
+  "currencies": {
+    /* We keep it like this because it would be too computationally expensive to make a collection for each guild,
+          so we keep all the currencies in one collection and filter them by guild id. */
+    "GuildId": "String",
+    "CurrName": "String",
+    "Symbol": "String",
+    "Visible": "Boolean",
+    "Base": "Boolean",
+    "BaseValue": "Number | Null", // Null if it is the base currency
+    "Pay": "Boolean", // If the members can pay eachother with it
+    "EarnByChat": "Boolean", // Whether the currency can be earned by chattings
+    "ChannelsIsWhitelist": "Boolean", // This is done to allow for roles and channels to be whitelist-based or blacklist-based
+    "RolesIsWhitelist": "Boolean",
+    "ChannelsWhitelist": "String[]", // And this is done to save the config to be saved for each of the modes
+    "RolesWhitelist": "String[]",
+    "ChannelsBlacklist": "String[]",
+    "RolesBlacklist": "String[]",
+    "EarnMin": "Number", // Allow for customiable rates of earning
+    "EarnMax": "Number",
+    "EarnTimeout": "Number" // How many seconds needs to pass before the next message counts for earning
+    // There is no need to put other earning settings here as they can be handled by the sections responsible for earning via that way.
+  },
+  "items": {
+    "GuildId": "String",
+    "ItemName": "String",
+    "Symbol": "String",
+    "Description": "String",
+    "Sellable": "Boolean", // Whether it can be sold to the void
+    "Tradeable": "Boolean", // Whether it can be traded to other members
+    "CurrencyValue": "String", // Which currency it is sold in and its value
+    "Value": "Number",
+    "Type": "Number",
+    // 0 = Trophy, 1 = Consumable, 2 = Instant Consumable
+    // (Instant consumable means it gets used the moment it is acquired or brought, also means cannot be sold)
+    "ActionType": "Number",
+    // 0 = None, 1 = Role, 2 = Lootbox
+    // They must be consumable / instant consumable to have an action.
+    "Message": "String", //TODO: Formatting
+    // ------ Begin Role ------
+    "RoleId": "String",
+    // ------ End Role ------
+    // ------ Begin Lootbox ------
+    "DropTableName": "String"
+    // ------ End Lootbox ------
+  },
+  "dropTables": {
+    // There will be one of these for every possible item / currency that can be dropped.
+    "GuildId": "String",
+    "DropTableName": "String",
+    // BEGIN OR
+    "ItemName": "String",
+    // OR
+    "CurrName": "String",
+    // END OR
+    "Weight": "Number",
+    "Amount": "Number"
+  },
+  "storeEntries": {
+    "GuildId": "String",
+    "ItemName": "String",
+    "CurrName": "String",
+    "Value": "Number",
+    "Amount": "Number", // If it gives more than 1 item
+    // Optionals V (They are optional because they are not needed for all items)
+    "StockAmount": "Number", // Do NOT forget to implement locking purchases so it cannot go into negatives when a lot of people are buying at the same time.
+    "ExpiryDate": "Date", // If the stock is limited time.
+    "RoleRestrictions": "String[]" // If the item is restricted to certain roles.
+  },
+  "balances": {
+    // There will be entries for each different currency the server has, per member.
+    "GuildId": "String",
+    "UserId": "String",
+    "CurrName": "String",
+    "Amount": "Number"
+  },
+  "inventories": {
+    // There will be entries for each different item the server has, per member.
+    "GuildId": "String",
+    "UserId": "String",
+    "ItemName": "String",
+    "Amount": "Number"
+  },
+  "roleRewards": {
+    // TODO: Cache this
+    /**
+     * For this make sure to implement a system where it caches roles that must be paid out soon,
+     * so it does not have to keep everything in the RAM.
+     */
+    "GuildId": "String",
+    "RoleId": "String",
+    "CurrName": "String",
+    "Amount": "Number",
+    "Interval": "Number", // In minutes
+    "LastGiven": "Date",
+    "NextGive": "Date"
+  },
+  "multipliers": {
+    // TODO: Also caching for this one.
+
+    "GuildId": "String",
+    "CurrName": "String",
+    "Multiplier": "Number",
+    "ExpiryDate": "Date"
+  },
+  "globalCurrencies": {
+    /**
+     * Need this for currencies that will be shared across servers
+     */
+    // TODO: Find a way to use the unique id mongodb provides for each record instead of GlobalCurrId
+    "GlobalCurrId": "Number",
+    "GlobalCurrName": "String",
+    "GlobalSymbol": "String",
+    "CreatorGuildId": "String" // This is to determine who has access to modify it
+  },
+  "globalParticipatingGuilds": {
+    // Which guild participates in which currency
+    // TODO: Make a system to randomly pick new currency owner if creator guild decides to leave
+    "GlobalCurrId": "Number",
+    "GuildId": "String"
+  },
+  "globalValues": {
+    // The value of each global currency in participating guild's base currency
+    "GlobalCurrId": "Number",
+    "GuildId": "String",
+    "BaseValue": "Number"
+  },
+  "globalBalances": {
+    // Self explanatory, member balances of global currencies
+    "UserId": "String",
+    "GlobalCurrId": "Number",
+    "Amount": "Number"
+  }
+}
