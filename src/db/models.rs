@@ -1,5 +1,5 @@
 mod balances;
-mod currency;
+pub mod currency;
 mod drop_table;
 pub mod global;
 mod inventory;

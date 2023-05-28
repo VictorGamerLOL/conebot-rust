@@ -18,7 +18,7 @@
 //! Additionally, also like other currency bots, there can be a configurable amount of randomness in the amount
 //! and also a configurable timeout between earning currency. This is to prevent spamming and to make it more
 //! fair for everyone.
-mod currency_builder;
+pub mod currency_builder;
 
 use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
 
@@ -891,6 +891,5 @@ mod test {
         .earn_max(Some(100.0))
         .earn_timeout(Duration::seconds(60));
         todo!();
-        ()
     }
 }

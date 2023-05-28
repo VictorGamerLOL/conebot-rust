@@ -12,16 +12,6 @@ use serenity::prelude::Context;
 
 pub struct Handler;
 
-struct UserTimeout {
-    user_id: u64,
-    guild: u64,
-    currency: String,
-}
-
-lazy_static! {
-    static ref USER_TIMEOUTS: Arc<Mutex<Vec<UserTimeout>>> /*dafuq?*/ = Arc::new(Mutex::new(Vec::new()));
-} // Walmart cache
-
 #[async_trait]
 impl EventHandler for Handler {
     /// This function is responsible for initializing the global application commands.
@@ -35,6 +25,7 @@ impl EventHandler for Handler {
             commands.set_application_commands(vec![
                 commands::ping::application_command(),
                 commands::test1::application_command(),
+                commands::currency::application_command(),
             ])
         })
         .await
@@ -57,14 +48,11 @@ impl EventHandler for Handler {
             match command.data.name.as_str() {
                 "ping" => commands::ping::run(&command.data.options, &command, &_ctx.http).await,
                 "test" => commands::test1::run(&command.data.options, &command, &_ctx.http).await,
+                "currency" => {
+                    commands::currency::run(&command.data.options, &command, &_ctx.http).await
+                }
                 _ => eprintln!("Unknown command: {}", command.data.name),
             }
         }
-    }
-
-    ///TODO: Idk yet I just have this.
-    async fn message(&self, ctx: Context, new_message: Message) {
-        let mut found: bool;
-        todo!()
     }
 }
