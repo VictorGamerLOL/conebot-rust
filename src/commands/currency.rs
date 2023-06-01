@@ -1,5 +1,6 @@
 pub mod create;
 
+use anyhow::{anyhow, Result};
 use serenity::{
     builder::CreateApplicationCommand,
     http::Http,
@@ -9,13 +10,14 @@ use serenity::{
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync,
-) {
+    http: impl AsRef<Http> + Send + Sync + Clone,
+) -> Result<()> {
     let cmd_name = options[0].name.as_str();
     match cmd_name {
-        "create" => create::run(&options[0].options, command, http).await,
-        _ => eprintln!("Unknown subcommand: {}", cmd_name),
-    }
+        "create" => create::run(&options[0].options, command, http.clone()).await?,
+        _ => return Err(anyhow!("Unknown subcommand: {}", cmd_name)),
+    };
+    Ok(())
 }
 
 pub fn application_command() -> CreateApplicationCommand {

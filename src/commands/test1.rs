@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serenity::{
     builder::CreateApplicationCommand,
     http::Http,
@@ -10,12 +11,11 @@ pub async fn run(
     _options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + std::marker::Send + std::marker::Sync,
-) {
-    let future = command.edit_original_interaction_response(&http, |msg| msg.content("177013"));
-    match future.await {
-        Ok(_) => (),
-        Err(e) => eprintln!("Error: {}", e),
-    };
+) -> Result<()> {
+    let future = command
+        .edit_original_interaction_response(&http, |msg| msg.content("177013"))
+        .await?;
+    Ok(())
 }
 
 pub fn application_command() -> CreateApplicationCommand {

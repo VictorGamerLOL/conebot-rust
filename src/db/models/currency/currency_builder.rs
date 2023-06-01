@@ -145,12 +145,12 @@ impl CurrencyBuilder {
 
         let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
-        let arccurr: super::ArcTokioMutex<Currency> = Arc::new(tokio::sync::Mutex::new(curr));
-        cache.push((self.guild_id.to_string(), self.curr_name.clone()), arccurr);
-        cache
-            .get(&(self.guild_id.to_string(), self.curr_name))
-            .cloned()
-            .ok_or(anyhow::anyhow!("Currency not found in cache"))
+        let arc_currency: super::ArcTokioMutex<Currency> = Arc::new(tokio::sync::Mutex::new(curr));
+        cache.push(
+            (self.guild_id.to_string(), self.curr_name.clone()),
+            arc_currency.clone(),
+        );
+        Ok(arc_currency)
     }
 
     /// Sets the guild_id field.

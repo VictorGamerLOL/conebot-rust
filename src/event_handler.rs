@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use crate::commands; // What the FUCK Rust?
+use crate::commands;
+use anyhow::anyhow;
+// What the FUCK Rust?
 use lazy_static::lazy_static;
 use serenity::async_trait;
 use serenity::client::EventHandler;
@@ -35,23 +37,37 @@ impl EventHandler for Handler {
     /// This function is responsible for handling all incoming interactions.
     ///
     /// New commands must be entered here when added due to the nature of Rust.
-    async fn interaction_create(&self, _ctx: Context, interaction: Interaction) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             println!("Received command interaction: {:#?}", command.data.name);
             command
-                .create_interaction_response(&_ctx.http, |a| {
+                .create_interaction_response(&ctx.http, |a| {
                     a.kind(InteractionResponseType::DeferredChannelMessageWithSource)
                         .interaction_response_data(|msg| msg.ephemeral(true))
                 })
                 .await
                 .unwrap_or_else(|e| eprintln!("Error creating response: {}", e)); // This returns
-            match command.data.name.as_str() {
-                "ping" => commands::ping::run(&command.data.options, &command, &_ctx.http).await,
-                "test" => commands::test1::run(&command.data.options, &command, &_ctx.http).await,
+            let res = match command.data.name.as_str() {
+                "ping" => commands::ping::run(&command.data.options, &command, &ctx.http).await,
+                "test" => commands::test1::run(&command.data.options, &command, &ctx.http).await,
                 "currency" => {
-                    commands::currency::run(&command.data.options, &command, &_ctx.http).await
+                    commands::currency::run(&command.data.options, &command, &ctx.http).await
                 }
-                _ => eprintln!("Unknown command: {}", command.data.name),
+                _ => Err(anyhow!("Unknown command: {}", command.data.name)),
+            };
+            if let Err(e) = res {
+                if let Some(e) = e.downcast_ref::<serenity::Error>() {
+                    // If it's serenity's fault it is futile to try to respond to the user
+                    eprintln!("Serenity error: {}", e);
+                } else if let Err(e) =
+                    command // If it is not serenity's fault we can respond to the user
+                        .edit_original_interaction_response(&ctx.http, |m| {
+                            m.content(format!("An error ocurred: {}", e))
+                        })
+                        .await
+                {
+                    eprintln!("Error editing response: {}", e); // Assuming serenity does not decide to error out now
+                }
             }
         }
     }
