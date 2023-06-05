@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 // a parking_lot or std mutex. It will not work. It will hang with mongodb operations
 // indefinitely. I have no idea why. Blame MongoDB.
 type TokioMutexCache<K, V> = tokio::sync::Mutex<LruCache<K, V>>;
-type ArcTokioMutex<T> = Arc<tokio::sync::Mutex<T>>;
+type ArcTokioMutexOption<T> = Arc<tokio::sync::Mutex<Option<T>>>;
 
 lazy_static! {
     pub static ref CLIENT: AsyncOnce<Client> = AsyncOnce::new(async {

@@ -140,7 +140,7 @@ pub async fn run(
             &_ => {}
         };
     }
-    let res = currency_builder.build().await?;
+    currency_builder.build().await?;
     command
         .edit_original_interaction_response(http, |m| m.content(format! {"Made currency {}", name}))
         .await?;

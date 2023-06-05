@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::db::{
     id::{DbChannelId, DbGuildId, DbRoleId},
-    ArcTokioMutex,
+    ArcTokioMutexOption,
 };
 use anyhow::{Ok, Result};
 use chrono::Duration;
@@ -89,7 +89,7 @@ impl CurrencyBuilder {
     /// assert_eq!(currency.earn_max, 10.0);
     /// assert_eq!(currency.earn_timeout, 30);
     /// ```
-    pub async fn build(self) -> Result<ArcTokioMutex<Currency>> {
+    pub async fn build(self) -> Result<ArcTokioMutexOption<Currency>> {
         // check if currency already exists
         let db = super::super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
@@ -145,7 +145,8 @@ impl CurrencyBuilder {
 
         let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
-        let arc_currency: super::ArcTokioMutex<Currency> = Arc::new(tokio::sync::Mutex::new(curr));
+        let arc_currency: super::ArcTokioMutexOption<Currency> =
+            Arc::new(tokio::sync::Mutex::new(Some(curr)));
         cache.push(
             (self.guild_id.to_string(), self.curr_name.clone()),
             arc_currency.clone(),
@@ -352,7 +353,7 @@ impl CurrencyBuilder {
 #[tokio::test]
 async fn test_currency_builder() {
     crate::init_env().await;
-    let mut curr = CurrencyBuilder::new(DbGuildId::from(12), "ttest".to_owned(), "t".to_owned());
+    let mut curr = CurrencyBuilder::new(DbGuildId::from(12), "TTest".to_owned(), "t".to_owned());
     curr.guild_id(Some(DbGuildId::from(123)))
         .curr_name(Some("test".to_string()))
         .symbol(Some("T".to_string()))
@@ -378,7 +379,7 @@ async fn test_currency_builder() {
     let curr = curr.lock().await;
     let curr2 = curr.clone();
     drop(curr);
-    let curr = curr2;
+    let curr = curr2.unwrap();
 
     assert_eq!(curr.guild_id, DbGuildId::from(123));
     assert_eq!(curr.curr_name, "test");
