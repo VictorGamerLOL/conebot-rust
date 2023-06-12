@@ -18,6 +18,10 @@ use serde::{Deserialize, Serialize};
 // a parking_lot or std mutex. It will not work. It will hang with mongodb operations
 // indefinitely. I have no idea why. Blame MongoDB.
 type TokioMutexCache<K, V> = tokio::sync::Mutex<LruCache<K, V>>;
+// The reason this is an option is to allow for existing Arcs to be invalidated
+// if a breaking change were to occur such as renaming or the name field
+// or deleting said thing from the database. Dropping it from the cache
+// is not enough because already existing arcs will still be valid.
 type ArcTokioMutexOption<T> = Arc<tokio::sync::Mutex<Option<T>>>;
 
 lazy_static! {
@@ -29,6 +33,9 @@ lazy_static! {
 
 pub mod id;
 
+/// Simply prepare the database for use.
+/// Environment variables must be set for this to work and
+/// the MongoDB server must be running.
 pub async fn init() {
     let db = CLIENT.get().await.database("conebot");
     let collections = match db.list_collection_names(None).await {
@@ -38,7 +45,7 @@ pub async fn init() {
             panic!();
         }
     };
-    let mut colls = vec![
+    let mut columns = vec![
         "currencies".to_string(),
         "items".to_string(),
         "dropTables".to_string(),
@@ -53,9 +60,9 @@ pub async fn init() {
     ];
     collections
         .into_iter()
-        .for_each(|coll| colls.retain(|x| x != &coll));
+        .for_each(|coll| columns.retain(|x| x != &coll));
 
-    for coll in colls.into_iter() {
+    for coll in columns.into_iter() {
         match db.create_collection(&coll, None).await {
             Ok(_) => println!("Created collection {}", coll),
             Err(e) => {

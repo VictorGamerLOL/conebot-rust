@@ -1,4 +1,5 @@
 pub mod create;
+mod delete;
 
 use anyhow::{anyhow, Result};
 use serenity::{
@@ -15,6 +16,7 @@ pub async fn run(
     let cmd_name = options[0].name.as_str();
     match cmd_name {
         "create" => create::run(&options[0].options, command, http.clone()).await?,
+        "delete" => delete::run(&options[0].options, command, http.clone()).await?,
         _ => return Err(anyhow!("Unknown subcommand: {}", cmd_name)),
     };
     Ok(())
@@ -26,6 +28,7 @@ pub fn application_command() -> CreateApplicationCommand {
         .name("currency")
         .description("Commands related to managing currencies.")
         .dm_permission(false)
-        .add_option(create::option());
+        .add_option(create::option())
+        .add_option(delete::option());
     command
 }

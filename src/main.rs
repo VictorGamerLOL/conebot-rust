@@ -4,6 +4,9 @@
 #![allow(unused_mut)]
 #![allow(clippy::await_holding_lock)]
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod commands;
 pub mod db;
 pub mod event_handler;
@@ -11,10 +14,25 @@ pub mod event_handler;
 use dotenv::dotenv;
 use serenity::{prelude::GatewayIntents, Client};
 use std::env;
+use tracing::{debug, error, info, instrument, span, trace, warn};
+use tracing_subscriber::{fmt, fmt::format, EnvFilter, FmtSubscriber};
 
 #[tokio::main]
 async fn main() {
+    let filter = EnvFilter::from_default_env();
+    let subscriber = fmt()
+        .event_format(format().pretty())
+        .with_env_filter(filter)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+    let sp = span!(tracing::Level::TRACE, "main");
+    let g = sp.enter();
     init_env().await;
+    error!("test");
+    warn!("test");
+    info!("test");
+    debug!("test");
+    trace!("test");
 
     let token = match env::var("TOKEN") {
         Ok(token) => token,

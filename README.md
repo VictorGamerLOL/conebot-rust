@@ -8,8 +8,8 @@ These currencies can also be setup by the guild staff to be exchangeable between
 This bot aims to make everything highly configurable and be as feature packed as possible to act as a replacement for many bots. The bot supports at the moment:
 
 - [ ] Currencies
-  - [ ] Create
-  - [ ] Delete
+  - [x] Create
+  - [x] Delete
   - [ ] Per-guild per-currency member balances
   - [ ] Give to members
   - [ ] Take from members

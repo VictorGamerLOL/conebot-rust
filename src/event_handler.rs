@@ -11,7 +11,9 @@ use serenity::model::application::interaction::Interaction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::{Message, Ready};
 use serenity::prelude::Context;
+use tracing::{debug, error, info, instrument, trace, warn};
 
+#[derive(Debug)]
 pub struct Handler;
 
 #[async_trait]
@@ -21,8 +23,9 @@ impl EventHandler for Handler {
     /// # Panics
     ///
     /// If it fails to register the commands. If the commands are not registered bot as well might not work.
+    #[instrument(skip_all)]
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is running!", ready.user.name);
         Command::set_global_application_commands(&ctx.http, |commands| {
             commands.set_application_commands(vec![
                 commands::ping::application_command(),
@@ -37,16 +40,17 @@ impl EventHandler for Handler {
     /// This function is responsible for handling all incoming interactions.
     ///
     /// New commands must be entered here when added due to the nature of Rust.
+    #[instrument(skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            println!("Received command interaction: {:#?}", command.data.name);
+            info!("Received command interaction: {:#?}", command.data.name);
             command
                 .create_interaction_response(&ctx.http, |a| {
                     a.kind(InteractionResponseType::DeferredChannelMessageWithSource)
                         .interaction_response_data(|msg| msg.ephemeral(true))
                 })
                 .await
-                .unwrap_or_else(|e| eprintln!("Error creating response: {}", e)); // This returns
+                .unwrap_or_else(|e| error!("Error creating response: {}", e)); // This returns
             let res = match command.data.name.as_str() {
                 "ping" => commands::ping::run(&command.data.options, &command, &ctx.http).await,
                 "test" => commands::test1::run(&command.data.options, &command, &ctx.http).await,
@@ -58,7 +62,7 @@ impl EventHandler for Handler {
             if let Err(e) = res {
                 if let Some(e) = e.downcast_ref::<serenity::Error>() {
                     // If it's serenity's fault it is futile to try to respond to the user
-                    eprintln!("Serenity error: {}", e);
+                    error!("Serenity error: {}", e);
                 } else if let Err(e) =
                     command // If it is not serenity's fault we can respond to the user
                         .edit_original_interaction_response(&ctx.http, |m| {
@@ -66,7 +70,7 @@ impl EventHandler for Handler {
                         })
                         .await
                 {
-                    eprintln!("Error editing response: {}", e); // Assuming serenity does not decide to error out now
+                    error!("Error editing response: {}", e); // Assuming serenity does not decide to error out now
                 }
             }
         }

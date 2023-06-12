@@ -144,8 +144,8 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc = doc! {
-            "GuildId": "123456789",
-            "CurrName": "test",
+            "GuildId": guild_id.clone(),
+            "CurrName": curr_name.clone(),
         };
         let res = coll.find_one(filterdoc, None).await.unwrap();
         drop(db); // Drop locks on mutexes as soon as possible.
@@ -810,6 +810,7 @@ impl Currency {
 
         // Remove the currency from the cache.
         cache.pop(&(__self.guild_id.to_string(), __self.curr_name.clone()));
+        dbg!(&cache);
         // Keep the cache past this point so that another task
         // will not try to get the currency from the db while we're deleting it.
 
@@ -828,6 +829,8 @@ impl Currency {
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+
     use super::*;
     use futures::Future;
     use rand::prelude::*;
@@ -923,8 +926,11 @@ mod test {
             .earn_max(Some(100.0))
             .earn_timeout(Duration::seconds(60));
         let curr = curr.build().await.unwrap();
-        // gives you time to check the DB
-        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
-        let curr = curr.lock().await;
+        for i in (0..20).rev() {
+            print!("Check the db. {} seconds left. \r", i);
+            std::io::stdout().lock().flush().unwrap();
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+        Currency::delete_currency(curr).await.unwrap();
     }
 }
