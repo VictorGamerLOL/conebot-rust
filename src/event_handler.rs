@@ -1,8 +1,11 @@
+mod message;
+
 use std::sync::{Arc, Mutex};
 
 use crate::commands;
 use anyhow::anyhow;
 // What the FUCK Rust?
+use crate::event_handler::message::message;
 use lazy_static::lazy_static;
 use serenity::async_trait;
 use serenity::client::EventHandler;
@@ -18,12 +21,17 @@ pub struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    #[instrument(skip(self, _ctx), level = "debug")]
+    async fn message(&self, _ctx: Context, _new_message: Message) {
+        let _ = message(_ctx, _new_message).await;
+    }
+
     /// This function is responsible for initializing the global application commands.
     ///
     /// # Panics
     ///
     /// If it fails to register the commands. If the commands are not registered bot as well might not work.
-    #[instrument(skip_all)]
+    #[instrument(skip_all)] // Required for tracing, since this would fill the output with a lot of junk if arguments were to be logged.
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is running!", ready.user.name);
         Command::set_global_application_commands(&ctx.http, |commands| {
@@ -66,7 +74,7 @@ impl EventHandler for Handler {
                 } else if let Err(e) =
                     command // If it is not serenity's fault we can respond to the user
                         .edit_original_interaction_response(&ctx.http, |m| {
-                            m.content(format!("An error ocurred: {}", e))
+                            m.content(format!("An error occurred: {e}"))
                         })
                         .await
                 {

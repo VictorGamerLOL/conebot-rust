@@ -24,14 +24,14 @@
     "Base": "Boolean",
     "BaseValue": "Number | Null", // Null if it is the base currency
     "Pay": "Boolean", // If the members can pay eachother with it
-    "EarnByChat": "Boolean", // Whether the currency can be earned by chattings
+    "EarnByChat": "Boolean", // Whether the currency can be earned by chatting
     "ChannelsIsWhitelist": "Boolean", // This is done to allow for roles and channels to be whitelist-based or blacklist-based
     "RolesIsWhitelist": "Boolean",
     "ChannelsWhitelist": "String[]", // And this is done to save the config to be saved for each of the modes
     "RolesWhitelist": "String[]",
     "ChannelsBlacklist": "String[]",
     "RolesBlacklist": "String[]",
-    "EarnMin": "Number", // Allow for customiable rates of earning
+    "EarnMin": "Number", // Allow for customizable rates of earning
     "EarnMax": "Number",
     "EarnTimeout": "Number" // How many seconds needs to pass before the next message counts for earning
     // There is no need to put other earning settings here as they can be handled by the sections responsible for earning via that way.

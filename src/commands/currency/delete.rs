@@ -1,5 +1,5 @@
 use crate::db::models::Currency;
-use crate::db::{id::DbGuildId, models::currency::currency_builder::CurrencyBuilder};
+use crate::db::{id::DbGuildId, models::currency::builder::Builder};
 use anyhow::{anyhow, Result};
 use serenity::builder::CreateApplicationCommandOption;
 use serenity::http::Http;
@@ -16,13 +16,13 @@ pub async fn run(
     let currency_name = unsafe { options.get_unchecked(0) }
         .value
         .clone()
-        .unwrap()
+        .ok_or(anyhow!("No currency name found."))?
         .as_str()
-        .unwrap()
+        .ok_or(anyhow!("Failed to convert currency name to str."))?
         .to_owned(); // its there just trust me on this one
     let mut currency =
         Currency::try_from_name(DbGuildId::from(command.guild_id.unwrap()), currency_name)
-            .await
+            .await?
             .ok_or(anyhow!("Currency not found"))?;
     Currency::delete_currency(currency).await?;
     command

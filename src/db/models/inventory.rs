@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)] // *no*.
+
 pub struct Inventory {
     guild_id: String,
     user_id: String,

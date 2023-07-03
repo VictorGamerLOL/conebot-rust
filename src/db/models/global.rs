@@ -1,9 +1,9 @@
-pub mod global_balance;
-pub mod global_currency;
-pub mod global_participating_guild;
-pub mod global_value;
+pub mod balance;
+pub mod currency;
+pub mod participating_guild;
+pub mod value;
 
-pub use global_balance::GlobalBalance;
-pub use global_currency::GlobalCurrency;
-pub use global_participating_guild::GlobalParticipatingGuild;
-pub use global_value::GlobalValue;
+pub use balance::GlobalBalance;
+pub use currency::GlobalCurrency;
+pub use participating_guild::ParticipatingGuild;
+pub use value::GlobalValue;

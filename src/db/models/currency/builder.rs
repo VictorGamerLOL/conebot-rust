@@ -11,7 +11,7 @@ use mongodb::{bson::doc, Collection};
 use super::Currency;
 
 #[derive(Debug, Clone)]
-pub struct CurrencyBuilder {
+pub struct Builder {
     guild_id: DbGuildId,
     curr_name: String,
     symbol: String,
@@ -31,7 +31,8 @@ pub struct CurrencyBuilder {
     earn_timeout: Option<Duration>,
 }
 
-impl CurrencyBuilder {
+impl Builder {
+    #[must_use]
     pub fn new(guild_id: DbGuildId, curr_name: String, symbol: String) -> Self {
         Self {
             guild_id,
@@ -89,6 +90,10 @@ impl CurrencyBuilder {
     /// assert_eq!(currency.earn_max, 10.0);
     /// assert_eq!(currency.earn_timeout, 30);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the currency already exists, or if any mongodb operation errors.
     pub async fn build(self) -> Result<ArcTokioMutexOption<Currency>> {
         // check if currency already exists
         let db = super::super::super::CLIENT.get().await.database("conebot");
@@ -145,7 +150,7 @@ impl CurrencyBuilder {
 
         let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
-        let arc_currency: super::ArcTokioMutexOption<Currency> =
+        let arc_currency: ArcTokioMutexOption<Currency> =
             Arc::new(tokio::sync::Mutex::new(Some(curr)));
         cache.push(
             (self.guild_id.to_string(), self.curr_name.clone()),
@@ -154,7 +159,7 @@ impl CurrencyBuilder {
         Ok(arc_currency)
     }
 
-    /// Sets the guild_id field.
+    /// `guild_id`
     /// If `None` is passed, the value provided with the `new()` method will be used.
     pub fn guild_id(&mut self, guild_id: impl Into<Option<DbGuildId>>) -> &mut Self {
         if let Some(guild_id) = guild_id.into() {
@@ -162,7 +167,7 @@ impl CurrencyBuilder {
         }
         self
     }
-    /// Sets the curr_name field.
+    /// `curr_name`
     /// If `None` is passed, the value provided with the `new()` method will be used.
     pub fn curr_name(&mut self, curr_name: impl Into<Option<String>>) -> &mut Self {
         if let Some(curr_name) = curr_name.into() {
@@ -193,7 +198,7 @@ impl CurrencyBuilder {
         self.base = base.into();
         self
     }
-    /// Sets the base_value field.
+    /// `base_value`
     /// If the method is not called, it falls back to `None`
     /// and shows up as `null` in the database.
     pub fn base_value(&mut self, base_value: impl Into<Option<f64>>) -> &mut Self {
@@ -207,14 +212,14 @@ impl CurrencyBuilder {
         self.pay = pay.into();
         self
     }
-    /// Sets the earn_by_chat field.
+    /// `earn_by_chat`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
     pub fn earn_by_chat(&mut self, earn_by_chat: impl Into<Option<bool>>) -> &mut Self {
         self.earn_by_chat = earn_by_chat.into();
         self
     }
-    /// Sets the channels_is_whitelist field.
+    /// `channels_is_whitelist`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
     pub fn channels_is_whitelist(
@@ -224,14 +229,14 @@ impl CurrencyBuilder {
         self.channels_is_whitelist = channels_is_whitelist.into();
         self
     }
-    /// Sets the roles_is_whitelist field.
+    /// `roles_is_whitelist`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `false`
     pub fn roles_is_whitelist(&mut self, roles_is_whitelist: impl Into<Option<bool>>) -> &mut Self {
         self.roles_is_whitelist = roles_is_whitelist.into();
         self
     }
-    /// Sets the channels_whitelist field.
+    /// `channels_whitelist`
     /// If `None` is passed, it resets the
     /// field to an empty vector.
     /// And if the method is not called,
@@ -248,14 +253,14 @@ impl CurrencyBuilder {
         };
         self
     }
-    /// Adds a channel to the channels_whitelist field.
+    /// `channels_whitelist`
     /// If the method is not called, it falls back to an empty vector,
     /// or the value provided with a previous call to `channels_whitelist()`.
     pub fn channels_whitelist_add(&mut self, channel_id: DbChannelId) -> &mut Self {
         self.channels_whitelist.push(channel_id);
         self
     }
-    /// Sets the roles_whitelist field.
+    /// `roles_whitelist`
     /// If `None` is passed, it resets the
     /// field to an empty vector.
     /// And if the method is not called,
@@ -272,14 +277,14 @@ impl CurrencyBuilder {
         };
         self
     }
-    /// Adds a role to the roles_whitelist field.
+    /// `roles_whitelist`
     /// If the method is not called, it falls back to an empty vector,
     /// or the value provided with a previous call to `roles_whitelist()`.
     pub fn roles_whitelist_add(&mut self, role_id: DbRoleId) -> &mut Self {
         self.roles_whitelist.push(role_id);
         self
     }
-    /// Sets the channels_blacklist field.
+    /// `channels_blacklist`
     /// If `None` is passed, it resets the
     /// field to an empty vector.
     /// And if the method is not called,
@@ -296,14 +301,14 @@ impl CurrencyBuilder {
         };
         self
     }
-    /// Adds a channel to the channels_blacklist field.
+    /// `channels_blacklist`
     /// If the method is not called, it falls back to an empty vector,
     /// or the value provided with a previous call to `channels_blacklist()`.
     pub fn channels_blacklist_add(&mut self, channel_id: DbChannelId) -> &mut Self {
         self.channels_blacklist.push(channel_id);
         self
     }
-    /// Sets the roles_blacklist field.
+    /// `roles_blacklist`
     /// If `None` is passed, it resets the
     /// field to an empty vector.
     /// And if the method is not called,
@@ -320,28 +325,28 @@ impl CurrencyBuilder {
         };
         self
     }
-    /// Adds a role to the roles_blacklist field.
+    /// `roles_blacklist`
     /// If the method is not called, it falls back to an empty vector,
     /// or the value provided with a previous call to `roles_blacklist()`.
     pub fn roles_blacklist_add(&mut self, role_id: DbRoleId) -> &mut Self {
         self.roles_blacklist.push(role_id);
         self
     }
-    /// Sets the earn_min field.
+    /// `earn_min`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `1.0`
     pub fn earn_min(&mut self, earn_min: impl Into<Option<f64>>) -> &mut Self {
         self.earn_min = earn_min.into();
         self
     }
-    /// Sets the earn_max field.
+    /// `earn_max`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `10.0`
     pub fn earn_max(&mut self, earn_max: impl Into<Option<f64>>) -> &mut Self {
         self.earn_max = earn_max.into();
         self
     }
-    /// Sets the earn_timeout field.
+    /// `earn_timeout`
     /// If `None` is passed, or the method is not called,
     /// it falls back to the default value of `30`
     pub fn earn_timeout(&mut self, earn_timeout: impl Into<Option<Duration>>) -> &mut Self {
@@ -353,7 +358,7 @@ impl CurrencyBuilder {
 #[tokio::test]
 async fn test_currency_builder() {
     crate::init_env().await;
-    let mut curr = CurrencyBuilder::new(DbGuildId::from(12), "TTest".to_owned(), "t".to_owned());
+    let mut curr = Builder::new(DbGuildId::from(12), "TTest".to_owned(), "t".to_owned());
     curr.guild_id(Some(DbGuildId::from(123)))
         .curr_name(Some("test".to_string()))
         .symbol(Some("T".to_string()))
@@ -407,7 +412,11 @@ async fn test_currency_builder() {
         curr.roles_blacklist,
         vec![DbRoleId::from(123), DbRoleId::from(456)]
     );
-    assert_eq!(curr.earn_min, 1.0);
-    assert_eq!(curr.earn_max, 10.0);
+
+    let error_margin_f64 = f64::EPSILON;
+    let res1 = curr.earn_min - 1.0;
+    let res2 = curr.earn_max - 10.0;
+    assert!(res1 < error_margin_f64);
+    assert!(res2 < error_margin_f64);
     assert_eq!(curr.earn_timeout, Duration::seconds(60));
 }

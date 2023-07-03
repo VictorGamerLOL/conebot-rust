@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)] // literally stop
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

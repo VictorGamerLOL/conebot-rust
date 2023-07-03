@@ -3,9 +3,11 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(clippy::await_holding_lock)]
+#![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)] // cant be asked
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+// #[global_allocator]
+// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub mod commands;
 pub mod db;
@@ -36,7 +38,7 @@ async fn main() {
 
     let token = match env::var("TOKEN") {
         Ok(token) => token,
-        Err(e) => panic!("Error: {}", e),
+        Err(e) => panic!("Error: {e}"),
     };
 
     let mut client = Client::builder(token, GatewayIntents::all())
@@ -45,7 +47,7 @@ async fn main() {
         .expect("Error creating client");
 
     if let Err(why) = client.start().await {
-        eprintln!("Client error: {:#?}", why);
+        eprintln!("Client error: {why:#?}");
     }
 }
 

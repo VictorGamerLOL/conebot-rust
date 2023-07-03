@@ -1,5 +1,6 @@
 pub mod create;
 mod delete;
+mod give;
 
 use anyhow::{anyhow, Result};
 use serenity::{
@@ -8,6 +9,8 @@ use serenity::{
     model::prelude::application_command::{ApplicationCommandInteraction, CommandDataOption},
 };
 
+/// # Errors
+/// Serenity stuff.
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
@@ -22,6 +25,7 @@ pub async fn run(
     Ok(())
 }
 
+#[must_use]
 pub fn application_command() -> CreateApplicationCommand {
     let mut command = CreateApplicationCommand::default();
     command

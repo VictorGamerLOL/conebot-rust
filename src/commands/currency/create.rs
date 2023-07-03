@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use chrono::Duration;
 use serde_json::Value;
+use serenity::model::prelude::application_command::CommandDataOptionValue;
 use serenity::{
     builder::CreateApplicationCommandOption,
     http::Http,
@@ -13,44 +14,68 @@ use serenity::{
 };
 use tokio::sync::Mutex;
 
-use crate::db::{id::DbGuildId, models::currency::currency_builder::CurrencyBuilder};
+use crate::db::{id::DbGuildId, models::currency::builder::Builder};
 
+/// Runs the create currency subcommand.
+///
+/// # Errors
+///
+/// Returns an error if:
+///
+/// - Any of the options could not be resolved
+/// - The currency name is empty
+/// - The symbol is empty
+/// - The currency already exists
+///
+/// # Panics
+///
+/// It shouldn't panic. This is done to please the linter.
+#[allow(clippy::too_many_lines)] // Can't be asked.
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync,
 ) -> Result<()> {
-    let mut currency_builder: CurrencyBuilder = CurrencyBuilder::new(
+    let mut currency_builder: Builder = Builder::new(
         DbGuildId::from(command.guild_id.unwrap()), // This is safe because this command is guild only
-        "".to_string(), // This will be set because it is a required option in the slash command
-        "".to_string(), // Same as above
+        String::new(), // This will be set because it is a required option in the slash command
+        String::new(), // Same as above
     );
-    let mut name: String = String::new();
-
+    let mut name = String::new();
+    let mut symbol = String::new();
     for option in options.iter() {
         match option.name.as_str() {
             // The values of command options are serde_json Values which need to be converted to the correct Rust type.
             // A solid amount of this is just error handling.
             "name" => {
-                name = option
-                    .value
-                    .as_ref()
-                    .ok_or(anyhow!("Name value not found"))?
-                    .as_str()
-                    .ok_or(anyhow!("Failed to convert name value to str"))?
-                    .to_string();
+                name = match option
+                    .resolved
+                    .clone()
+                    .ok_or(anyhow!("Failed to resolve name"))?
+                {
+                    CommandDataOptionValue::String(s) => s,
+                    _ => return Err(anyhow!("Expected string but found something else")),
+                };
+                // remove trailing and leading whitespace from name
+                name = name.trim().to_string();
+                if name.is_empty() {
+                    return Err(anyhow!("Currency name cannot be empty"));
+                }
                 currency_builder.curr_name(name.clone());
             }
             "symbol" => {
-                currency_builder.symbol(
-                    option
-                        .value
-                        .as_ref()
-                        .ok_or(anyhow!("Symbol value not found"))?
-                        .as_str()
-                        .ok_or(anyhow!("Failed to convert symbol value to str"))?
-                        .to_string(),
-                );
+                symbol = option
+                    .value
+                    .as_ref()
+                    .ok_or(anyhow!("Symbol value not found"))?
+                    .as_str()
+                    .ok_or(anyhow!("Failed to convert symbol value to str"))?
+                    .to_string();
+                symbol = symbol.trim().to_string();
+                if symbol.is_empty() {
+                    return Err(anyhow!("Symbol cannot be empty"));
+                }
+                currency_builder.symbol(symbol.clone());
             }
             "visible" => {
                 currency_builder.visible(
@@ -134,7 +159,12 @@ pub async fn run(
             }
             "earn_timeout" => {
                 currency_builder.earn_timeout(Duration::seconds(
-                    option.value.as_ref().unwrap().as_i64().unwrap(),
+                    option
+                        .value
+                        .as_ref()
+                        .ok_or(anyhow!("earn_timeout value provided but not found"))?
+                        .as_i64()
+                        .ok_or(anyhow!("Failed to parse earn_timeout value to i64"))?,
                 ));
             }
             &_ => {}
@@ -142,11 +172,15 @@ pub async fn run(
     }
     currency_builder.build().await?;
     command
-        .edit_original_interaction_response(http, |m| m.content(format! {"Made currency {}", name}))
+        .edit_original_interaction_response(http, |m| {
+            m.content(format! {"Made currency {symbol}{name}"})
+        })
         .await?;
     Ok(())
 }
+// There might be a more efficient and compact way to do this but I cannot think of it right now.
 
+#[must_use]
 pub fn option() -> CreateApplicationCommandOption {
     let mut option = CreateApplicationCommandOption::default();
     option

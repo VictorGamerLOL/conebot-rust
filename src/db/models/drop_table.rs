@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)] // no.
+
 pub struct DropTable {
     guild_id: String,
     drop_table_name: String,
