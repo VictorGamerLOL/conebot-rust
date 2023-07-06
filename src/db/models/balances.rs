@@ -96,7 +96,7 @@ impl Balances {
     /// Returns an error if:
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
-    pub async fn add_balance(&mut self, curr_name: String) -> Result<()> {
+    pub async fn create_balance(&mut self, curr_name: String) -> Result<()> {
         let bal = Balance::new(self.guild_id.clone(), self.user_id.clone(), curr_name).await?;
         self.balances.push(bal);
         Ok(())
@@ -183,7 +183,139 @@ impl Balance {
     /// # Errors
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
+    /// - If the amount specified is infinite.
+    /// - If the amount specified is NaN.
+    #[inline]
     pub async fn set_amount(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_infinite() {
+            return Err(anyhow!("Amount cannot be infinite."));
+        }
+        if amount.is_nan() {
+            return Err(anyhow!("Amount cannot be NaN."));
+        }
+
+        self.set_amount_unchecked(amount).await
+    }
+
+    /// Adds the specified amount to the current amount.
+    ///
+    /// # Errors
+    /// - If any `MongoDB` error occurs.
+    /// - If the amount of modified documents is 0.
+    /// - The specified amount is negative.
+    /// - The specified amount is infinite.
+    /// - The specified amount would cause the balance to overflow to infinity.
+    /// - The specified amount would cause a NaN.
+    #[allow(clippy::float_cmp)] // we compare ***TRUNCATED*** values.
+    pub async fn add_amount(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_nan() {
+            return Err(anyhow!("Cannot add NaN."));
+        };
+        if amount < 0.0 {
+            return Err(anyhow!("Cannot add a negative amount."));
+        };
+        if amount.is_infinite() {
+            return Err(anyhow!("Cannot add infinity."));
+        };
+        // Round provided amount to 2 decimal places
+        amount = if amount.trunc() == amount || (amount * 100.0).trunc() == amount * 100.0 {
+            amount
+        } else {
+            (amount * 100.0).round() * 0.01 // multiplication is faster than division
+        };
+        let new_amount = (self.amount * 100.0 + amount * 100.0).round() * 0.01;
+        if new_amount.is_infinite() {
+            return Err(anyhow!(
+                "Cannot add that amount, would overflow to infinity."
+            ));
+        } else if new_amount.is_nan() {
+            return Err(anyhow!("Cannot add that amount, would cause a NaN."));
+        }
+        self.set_amount(new_amount).await
+    }
+
+    /// Subtracts the specified amount from the current amount.
+    ///
+    /// # Errors
+    /// - If any `MongoDB` error occurs.
+    /// - If the amount of modified documents is 0.
+    /// - If the amount to subtract is greater than the current amount.
+    /// - The specified amount is negative.
+    /// - The specified amount is infinite.
+    /// - The specified amount would cause a NaN.
+    pub async fn sub_amount(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_nan() {
+            return Err(anyhow!("Cannot subtract NaN."));
+        };
+        if amount < 0.0 {
+            return Err(anyhow!("Cannot subtract a negative amount."));
+        };
+        if amount.is_infinite() {
+            return Err(anyhow!("Cannot subtract infinity."));
+        };
+        amount = (amount * 100.0).round() * 0.01; // multiplication is faster than division
+        if amount > self.amount {
+            return Err(anyhow!("Cannot subtract more than the current amount."));
+        }
+        let new_amount = (self.amount * 100.0 - amount * 100.0).round() * 0.01;
+        if new_amount.is_nan() {
+            return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
+        }
+        self.set_amount(new_amount).await
+    }
+
+    /// Subtracts the specified amount from the current amount without checking if the balance
+    /// will go into the negatives and without checking if the amount is negative. However, it still
+    /// checks to see if the result of the operations turns out to be NaN.
+    ///
+    /// # Errors
+    /// - If any `MongoDB` error occurs.
+    /// - If the amount of modified documents is 0.
+    /// - The specified amount would cause a NaN.
+    pub async fn sub_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_nan() {
+            return Err(anyhow!("Cannot subtract NaN."));
+        };
+        amount = (amount * 100.0).round() / 100.0;
+        let new_amount = (self.amount * 100.0 - amount * 100.0).round() / 100.0;
+        if new_amount.is_nan() {
+            return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
+        }
+        self.set_amount(new_amount).await
+    }
+
+    /// Adds the specified amount to the current amount without checking if the balance
+    /// will go into infinity and without checking if the amount is negative. However, it still
+    /// checks to see if the result of the operations turns out to be NaN.
+    ///
+    /// # Errors
+    ///
+    /// - If any `MongoDB` error occurs.
+    /// - If the amount of modified documents is 0.
+    /// - The specified amount would cause a NaN.
+    pub async fn add_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_nan() {
+            return Err(anyhow!("Cannot add NaN."));
+        };
+        amount = (amount * 100.0).round() / 100.0;
+        let new_amount = (self.amount * 100.0 + amount * 100.0).round() / 100.0;
+        if new_amount.is_nan() {
+            return Err(anyhow!("Cannot add that amount, would cause a NaN."));
+        }
+        self.set_amount(new_amount).await
+    }
+
+    /// Sets the amount to the specified amount without checking if the amount is infinite.
+    /// However, it still checks to see if the amount is NaN.
+    ///
+    /// # Errors
+    /// - If any `MongoDB` error occurs.
+    /// - If the amount of modified documents is 0.
+    /// - The specified amount is NaN.
+    pub async fn set_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+        if amount.is_nan() {
+            return Err(anyhow!("Cannot set NaN."));
+        }
         amount = (amount * 100.0).round() / 100.0;
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
@@ -207,57 +339,6 @@ impl Balance {
         Ok(())
     }
 
-    /// Adds the specified amount to the current amount.
-    ///
-    /// # Errors
-    /// - If any `MongoDB` error occurs.
-    /// - If the amount of modified documents is 0.
-    #[allow(clippy::float_cmp)] // we compare ***TRUNCATED*** values.
-    pub async fn add_amount(&mut self, mut amount: f64) -> Result<()> {
-        // Round provided amount to 2 decimal places
-        amount = if amount.trunc() == amount || (amount * 100.0).trunc() == amount * 100.0 {
-            amount
-        } else {
-            (amount * 100.0).round() * 0.01 // multiplication is faster than division
-        };
-        let self_amount = if self.amount.trunc() == self.amount
-            || (self.amount * 100.0).trunc() == self.amount * 100.0
-        {
-            self.amount
-        } else {
-            (self.amount * 100.0).round() * 0.01 // multiplication is faster than division
-        };
-        let new_amount = (self_amount * 100.0 + amount * 100.0).round() * 0.01;
-        self.set_amount(new_amount).await
-    }
-
-    /// Subtracts the specified amount from the current amount.
-    ///
-    /// # Errors
-    /// - If any `MongoDB` error occurs.
-    /// - If the amount of modified documents is 0.
-    /// - If the amount to subtract is greater than the current amount.
-    pub async fn sub_amount(&mut self, mut amount: f64) -> Result<()> {
-        amount = (amount * 100.0).round() * 0.01; // multiplication is faster than division
-        if amount > self.amount {
-            return Err(anyhow!("Cannot subtract more than the current amount."));
-        }
-        let new_amount = (self.amount * 100.0 - amount * 100.0).round() * 0.01;
-        self.set_amount(new_amount).await
-    }
-
-    /// Subtracts the specified amount from the current amount without checking if it will go
-    /// into the negatives.
-    ///
-    /// # Errors
-    /// - If any `MongoDB` error occurs.
-    /// - If the amount of modified documents is 0.
-    pub async fn sub_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
-        amount = (amount * 100.0).round() / 100.0;
-        let new_amount = (self.amount * 100.0 - amount * 100.0).round() / 100.0;
-        self.set_amount(new_amount).await
-    }
-
     /// Clears the user's balance for this currency.
     ///
     /// Literally just an alias for `set_amount(0.0)`.
@@ -265,6 +346,7 @@ impl Balance {
     /// # Errors
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
+    #[inline]
     pub async fn clear(&mut self) -> Result<()> {
         self.set_amount(0.0).await
     }
@@ -314,17 +396,107 @@ impl Balance {
 
 #[cfg(test)]
 mod test {
+    const TEST_USER_ID: u64 = 987_654_321;
+    const TEST_GUILD_ID: u64 = 123_456_789;
     #[tokio::test]
     async fn test_try_from_user() {
         crate::init_env().await;
-        let user = crate::db::id::DbUserId::from(987_654_321);
-        let guild = crate::db::id::DbGuildId::from(123_456_789);
+        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user)
             .await
             .unwrap()
             .unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
-        assert_eq!(balances.balances.len(), 2);
+        assert_eq!(balances.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
+    }
+
+    #[tokio::test]
+    #[allow(clippy::float_cmp)]
+    async fn test_checked_amount_operations() {
+        crate::init_env().await;
+        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
+        let mut balances = super::Balances::try_from_user(guild, user)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut balances = balances.lock().await;
+        let mut balances = balances.as_mut().unwrap();
+        let mut balance = balances
+            .balances
+            .iter_mut()
+            .find(|b| b.curr_name == "test")
+            .unwrap();
+        let error_margin: f64 = f64::EPSILON;
+
+        assert!((balance.amount - 30.0).abs() < error_margin); // value in DB is 30.0
+        balance.add_amount(1.0).await.unwrap();
+        assert!((balance.amount - 31.0).abs() < error_margin);
+        balance.sub_amount(1.0).await.unwrap();
+        assert!((balance.amount - 30.0).abs() < error_margin);
+
+        assert!(balance.add_amount(f64::INFINITY).await.is_err()); // inf check
+        assert!(balance.sub_amount(f64::INFINITY).await.is_err());
+
+        assert!(balance.add_amount(f64::MAX).await.is_err()); // overflow check
+        assert!(balance.sub_amount(32.0).await.is_err());
+
+        assert!(balance.add_amount(-1.0).await.is_err()); // negative check
+        assert!(balance.sub_amount(-1.0).await.is_err());
+
+        assert!(balance.add_amount(f64::NAN).await.is_err()); // NaN check
+        assert!(balance.sub_amount(f64::NAN).await.is_err());
+
+        balance.set_amount(0.1).await.unwrap(); // Rounding to 2dp check.
+        balance.add_amount(0.2).await.unwrap(); // Precision cmp is required here without error margin.
+        assert_eq!(balance.amount, 0.3);
+        balance.sub_amount(0.2).await.unwrap();
+        assert_eq!(balance.amount, 0.1);
+
+        balance.set_amount(0.111).await.unwrap(); // Rounding to 2dp check part 2.
+        assert_eq!(balance.amount, 0.11);
+        balance.add_amount(0.222).await.unwrap();
+        assert_eq!(balance.amount, 0.33);
+        balance.sub_amount(0.222).await.unwrap();
+        assert_eq!(balance.amount, 0.11);
+
+        balance.set_amount(30.0).await.unwrap(); // Reset amount
+    }
+
+    #[tokio::test]
+    async fn test_unchecked_amount_operations() {
+        crate::init_env().await;
+        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
+        let mut balances = super::Balances::try_from_user(guild, user)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut balances = balances.lock().await;
+        let mut balances = balances.as_mut().unwrap();
+        let mut balance = balances
+            .balances
+            .iter_mut()
+            .find(|b| b.curr_name == "test")
+            .unwrap();
+        let error_margin: f64 = f64::EPSILON;
+        assert!(balance.amount - 30.0 < error_margin);
+
+        balance.add_amount_unchecked(f64::INFINITY).await.unwrap();
+        assert!(balance.amount.is_infinite() && balance.amount.is_sign_positive());
+        balance.set_amount(30.0).await.unwrap();
+        balance.sub_amount_unchecked(f64::INFINITY).await.unwrap();
+        assert!(balance.amount.is_infinite() && balance.amount.is_sign_negative());
+        balance.set_amount(30.0).await.unwrap();
+
+        balance.add_amount_unchecked(-1.0).await.unwrap();
+        assert!(balance.amount - 29.0 < error_margin);
+        balance.sub_amount_unchecked(-1.0).await.unwrap();
+        assert!(balance.amount - 30.0 < error_margin);
+
+        assert!(balance.add_amount_unchecked(f64::NAN).await.is_err()); // NaN check
+        assert!(balance.sub_amount_unchecked(f64::NAN).await.is_err());
     }
 }

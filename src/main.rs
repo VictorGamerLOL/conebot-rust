@@ -6,9 +6,6 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
 
-// #[global_allocator]
-// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 pub mod commands;
 pub mod db;
 pub mod event_handler;
