@@ -10,15 +10,15 @@
 //! be doing things like changing the user that has that amount of currency or changing the currency.
 //!
 
-use crate::db::id::{DbGuildId, DbUserId};
-use crate::db::{ArcTokioMutexOption, TokioMutexCache};
-use anyhow::{anyhow, Result};
+use crate::db::id::{ DbGuildId, DbUserId };
+use crate::db::{ ArcTokioMutexOption, TokioMutexCache };
+use anyhow::{ anyhow, Result };
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::bson::doc;
 use mongodb::Collection;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -62,7 +62,7 @@ impl Balances {
     /// - Any `MongoDB` error occurs.
     pub async fn try_from_user(
         guild_id: DbGuildId,
-        user_id: DbUserId,
+        user_id: DbUserId
     ) -> Result<Option<ArcTokioMutexOption<Self>>> {
         let mut cache = CACHE_BALANCES.lock().await;
         let balances = cache.get(&(guild_id.clone(), user_id.clone())).cloned();
@@ -72,7 +72,8 @@ impl Balances {
 
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": guild_id.to_string(),
             "UserId": user_id.to_string(),
         };
@@ -80,11 +81,15 @@ impl Balances {
         let res = TryStreamExt::try_collect::<Vec<Balance>>(res).await?;
         drop(db);
 
-        let balances = Arc::new(Mutex::new(Some(Balances {
-            guild_id: guild_id.clone(),
-            user_id: user_id.clone(),
-            balances: res,
-        })));
+        let balances = Arc::new(
+            Mutex::new(
+                Some(Balances {
+                    guild_id: guild_id.clone(),
+                    user_id: user_id.clone(),
+                    balances: res,
+                })
+            )
+        );
         cache.put((guild_id, user_id), balances.clone());
         Ok(Some(balances))
     }
@@ -118,8 +123,7 @@ impl Balances {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
         // get the balance with the specified name from self's balance vec as owned value
-        let bal = self
-            .balances
+        let bal = self.balances
             .iter()
             .position(|bal| bal.curr_name == curr_name)
             .ok_or_else(|| anyhow!("No balance with that currency name exists"))?;
@@ -162,17 +166,16 @@ impl Balance {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
 
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": guild_id.to_string(),
             "UserId": user_id.to_string(),
             "CurrName": curr_name.clone(),
         };
         let res = coll.find_one(filterdoc, None).await?;
         if res.is_some() {
-            return Err(anyhow!(
-                "User already has a balance for that currency in that guild."
-            ));
-        };
+            return Err(anyhow!("User already has a balance for that currency in that guild."));
+        }
 
         coll.insert_one(user_balance2, None).await?;
         Ok(user_balance)
@@ -210,13 +213,13 @@ impl Balance {
     pub async fn add_amount(&mut self, mut amount: f64) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
-        };
+        }
         if amount < 0.0 {
             return Err(anyhow!("Cannot add a negative amount."));
-        };
+        }
         if amount.is_infinite() {
             return Err(anyhow!("Cannot add infinity."));
-        };
+        }
         // Round provided amount to 2 decimal places
         amount = if amount.trunc() == amount || (amount * 100.0).trunc() == amount * 100.0 {
             amount
@@ -225,9 +228,7 @@ impl Balance {
         };
         let new_amount = (self.amount * 100.0 + amount * 100.0).round() * 0.01;
         if new_amount.is_infinite() {
-            return Err(anyhow!(
-                "Cannot add that amount, would overflow to infinity."
-            ));
+            return Err(anyhow!("Cannot add that amount, would overflow to infinity."));
         } else if new_amount.is_nan() {
             return Err(anyhow!("Cannot add that amount, would cause a NaN."));
         }
@@ -246,13 +247,13 @@ impl Balance {
     pub async fn sub_amount(&mut self, mut amount: f64) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
-        };
+        }
         if amount < 0.0 {
             return Err(anyhow!("Cannot subtract a negative amount."));
-        };
+        }
         if amount.is_infinite() {
             return Err(anyhow!("Cannot subtract infinity."));
-        };
+        }
         amount = (amount * 100.0).round() * 0.01; // multiplication is faster than division
         if amount > self.amount {
             return Err(anyhow!("Cannot subtract more than the current amount."));
@@ -275,7 +276,7 @@ impl Balance {
     pub async fn sub_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
-        };
+        }
         amount = (amount * 100.0).round() / 100.0;
         let new_amount = (self.amount * 100.0 - amount * 100.0).round() / 100.0;
         if new_amount.is_nan() {
@@ -296,7 +297,7 @@ impl Balance {
     pub async fn add_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
-        };
+        }
         amount = (amount * 100.0).round() / 100.0;
         let new_amount = (self.amount * 100.0 + amount * 100.0).round() / 100.0;
         if new_amount.is_nan() {
@@ -320,12 +321,14 @@ impl Balance {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
 
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "UserId": self.user_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "Amount": amount,
             },
@@ -359,9 +362,9 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     pub async fn is_valid(&self) -> Result<bool> {
         Ok(
-            super::currency::Currency::try_from_name(self.guild_id.clone(), self.curr_name.clone())
-                .await?
-                .is_some(),
+            super::currency::Currency
+                ::try_from_name(self.guild_id.clone(), self.curr_name.clone()).await?
+                .is_some()
         )
     }
 
@@ -377,7 +380,8 @@ impl Balance {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
 
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "UserId": self.user_id.to_string(),
             "CurrName": self.curr_name.clone(),
@@ -385,7 +389,9 @@ impl Balance {
 
         let res = match coll.delete_one(filterdoc, None).await {
             Ok(res) => res,
-            Err(e) => return Err((e.into(), self)),
+            Err(e) => {
+                return Err((e.into(), self));
+            }
         };
         if res.deleted_count == 0 {
             return Err((anyhow!("No documents were deleted"), self));
@@ -403,10 +409,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
         assert_eq!(balances.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
@@ -418,14 +421,10 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
-        let mut balance = balances
-            .balances
+        let mut balance = balances.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();
@@ -470,14 +469,10 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
-        let mut balance = balances
-            .balances
+        let mut balance = balances.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();

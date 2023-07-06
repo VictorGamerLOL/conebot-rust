@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use serde_json::Value;
 use serenity::model::prelude::application_command::CommandDataOptionValue;
@@ -9,12 +9,12 @@ use serenity::{
     http::Http,
     model::{
         prelude::interaction::application_command::ApplicationCommandInteraction,
-        prelude::{application_command::CommandDataOption, command::CommandOptionType},
+        prelude::{ application_command::CommandDataOption, command::CommandOptionType },
     },
 };
 use tokio::sync::Mutex;
 
-use crate::db::{id::DbGuildId, models::currency::builder::Builder};
+use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
 
 /// Runs the create currency subcommand.
 ///
@@ -34,12 +34,12 @@ use crate::db::{id::DbGuildId, models::currency::builder::Builder};
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync,
+    http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
     let mut currency_builder: Builder = Builder::new(
         DbGuildId::from(command.guild_id.unwrap()), // This is safe because this command is guild only
         String::new(), // This will be set because it is a required option in the slash command
-        String::new(), // Same as above
+        String::new() // Same as above
     );
     let mut name = String::new();
     let mut symbol = String::new();
@@ -48,13 +48,11 @@ pub async fn run(
             // The values of command options are serde_json Values which need to be converted to the correct Rust type.
             // A solid amount of this is just error handling.
             "name" => {
-                name = match option
-                    .resolved
-                    .clone()
-                    .ok_or(anyhow!("Failed to resolve name"))?
-                {
+                name = match option.resolved.clone().ok_or(anyhow!("Failed to resolve name"))? {
                     CommandDataOptionValue::String(s) => s,
-                    _ => return Err(anyhow!("Expected string but found something else")),
+                    _ => {
+                        return Err(anyhow!("Expected string but found something else"));
+                    }
                 };
                 // remove trailing and leading whitespace from name
                 name = name.trim().to_string();
@@ -64,8 +62,7 @@ pub async fn run(
                 currency_builder.curr_name(name.clone());
             }
             "symbol" => {
-                symbol = option
-                    .value
+                symbol = option.value
                     .as_ref()
                     .ok_or(anyhow!("Symbol value not found"))?
                     .as_str()
@@ -79,76 +76,65 @@ pub async fn run(
             }
             "visible" => {
                 currency_builder.visible(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Visible value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse visible value to bool"))?,
+                        .ok_or(anyhow!("Failed to parse visible value to bool"))?
                 );
             }
             "base" => {
                 currency_builder.base(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Base value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse base value to bool"))?,
+                        .ok_or(anyhow!("Failed to parse base value to bool"))?
                 );
             }
             "base_value" => {
                 currency_builder.base_value(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Base_value value provided but not found"))?
                         .as_f64()
-                        .ok_or(anyhow!("Failed to parse base_value value to f64"))?,
+                        .ok_or(anyhow!("Failed to parse base_value value to f64"))?
                 );
             }
             "pay" => {
                 currency_builder.pay(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Pay value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse pay value to bool"))?,
+                        .ok_or(anyhow!("Failed to parse pay value to bool"))?
                 );
             }
             "earn_by_chat" => {
                 currency_builder.earn_by_chat(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Each_by_chat value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse earn_by_chat value to bool"))?,
+                        .ok_or(anyhow!("Failed to parse earn_by_chat value to bool"))?
                 );
             }
             "channels_is_whitelist" => {
                 currency_builder.channels_is_whitelist(
-                    option
-                        .value
+                    option.value
                         .as_ref()
-                        .ok_or(anyhow!(
-                            "Channels_is_whitelist value provided but not found"
-                        ))?
+                        .ok_or(anyhow!("Channels_is_whitelist value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!(
-                            "Failed to parse channels_is_whitelist value to bool"
-                        ))?,
+                        .ok_or(anyhow!("Failed to parse channels_is_whitelist value to bool"))?
                 );
             }
             "roles_is_whitelist" => {
                 currency_builder.roles_is_whitelist(
-                    option
-                        .value
+                    option.value
                         .as_ref()
                         .ok_or(anyhow!("Roles_is_whitelist value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse roles_is_whitelist value to bool"))?,
+                        .ok_or(anyhow!("Failed to parse roles_is_whitelist value to bool"))?
                 );
             }
             "earn_min" => {
@@ -158,24 +144,23 @@ pub async fn run(
                 currency_builder.earn_max(option.value.as_ref().unwrap().as_f64().unwrap());
             }
             "earn_timeout" => {
-                currency_builder.earn_timeout(Duration::seconds(
-                    option
-                        .value
-                        .as_ref()
-                        .ok_or(anyhow!("earn_timeout value provided but not found"))?
-                        .as_i64()
-                        .ok_or(anyhow!("Failed to parse earn_timeout value to i64"))?,
-                ));
+                currency_builder.earn_timeout(
+                    Duration::seconds(
+                        option.value
+                            .as_ref()
+                            .ok_or(anyhow!("earn_timeout value provided but not found"))?
+                            .as_i64()
+                            .ok_or(anyhow!("Failed to parse earn_timeout value to i64"))?
+                    )
+                );
             }
             &_ => {}
         };
     }
     currency_builder.build().await?;
-    command
-        .edit_original_interaction_response(http, |m| {
-            m.content(format! {"Made currency {symbol}{name}"})
-        })
-        .await?;
+    command.edit_original_interaction_response(http, |m| {
+        m.content(format!("Made currency {symbol}{name}"))
+    }).await?;
     Ok(())
 }
 // There might be a more efficient and compact way to do this but I cannot think of it right now.
@@ -232,13 +217,17 @@ pub fn option() -> CreateApplicationCommandOption {
         .create_sub_option(|o| {
             o.kind(CommandOptionType::Boolean)
                 .name("channels_is_whitelist")
-                .description("If channel restrictions are in whitelist mode (true) or blacklist mode (false)")
+                .description(
+                    "If channel restrictions are in whitelist mode (true) or blacklist mode (false)"
+                )
                 .required(false)
         })
         .create_sub_option(|o| {
             o.kind(CommandOptionType::Boolean)
                 .name("roles_is_whitelist")
-                .description("If role restrictions are in whitelist mode (true) or blacklist mode (false)")
+                .description(
+                    "If role restrictions are in whitelist mode (true) or blacklist mode (false)"
+                )
                 .required(false)
         })
         .create_sub_option(|o| {

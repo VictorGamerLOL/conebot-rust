@@ -1,18 +1,20 @@
-use anyhow::{anyhow, Result};
+use anyhow::{ anyhow, Result };
 use serenity::builder::CreateApplicationCommandOption;
 use serenity::http::Http;
 use serenity::model::application::command::CommandOptionType;
 use serenity::model::prelude::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
+    ApplicationCommandInteraction,
+    CommandDataOption,
+    CommandDataOptionValue,
 };
 use serenity::model::user::User;
 
-#[allow(clippy::unused_async)] // later
+#[allow(clippy::unused_async)] // TODO
 #[allow(unused)]
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync,
+    http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
     let mut name: String = String::new();
     let mut amount: f64 = 0.0;
@@ -20,8 +22,7 @@ pub async fn run(
     for option in options {
         match option.name.as_str() {
             "name" => {
-                name = option
-                    .value
+                name = option.value
                     .clone()
                     .ok_or(anyhow!("No currency name found."))?
                     .as_str()
@@ -29,24 +30,23 @@ pub async fn run(
                     .to_owned();
             }
             "amount" => {
-                amount = option
-                    .value
+                amount = option.value
                     .clone()
                     .ok_or(anyhow!("No amount found."))?
                     .as_f64()
                     .ok_or(anyhow!("Failed to convert amount to f64."))?;
             }
             "user" => {
-                user = match option
-                    .resolved
-                    .clone()
-                    .ok_or(anyhow!("Failed to resolve user."))?
-                {
+                user = match option.resolved.clone().ok_or(anyhow!("Failed to resolve user."))? {
                     CommandDataOptionValue::User(u, _) => u,
-                    _ => return Err(anyhow!("Failed to resolve user.")),
-                }
+                    _ => {
+                        return Err(anyhow!("Failed to resolve user."));
+                    }
+                };
             }
-            _ => return Err(anyhow!("Unknown option: {}", option.name)),
+            _ => {
+                return Err(anyhow!("Unknown option: {}", option.name));
+            }
         }
     }
     Ok(())

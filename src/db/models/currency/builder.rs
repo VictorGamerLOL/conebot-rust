@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use crate::db::{
-    id::{DbChannelId, DbGuildId, DbRoleId},
-    ArcTokioMutexOption,
-};
-use anyhow::{Ok, Result};
+use crate::db::{ id::{ DbChannelId, DbGuildId, DbRoleId }, ArcTokioMutexOption };
+use anyhow::{ Ok, Result };
 use chrono::Duration;
-use mongodb::{bson::doc, Collection};
+use mongodb::{ bson::doc, Collection };
 
 use super::Currency;
 
@@ -99,7 +96,7 @@ impl Builder {
         let db = super::super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
         let filter =
-            doc! {"guild_id": self.guild_id.to_string(), "curr_name": self.curr_name.clone()};
+            doc! { "guild_id": self.guild_id.to_string(), "curr_name": self.curr_name.clone() };
         let curr = coll.find_one(filter, None).await?;
         if curr.is_some() {
             return Err(anyhow::anyhow!("Currency already exists"));
@@ -143,19 +140,17 @@ impl Builder {
         };
         // if base is set to true, check if there is another currency where base is true and set it to false
         if curr.base {
-            let filter = doc! {"guild_id": curr.guild_id.to_string(), "base": true};
-            let update = doc! {"$set": {"base": false}};
+            let filter = doc! { "guild_id": curr.guild_id.to_string(), "base": true };
+            let update = doc! { "$set": {"base": false} };
             coll.update_one(filter, update, None).await?;
         }
 
         let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
-        let arc_currency: ArcTokioMutexOption<Currency> =
-            Arc::new(tokio::sync::Mutex::new(Some(curr)));
-        cache.push(
-            (self.guild_id.to_string(), self.curr_name.clone()),
-            arc_currency.clone(),
+        let arc_currency: ArcTokioMutexOption<Currency> = Arc::new(
+            tokio::sync::Mutex::new(Some(curr))
         );
+        cache.push((self.guild_id.to_string(), self.curr_name.clone()), arc_currency.clone());
         Ok(arc_currency)
     }
 
@@ -224,7 +219,7 @@ impl Builder {
     /// it falls back to the default value of `false`
     pub fn channels_is_whitelist(
         &mut self,
-        channels_is_whitelist: impl Into<Option<bool>>,
+        channels_is_whitelist: impl Into<Option<bool>>
     ) -> &mut Self {
         self.channels_is_whitelist = channels_is_whitelist.into();
         self
@@ -244,13 +239,13 @@ impl Builder {
     /// with calls to `channels_whitelist_add()`..
     pub fn channels_whitelist(
         &mut self,
-        channels_whitelist: impl Into<Option<Vec<DbChannelId>>>,
+        channels_whitelist: impl Into<Option<Vec<DbChannelId>>>
     ) -> &mut Self {
         if let Some(channels_whitelist) = channels_whitelist.into() {
             self.channels_whitelist = channels_whitelist;
         } else {
             self.channels_whitelist = vec![];
-        };
+        }
         self
     }
     /// `channels_whitelist`
@@ -268,13 +263,13 @@ impl Builder {
     /// with calls to `roles_whitelist_add()`.
     pub fn roles_whitelist(
         &mut self,
-        roles_whitelist: impl Into<Option<Vec<DbRoleId>>>,
+        roles_whitelist: impl Into<Option<Vec<DbRoleId>>>
     ) -> &mut Self {
         if let Some(roles_whitelist) = roles_whitelist.into() {
             self.roles_whitelist = roles_whitelist;
         } else {
             self.roles_whitelist = vec![];
-        };
+        }
         self
     }
     /// `roles_whitelist`
@@ -292,13 +287,13 @@ impl Builder {
     /// with calls to `channels_blacklist_add()`.
     pub fn channels_blacklist(
         &mut self,
-        channels_blacklist: impl Into<Option<Vec<DbChannelId>>>,
+        channels_blacklist: impl Into<Option<Vec<DbChannelId>>>
     ) -> &mut Self {
         if let Some(channels_blacklist) = channels_blacklist.into() {
             self.channels_blacklist = channels_blacklist;
         } else {
             self.channels_blacklist = vec![];
-        };
+        }
         self
     }
     /// `channels_blacklist`
@@ -316,13 +311,13 @@ impl Builder {
     /// with calls to `roles_blacklist_add()`.
     pub fn roles_blacklist(
         &mut self,
-        roles_blacklist: impl Into<Option<Vec<DbRoleId>>>,
+        roles_blacklist: impl Into<Option<Vec<DbRoleId>>>
     ) -> &mut Self {
         if let Some(roles_blacklist) = roles_blacklist.into() {
             self.roles_blacklist = roles_blacklist;
         } else {
             self.roles_blacklist = vec![];
-        };
+        }
         self
     }
     /// `roles_blacklist`
@@ -396,22 +391,10 @@ async fn test_currency_builder() {
     assert!(curr.earn_by_chat);
     assert!(curr.channels_is_whitelist);
     assert!(curr.roles_is_whitelist);
-    assert_eq!(
-        curr.channels_whitelist,
-        vec![DbChannelId::from(123), DbChannelId::from(456)]
-    );
-    assert_eq!(
-        curr.roles_whitelist,
-        vec![DbRoleId::from(123), DbRoleId::from(456)]
-    );
-    assert_eq!(
-        curr.channels_blacklist,
-        vec![DbChannelId::from(123), DbChannelId::from(456)]
-    );
-    assert_eq!(
-        curr.roles_blacklist,
-        vec![DbRoleId::from(123), DbRoleId::from(456)]
-    );
+    assert_eq!(curr.channels_whitelist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
+    assert_eq!(curr.roles_whitelist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
+    assert_eq!(curr.channels_blacklist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
+    assert_eq!(curr.roles_blacklist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
 
     let error_margin_f64 = f64::EPSILON;
     let res1 = curr.earn_min - 1.0;

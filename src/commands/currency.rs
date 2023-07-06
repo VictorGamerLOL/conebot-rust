@@ -2,11 +2,11 @@ pub mod create;
 mod delete;
 mod give;
 
-use anyhow::{anyhow, Result};
+use anyhow::{ anyhow, Result };
 use serenity::{
     builder::CreateApplicationCommand,
     http::Http,
-    model::prelude::application_command::{ApplicationCommandInteraction, CommandDataOption},
+    model::prelude::application_command::{ ApplicationCommandInteraction, CommandDataOption },
 };
 
 /// # Errors
@@ -14,14 +14,16 @@ use serenity::{
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync + Clone,
+    http: impl AsRef<Http> + Send + Sync + Clone
 ) -> Result<()> {
     let cmd_name = options[0].name.as_str();
     match cmd_name {
         "create" => create::run(&options[0].options, command, http.clone()).await?,
         "delete" => delete::run(&options[0].options, command, http.clone()).await?,
-        _ => return Err(anyhow!("Unknown subcommand: {}", cmd_name)),
-    };
+        _ => {
+            return Err(anyhow!("Unknown subcommand: {}", cmd_name));
+        }
+    }
     Ok(())
 }
 

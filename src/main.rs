@@ -11,18 +11,15 @@ pub mod db;
 pub mod event_handler;
 
 use dotenv::dotenv;
-use serenity::{prelude::GatewayIntents, Client};
+use serenity::{ prelude::GatewayIntents, Client };
 use std::env;
-use tracing::{debug, error, info, instrument, span, trace, warn};
-use tracing_subscriber::{fmt, fmt::format, EnvFilter, FmtSubscriber};
+use tracing::{ debug, error, info, instrument, span, trace, warn };
+use tracing_subscriber::{ fmt, fmt::format, EnvFilter, FmtSubscriber };
 
 #[tokio::main]
 async fn main() {
     let filter = EnvFilter::from_default_env();
-    let subscriber = fmt()
-        .event_format(format().pretty())
-        .with_env_filter(filter)
-        .finish();
+    let subscriber = fmt().event_format(format().pretty()).with_env_filter(filter).finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
     let sp = span!(tracing::Level::TRACE, "main");
     let g = sp.enter();
@@ -39,8 +36,7 @@ async fn main() {
     };
 
     let mut client = Client::builder(token, GatewayIntents::all())
-        .event_handler(event_handler::Handler)
-        .await
+        .event_handler(event_handler::Handler).await
         .expect("Error creating client");
 
     if let Err(why) = client.start().await {

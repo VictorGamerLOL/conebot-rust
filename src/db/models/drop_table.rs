@@ -12,6 +12,10 @@ pub struct DropTablePart {
     weight: i64,
 }
 pub enum DropTablePartOption {
-    Item { item_name: String },
-    Currency { currency_name: String },
+    Item {
+        item_name: String,
+    },
+    Currency {
+        currency_name: String,
+    },
 }

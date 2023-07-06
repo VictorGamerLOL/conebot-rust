@@ -20,26 +20,27 @@
 //! fair for everyone.
 pub mod builder;
 
-use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
+use std::{ hash::Hash, num::NonZeroUsize, sync::Arc };
 
-use anyhow::{anyhow, Result};
+use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
-use lru::{DefaultHasher, LruCache};
-use mongodb::{
-    bson::{doc, Document, RawDocument, RawDocumentBuf},
-    Collection,
-};
+use lru::{ DefaultHasher, LruCache };
+use mongodb::{ bson::{ doc, Document, RawDocument, RawDocumentBuf }, Collection };
 use once_cell::sync::OnceCell;
 use parking_lot::FairMutex;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde::{ Deserialize, Serialize };
+use serde_with::{ serde_as, DurationSeconds };
 use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::db::{
-    id::DbChannelId, id::DbGuildId, id::DbRoleId, ArcTokioMutexOption, TokioMutexCache,
+    id::DbChannelId,
+    id::DbGuildId,
+    id::DbRoleId,
+    ArcTokioMutexOption,
+    TokioMutexCache,
 };
 
 // #[derive(Debug, Clone, Error)]
@@ -126,10 +127,9 @@ impl Currency {
     /// ```
     pub async fn try_from_name<T>(
         guild_id: T,
-        curr_name: String,
+        curr_name: String
     ) -> Result<Option<ArcTokioMutexOption<Self>>>
-    where
-        T: ToString,
+        where T: ToString
     {
         let guild_id = guild_id.to_string();
 
@@ -145,7 +145,8 @@ impl Currency {
         // so that another thread doesn't try to get the same currency from the database.
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": guild_id.clone(),
             "CurrName": curr_name.clone(),
         };
@@ -182,19 +183,19 @@ impl Currency {
         let mut cache = CACHE_CURRENCY.lock().await;
         // Get the cache so no other task tries to use this while it is being updated.
         if self_.is_none() {
-            return Err(anyhow!(
-                "Currency is already being used in a breaking operation."
-            ));
+            return Err(anyhow!("Currency is already being used in a breaking operation."));
         }
         let self__ = self_.take().unwrap(); // Safe b/c we just checked that it is not none.
-                                            // Also all existing arcs to this should be dropped when None is seen.
-                                            // We also still hold the lock on the mutex, so no other task can use this currency.
+        // Also all existing arcs to this should be dropped when None is seen.
+        // We also still hold the lock on the mutex, so no other task can use this currency.
 
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self__.guild_id.to_string(),
             "CurrName": self__.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "CurrName": new_name.clone(),
             },
@@ -204,16 +205,19 @@ impl Currency {
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if the new name already exists in the guild
-        let filterdoc2 = doc! {
+        let filterdoc2 =
+            doc! {
             "GuildId": self__.guild_id.to_string(),
             "CurrName": new_name.clone(),
         };
         if coll.find_one(filterdoc2, None).await?.is_some() {
-            return Err(anyhow!(
-                "Currency with name {} already exists in guild {}",
-                new_name,
-                self__.guild_id.to_string()
-            ));
+            return Err(
+                anyhow!(
+                    "Currency with name {} already exists in guild {}",
+                    new_name,
+                    self__.guild_id.to_string()
+                )
+            );
         }
 
         coll.update_one(filterdoc, updatedoc, None).await?;
@@ -221,7 +225,7 @@ impl Currency {
         cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
         cache.put(
             (self__.guild_id.to_string(), new_name),
-            Arc::new(Mutex::new(Some(self__.clone()))),
+            Arc::new(Mutex::new(Some(self__.clone())))
         );
         Ok(())
     }
@@ -232,11 +236,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_symbol(&mut self, new_symbol: String) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "Symbol": new_symbol.clone(),
             },
@@ -257,11 +263,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_visible(&mut self, new_visible: bool) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "Visible": new_visible,
             },
@@ -284,11 +292,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_base(&mut self, new_base: bool) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "Base": new_base,
             },
@@ -299,11 +309,13 @@ impl Currency {
         // check if there is already a base currency in the guild
         // if it is, set it to false
         if new_base {
-            let filterdoc2 = doc! {
+            let filterdoc2 =
+                doc! {
                 "GuildId": self.guild_id.to_string(),
                 "Base": true,
             };
-            let updatedoc2 = doc! {
+            let updatedoc2 =
+                doc! {
                 "$set": {
                     "Base": false,
                 },
@@ -324,11 +336,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_base_value(&mut self, new_base_value: Option<f64>) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "BaseValue": new_base_value,
             },
@@ -349,11 +363,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_pay(&mut self, new_pay: bool) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "Pay": new_pay,
             },
@@ -374,11 +390,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_earn_by_chat(&mut self, new_earn_by_chat: bool) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "EarnByChat": new_earn_by_chat,
             },
@@ -400,13 +418,15 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn update_channels_is_whitelist(
         &mut self,
-        new_channels_is_whitelist: bool,
+        new_channels_is_whitelist: bool
     ) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "ChannelsIsWhitelist": new_channels_is_whitelist,
             },
@@ -427,11 +447,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_roles_is_whitelist(&mut self, new_roles_is_whitelist: bool) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "RolesIsWhitelist": new_roles_is_whitelist,
             },
@@ -452,11 +474,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if channel is already whitelisted.
     pub async fn add_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$push": {
                 "ChannelsWhitelist": channel_id.to_string(),
             },
@@ -465,7 +489,8 @@ impl Currency {
         let coll: Collection<Currency> = db.collection("currencies");
 
         // check if that channel is present in the whitelist
-        let filterdoc2 = doc! {
+        let filterdoc2 =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsWhitelist": {
@@ -490,14 +515,16 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if channel is not whitelisted.
     pub async fn remove_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsWhitelist": {
                 "$in": [channel_id.to_string()],
             }
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$pull": {
                 "ChannelsWhitelist": channel_id.to_string(),
             },
@@ -518,11 +545,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if role is already whitelisted.
     pub async fn add_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$push": {
                 "RolesWhitelist": role_id.to_string(),
             },
@@ -531,7 +560,8 @@ impl Currency {
         let coll: Collection<Currency> = db.collection("currencies");
 
         // check if that role is present in the whitelist
-        let filterdoc2 = doc! {
+        let filterdoc2 =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "RolesWhitelist": {
@@ -556,14 +586,16 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if role is not whitelisted.
     pub async fn remove_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "RolesWhitelist": {
                 "$in": [role_id.to_string()],
             }
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$pull": {
                 "RolesWhitelist": role_id.to_string(),
             },
@@ -584,11 +616,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if channel is already blacklisted.
     pub async fn add_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$push": {
                 "ChannelsBlacklist": channel_id.to_string(),
             },
@@ -597,7 +631,8 @@ impl Currency {
         let coll: Collection<Currency> = db.collection("currencies");
 
         // check if that channel is present in the blacklist
-        let filterdoc2 = doc! {
+        let filterdoc2 =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsBlacklist": {
@@ -622,14 +657,16 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if channel is not blacklisted.
     pub async fn remove_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsBlacklist": {
                 "$in": [channel_id.to_string()],
             }
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$pull": {
                 "ChannelsBlacklist": channel_id.to_string(),
             },
@@ -650,11 +687,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if role is already blacklisted.
     pub async fn add_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$push": {
                 "RolesBlacklist": role_id.to_string(),
             },
@@ -663,7 +702,8 @@ impl Currency {
         let coll: Collection<Currency> = db.collection("currencies");
 
         // check if that role is present in the blacklist
-        let filterdoc2 = doc! {
+        let filterdoc2 =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "RolesBlacklist": {
@@ -688,14 +728,16 @@ impl Currency {
     ///
     /// If any mongodb operation errors, or if role is not blacklisted.
     pub async fn remove_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "RolesBlacklist": {
                 "$in": [role_id.to_string()],
             }
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$pull": {
                 "RolesBlacklist": role_id.to_string(),
             },
@@ -717,13 +759,15 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn overwrite_whitelisted_channels(
         &mut self,
-        channels: Vec<DbChannelId>,
+        channels: Vec<DbChannelId>
     ) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "ChannelsWhitelist": channels.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
             },
@@ -744,11 +788,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn overwrite_whitelisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "RolesWhitelist": roles.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
             },
@@ -770,13 +816,15 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn overwrite_blacklisted_channels(
         &mut self,
-        channels: Vec<DbChannelId>,
+        channels: Vec<DbChannelId>
     ) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "ChannelsBlacklist": channels.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
             },
@@ -797,11 +845,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn overwrite_blacklisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "RolesBlacklist": roles.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
             },
@@ -822,11 +872,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_earn_min(&mut self, new_earn_min: f64) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "EarnMin": new_earn_min,
             },
@@ -847,11 +899,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_earn_max(&mut self, new_earn_max: f64) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "EarnMax": new_earn_max,
             },
@@ -872,11 +926,13 @@ impl Currency {
     ///
     /// If any mongodb operation errors.
     pub async fn update_earn_timeout(&mut self, new_earn_timeout: Duration) -> Result<()> {
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
         };
-        let updatedoc = doc! {
+        let updatedoc =
+            doc! {
             "$set": {
                 "EarnTimeout": new_earn_timeout.num_seconds(),
             },
@@ -903,16 +959,14 @@ impl Currency {
     /// It should not. This is here to please the linter.
     pub async fn delete_currency(self_: ArcTokioMutexOption<Self>) -> Result<()> {
         let mut cache = CACHE_CURRENCY.lock().await; // Get the cache here so no other task
-                                                     // can get the currency while were working on it.
+        // can get the currency while were working on it.
         let mut self_ = self_.lock().await;
         if self_.is_none() {
-            return Err(anyhow!(
-                "Currency is already being used in a breaking operation."
-            ));
+            return Err(anyhow!("Currency is already being used in a breaking operation."));
         }
 
         let self__ = self_.take().unwrap(); // Save b/c we just checked that it's not None.
-                                            // Also this should make all other Arcs be dropped when None is seen.
+        // Also this should make all other Arcs be dropped when None is seen.
 
         // Remove the currency from the cache.
         cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
@@ -922,7 +976,8 @@ impl Currency {
         // Delete the currency from the database.
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
-        let filterdoc = doc! {
+        let filterdoc =
+            doc! {
             "GuildId": self__.guild_id.to_string(),
             "CurrName": self__.curr_name.clone(),
         };
@@ -945,8 +1000,7 @@ mod test {
         crate::init_env().await;
         let guild_id: u64 = 123_456_789; // Test currency present in the database.
         let curr_name = "test";
-        let currency = Currency::try_from_name(guild_id, curr_name.to_string())
-            .await
+        let currency = Currency::try_from_name(guild_id, curr_name.to_string()).await
             .unwrap()
             .unwrap();
         let currency = currency.lock().await;
@@ -993,8 +1047,7 @@ mod test {
     async fn sleepy_fetch_currency(guild_id: u64, curr_name: &str, millis: u64, i: usize) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
         println!("T{i}");
-        let currency = Currency::try_from_name(guild_id, curr_name.to_string())
-            .await
+        let currency = Currency::try_from_name(guild_id, curr_name.to_string()).await
             .unwrap()
             .unwrap();
         let currency = currency.lock().await;
@@ -1006,8 +1059,11 @@ mod test {
     #[tokio::test]
     async fn try_create_delete() {
         crate::init_env().await;
-        let mut curr =
-            builder::Builder::new(DbGuildId::from(12), "testNo".to_string(), "Tt".to_string());
+        let mut curr = builder::Builder::new(
+            DbGuildId::from(12),
+            "testNo".to_string(),
+            "Tt".to_string()
+        );
 
         curr.guild_id(DbGuildId::from(123))
             .curr_name("test2".to_string())

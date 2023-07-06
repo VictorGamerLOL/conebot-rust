@@ -9,10 +9,10 @@ use dotenv::dotenv;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
-use mongodb::{bson::Document, Client, Cursor};
+use mongodb::{ bson::Document, Client, Cursor };
 use parking_lot::FairMutex;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 // Do not, and I repeat, DO NOT try to replace the tokio mutexes with
 // a parking_lot or std mutex. It will not work. It will hang with mongodb operations
@@ -69,11 +69,9 @@ pub async fn init() {
         "multipliers".to_string(),
         "globalCurrencies".to_string(),
         "globalParticipatingGuilds".to_string(),
-        "globalBalances".to_string(),
+        "globalBalances".to_string()
     ];
-    collections
-        .into_iter()
-        .for_each(|coll| columns.retain(|x| x != &coll));
+    collections.into_iter().for_each(|coll| columns.retain(|x| x != &coll));
 
     for coll in columns {
         match db.create_collection(&coll, None).await {

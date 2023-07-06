@@ -22,8 +22,8 @@
 //!
 //! These structs contain the necessary methods to convert them to strings, u64s, serenity types and vice versa.
 
-use serde::{Deserialize, Serialize};
-use serenity::model::prelude::{ChannelId, GuildId, RoleId, UserId};
+use serde::{ Deserialize, Serialize };
+use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]

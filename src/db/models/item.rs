@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // literally stop
 
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -35,8 +35,7 @@ pub enum ItemType {
 #[serde(tag = "ActionType")]
 pub enum ItemActionType {
     None,
-    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
-    Role {
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] Role {
         role_id: String,
     },
     Lootbox {

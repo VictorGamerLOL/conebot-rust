@@ -3,7 +3,8 @@ use serenity::{
     builder::CreateApplicationCommand,
     http::Http,
     model::prelude::interaction::application_command::{
-        ApplicationCommandInteraction, CommandDataOption,
+        ApplicationCommandInteraction,
+        CommandDataOption,
     },
 };
 
@@ -12,11 +13,11 @@ use serenity::{
 pub async fn run(
     _options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync,
+    http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
-    let future = command
-        .edit_original_interaction_response(&http, |msg| msg.content("Pong!"))
-        .await?;
+    let future = command.edit_original_interaction_response(&http, |msg|
+        msg.content("Pong!")
+    ).await?;
     Ok(())
 }
 

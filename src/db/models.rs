@@ -8,13 +8,13 @@ mod multipliers;
 mod role_rewards;
 mod store_entry;
 
-pub use balances::{Balance, Balances};
+pub use balances::{ Balance, Balances };
 pub use currency::Currency;
 pub use drop_table::DropTable;
-pub use inventory::{Inventory, InventoryEntry};
+pub use inventory::{ Inventory, InventoryEntry };
 pub use item::Item;
-pub use multipliers::{Multiplier, Multipliers};
-pub use role_rewards::{RoleReward, RoleRewards};
+pub use multipliers::{ Multiplier, Multipliers };
+pub use role_rewards::{ RoleReward, RoleRewards };
 pub use store_entry::StoreEntry;
 
 use once_cell::sync::OnceCell;
@@ -34,10 +34,7 @@ pub struct BotGuild {
 }
 
 impl BotGuild {
-    pub fn new<T>(guild_id: T) -> Self
-    where
-        T: Into<DbGuildId>,
-    {
+    pub fn new<T>(guild_id: T) -> Self where T: Into<DbGuildId> {
         Self {
             guild_id: guild_id.into(),
             currencies: OnceCell::new(),

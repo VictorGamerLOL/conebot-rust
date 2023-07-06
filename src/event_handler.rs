@@ -1,6 +1,6 @@
 mod message;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc, Mutex };
 
 use crate::commands;
 use anyhow::anyhow;
@@ -12,9 +12,9 @@ use serenity::client::EventHandler;
 use serenity::model::application::command::Command;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::prelude::interaction::InteractionResponseType;
-use serenity::model::prelude::{Message, Ready};
+use serenity::model::prelude::{ Message, Ready };
 use serenity::prelude::Context;
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{ debug, error, info, instrument, trace, warn };
 
 #[derive(Debug)]
 pub struct Handler;
@@ -35,14 +35,14 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is running!", ready.user.name);
         Command::set_global_application_commands(&ctx.http, |commands| {
-            commands.set_application_commands(vec![
-                commands::ping::application_command(),
-                commands::test1::application_command(),
-                commands::currency::application_command(),
-            ])
-        })
-        .await
-        .expect("Failed to register commands.");
+            commands.set_application_commands(
+                vec![
+                    commands::ping::application_command(),
+                    commands::test1::application_command(),
+                    commands::currency::application_command()
+                ]
+            )
+        }).await.expect("Failed to register commands.");
     }
 
     /// This function is responsible for handling all incoming interactions.
@@ -54,10 +54,10 @@ impl EventHandler for Handler {
             info!("Received command interaction: {:#?}", command.data.name);
             command
                 .create_interaction_response(&ctx.http, |a| {
-                    a.kind(InteractionResponseType::DeferredChannelMessageWithSource)
-                        .interaction_response_data(|msg| msg.ephemeral(true))
-                })
-                .await
+                    a.kind(
+                        InteractionResponseType::DeferredChannelMessageWithSource
+                    ).interaction_response_data(|msg| msg.ephemeral(true))
+                }).await
                 .unwrap_or_else(|e| error!("Error creating response: {}", e)); // This returns
             let res = match command.data.name.as_str() {
                 "ping" => commands::ping::run(&command.data.options, &command, &ctx.http).await,
@@ -71,12 +71,11 @@ impl EventHandler for Handler {
                 if let Some(e) = e.downcast_ref::<serenity::Error>() {
                     // If it's serenity's fault it is futile to try to respond to the user
                     error!("Serenity error: {}", e);
-                } else if let Err(e) =
-                    command // If it is not serenity's fault we can respond to the user
+                } else if
+                    let Err(e) = command // If it is not serenity's fault we can respond to the user
                         .edit_original_interaction_response(&ctx.http, |m| {
                             m.content(format!("An error occurred: {e}"))
-                        })
-                        .await
+                        }).await
                 {
                     error!("Error editing response: {}", e); // Assuming serenity does not decide to error out now
                 }
