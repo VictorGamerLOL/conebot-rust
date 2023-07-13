@@ -23,6 +23,8 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use super::Currency;
+
 /// This struct represents all of the balances for every currency for a certain user in a certain
 /// guild.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -30,7 +32,7 @@ use tokio::sync::Mutex;
 pub struct Balances {
     guild_id: DbGuildId,
     user_id: DbUserId,
-    balances: Vec<Balance>,
+    pub balances: Vec<Balance>,
 }
 
 /// This struct represents the balance for a certain user in a specific guild for a specific currency.
@@ -44,8 +46,8 @@ pub struct Balances {
 pub struct Balance {
     guild_id: DbGuildId,
     user_id: DbUserId,
-    curr_name: String,
-    amount: f64,
+    pub curr_name: String,
+    pub amount: f64,
 }
 
 lazy_static! {
@@ -63,10 +65,11 @@ impl Balances {
     pub async fn try_from_user(
         guild_id: DbGuildId,
         user_id: DbUserId
-    ) -> Result<Option<ArcTokioMutexOption<Self>>> {
+    ) -> Result<ArcTokioMutexOption<Self>> {
         let mut cache = CACHE_BALANCES.lock().await;
         let balances = cache.get(&(guild_id.clone(), user_id.clone())).cloned();
-        if balances.is_some() {
+        // if it some return if, else continue
+        if let Some(balances) = balances {
             return Ok(balances);
         }
 
@@ -91,7 +94,11 @@ impl Balances {
             )
         );
         cache.put((guild_id, user_id), balances.clone());
-        Ok(Some(balances))
+        Ok(balances)
+    }
+
+    pub fn balances(&self) -> &[Balance] {
+        return &self.balances;
     }
 
     /// Adds another balance for this user for a certain currency.
@@ -181,6 +188,33 @@ impl Balance {
         Ok(user_balance)
     }
 
+    /// Attempts to get the currency corresponding to this balance.
+    /// # Errors
+    /// - Any `MongoDB` error occurs.
+    /// - The currency does not exist.
+    pub async fn currency(&self) -> Result<Option<ArcTokioMutexOption<Currency>>> {
+        Currency::try_from_name(self.guild_id.clone(), self.curr_name.clone()).await
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn guild_id(&self) -> &DbGuildId {
+        &self.guild_id
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn user_id(&self) -> &DbUserId {
+        &self.user_id
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn curr_name(&self) -> &str {
+        &self.curr_name
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn amount(&self) -> f64 {
+        self.amount
+    }
     /// Sets the amount of the currency that the user said to the specified amount.
     ///
     /// # Errors
@@ -409,7 +443,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
         assert_eq!(balances.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
@@ -421,7 +455,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
         let mut balance = balances.balances
@@ -469,7 +503,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap().unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances = balances.as_mut().unwrap();
         let mut balance = balances.balances

@@ -1,11 +1,10 @@
 pub mod create;
 mod delete;
-mod give;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
     builder::CreateApplicationCommand,
-    http::Http,
+    http::{ Http, CacheHttp },
     model::prelude::application_command::{ ApplicationCommandInteraction, CommandDataOption },
 };
 
@@ -14,7 +13,7 @@ use serenity::{
 pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync + Clone
+    http: impl AsRef<Http> + Send + Sync + Clone + CacheHttp
 ) -> Result<()> {
     let cmd_name = options[0].name.as_str();
     match cmd_name {

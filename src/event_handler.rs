@@ -39,7 +39,8 @@ impl EventHandler for Handler {
                 vec![
                     commands::ping::application_command(),
                     commands::test1::application_command(),
-                    commands::currency::application_command()
+                    commands::currency::application_command(),
+                    commands::balance::application_command()
                 ]
             )
         }).await.expect("Failed to register commands.");
@@ -48,7 +49,6 @@ impl EventHandler for Handler {
     /// This function is responsible for handling all incoming interactions.
     ///
     /// New commands must be entered here when added due to the nature of Rust.
-    #[instrument(skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             info!("Received command interaction: {:#?}", command.data.name);
@@ -65,6 +65,8 @@ impl EventHandler for Handler {
                 "currency" => {
                     commands::currency::run(&command.data.options, &command, &ctx.http).await
                 }
+                "balance" =>
+                    commands::balance::run(&command.data.options, &command, &ctx.http).await,
                 _ => Err(anyhow!("Unknown command: {}", command.data.name)),
             };
             if let Err(e) = res {

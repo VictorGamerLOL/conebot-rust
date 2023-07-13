@@ -10,10 +10,11 @@ This bot aims to make everything highly configurable and be as feature packed as
 - [ ] Currencies
   - [x] Create
   - [x] Delete
-  - [ ] Per-guild per-currency member balances
-  - [ ] Give to members
-  - [ ] Take from members
-  - [ ] Changing config values
+  - [x] Per-guild per-currency member balances
+  - [ ] Display member balances <!-- backend done, in progress -->
+  - [ ] Give to members <!--backend done -->
+  - [ ] Take from members <!-- backend done -->
+  - [ ] Changing config values <!-- backend done -->
   - [ ] Chat earning
   - [ ] Whitelisting and blacklisting earning
     - [ ] Channels

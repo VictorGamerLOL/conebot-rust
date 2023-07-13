@@ -169,6 +169,118 @@ impl Currency {
         }
     }
 
+    /// Attempts to fetch all of the currencies that a guild has made.
+    ///
+    /// # Errors
+    /// - If any mongodb errors occur.
+    pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioMutexOption<Self>>> {
+        let guild_id = guild_id.to_string();
+
+        let mut cache = CACHE_CURRENCY.lock().await;
+
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("currencies");
+        let filterdoc = doc! {
+            "GuildId": guild_id.clone(),
+        };
+        let mut res = coll.find(filterdoc, None).await?;
+        drop(db); // Drop locks on mutexes as soon as possible.
+
+        let mut currencies = Vec::new();
+        while let Some(curr) = res.try_next().await? {
+            let curr_name = curr.curr_name().to_owned();
+            let tmp = Arc::new(Mutex::new(Some(curr)));
+            currencies.push(tmp.clone());
+            cache.put((guild_id.clone(), curr_name), tmp.clone());
+        }
+        Ok(currencies)
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn guild_id(&self) -> &DbGuildId {
+        &self.guild_id
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn curr_name(&self) -> &str {
+        &self.curr_name
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn visible(&self) -> bool {
+        self.visible
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn base(&self) -> bool {
+        self.base
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn base_value(&self) -> Option<f64> {
+        self.base_value
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn pay(&self) -> bool {
+        self.pay
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn earn_by_chat(&self) -> bool {
+        self.earn_by_chat
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn channels_is_whitelist(&self) -> bool {
+        self.channels_is_whitelist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn roles_is_whitelist(&self) -> bool {
+        self.roles_is_whitelist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn channels_whitelist(&self) -> &[DbChannelId] {
+        &self.channels_whitelist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn roles_whitelist(&self) -> &[DbRoleId] {
+        &self.roles_whitelist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn channels_blacklist(&self) -> &[DbChannelId] {
+        &self.channels_blacklist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn roles_blacklist(&self) -> &[DbRoleId] {
+        &self.roles_blacklist
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn earn_min(&self) -> f64 {
+        self.earn_min
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn earn_max(&self) -> f64 {
+        self.earn_max
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn earn_timeout(&self) -> Duration {
+        self.earn_timeout
+    }
+
     /// Attempts to change the name of this currency.
     ///
     /// # Errors

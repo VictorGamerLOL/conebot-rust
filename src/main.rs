@@ -9,6 +9,7 @@
 pub mod commands;
 pub mod db;
 pub mod event_handler;
+pub mod util;
 
 use dotenv::dotenv;
 use serenity::{ prelude::GatewayIntents, Client };
