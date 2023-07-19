@@ -16,14 +16,14 @@ pub async fn run(
 ) -> Result<()> {
     let currency_name = (unsafe { options.get_unchecked(0) }).value
         .clone()
-        .ok_or(anyhow!("No currency name found."))?
+        .ok_or_else(|| anyhow!("No currency name found."))?
         .as_str()
-        .ok_or(anyhow!("Failed to convert currency name to str."))?
+        .ok_or_else(|| anyhow!("Failed to convert currency name to str."))?
         .to_owned(); // its there just trust me on this one
     let mut currency = Currency::try_from_name(
         DbGuildId::from(command.guild_id.unwrap()),
         currency_name
-    ).await?.ok_or(anyhow!("Currency not found"))?;
+    ).await?.ok_or_else(|| anyhow!("Currency not found"))?;
     Currency::delete_currency(currency).await?;
     command.edit_original_interaction_response(http, |response|
         response.content("Currency deleted.")

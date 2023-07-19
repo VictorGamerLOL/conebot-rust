@@ -48,7 +48,9 @@ pub async fn run(
             // The values of command options are serde_json Values which need to be converted to the correct Rust type.
             // A solid amount of this is just error handling.
             "name" => {
-                name = match option.resolved.clone().ok_or(anyhow!("Failed to resolve name"))? {
+                name = match
+                    option.resolved.clone().ok_or_else(|| anyhow!("Failed to resolve name"))?
+                {
                     CommandDataOptionValue::String(s) => s,
                     _ => {
                         return Err(anyhow!("Expected string but found something else"));
@@ -64,9 +66,9 @@ pub async fn run(
             "symbol" => {
                 symbol = option.value
                     .as_ref()
-                    .ok_or(anyhow!("Symbol value not found"))?
+                    .ok_or_else(|| anyhow!("Symbol value not found"))?
                     .as_str()
-                    .ok_or(anyhow!("Failed to convert symbol value to str"))?
+                    .ok_or_else(|| anyhow!("Failed to convert symbol value to str"))?
                     .to_string();
                 symbol = symbol.trim().to_string();
                 if symbol.is_empty() {
@@ -78,63 +80,67 @@ pub async fn run(
                 currency_builder.visible(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Visible value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Visible value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse visible value to bool"))?
+                        .ok_or_else(|| anyhow!("Failed to parse visible value to bool"))?
                 );
             }
             "base" => {
                 currency_builder.base(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Base value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Base value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse base value to bool"))?
+                        .ok_or_else(|| anyhow!("Failed to parse base value to bool"))?
                 );
             }
             "base_value" => {
                 currency_builder.base_value(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Base_value value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Base_value value provided but not found"))?
                         .as_f64()
-                        .ok_or(anyhow!("Failed to parse base_value value to f64"))?
+                        .ok_or_else(|| anyhow!("Failed to parse base_value value to f64"))?
                 );
             }
             "pay" => {
                 currency_builder.pay(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Pay value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Pay value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse pay value to bool"))?
+                        .ok_or_else(|| anyhow!("Failed to parse pay value to bool"))?
                 );
             }
             "earn_by_chat" => {
                 currency_builder.earn_by_chat(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Each_by_chat value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Each_by_chat value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse earn_by_chat value to bool"))?
+                        .ok_or_else(|| anyhow!("Failed to parse earn_by_chat value to bool"))?
                 );
             }
             "channels_is_whitelist" => {
                 currency_builder.channels_is_whitelist(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Channels_is_whitelist value provided but not found"))?
+                        .ok_or_else(||
+                            anyhow!("Channels_is_whitelist value provided but not found")
+                        )?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse channels_is_whitelist value to bool"))?
+                        .ok_or_else(||
+                            anyhow!("Failed to parse channels_is_whitelist value to bool")
+                        )?
                 );
             }
             "roles_is_whitelist" => {
                 currency_builder.roles_is_whitelist(
                     option.value
                         .as_ref()
-                        .ok_or(anyhow!("Roles_is_whitelist value provided but not found"))?
+                        .ok_or_else(|| anyhow!("Roles_is_whitelist value provided but not found"))?
                         .as_bool()
-                        .ok_or(anyhow!("Failed to parse roles_is_whitelist value to bool"))?
+                        .ok_or_else(|| anyhow!("Failed to parse roles_is_whitelist value to bool"))?
                 );
             }
             "earn_min" => {
@@ -148,9 +154,9 @@ pub async fn run(
                     Duration::seconds(
                         option.value
                             .as_ref()
-                            .ok_or(anyhow!("earn_timeout value provided but not found"))?
+                            .ok_or_else(|| anyhow!("earn_timeout value provided but not found"))?
                             .as_i64()
-                            .ok_or(anyhow!("Failed to parse earn_timeout value to i64"))?
+                            .ok_or_else(|| anyhow!("Failed to parse earn_timeout value to i64"))?
                     )
                 );
             }

@@ -125,12 +125,10 @@ impl Currency {
     /// let curr_name = "ConeCoin";
     /// let currency: Currency = Currency::try_from_name(guild_id, curr_name).await.unwrap();
     /// ```
-    pub async fn try_from_name<T>(
-        guild_id: T,
+    pub async fn try_from_name(
+        guild_id: DbGuildId,
         curr_name: String
-    ) -> Result<Option<ArcTokioMutexOption<Self>>>
-        where T: ToString
-    {
+    ) -> Result<Option<ArcTokioMutexOption<Self>>> {
         let guild_id = guild_id.to_string();
 
         // Try to get from cache first.
@@ -154,19 +152,22 @@ impl Currency {
         drop(db); // Drop locks on mutexes as soon as possible.
 
         // If the currency exists, put it in the cache and return it.
-        if let Some(curr) = res {
-            if cfg!(test) || cfg!(debug_assertions) {
-                println!("Cache miss!");
+        res.map_or_else(
+            || {
+                if cfg!(test) || cfg!(debug_assertions) {
+                    println!("Cache miss and not found in database!");
+                }
+                Ok(None)
+            },
+            |curr| {
+                if cfg!(test) || cfg!(debug_assertions) {
+                    println!("Cache miss!");
+                }
+                let tmp = Arc::new(Mutex::new(Some(curr)));
+                cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
+                Ok(Some(tmp))
             }
-            let tmp = Arc::new(Mutex::new(Some(curr)));
-            cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
-            Ok(Some(tmp))
-        } else {
-            if cfg!(test) || cfg!(debug_assertions) {
-                println!("Cache miss and not found in database!");
-            }
-            Ok(None)
-        }
+        )
     }
 
     /// Attempts to fetch all of the currencies that a guild has made.
@@ -197,7 +198,7 @@ impl Currency {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn guild_id(&self) -> &DbGuildId {
+    pub const fn guild_id(&self) -> &DbGuildId {
         &self.guild_id
     }
 
@@ -212,37 +213,37 @@ impl Currency {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn visible(&self) -> bool {
+    pub const fn visible(&self) -> bool {
         self.visible
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn base(&self) -> bool {
+    pub const fn base(&self) -> bool {
         self.base
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn base_value(&self) -> Option<f64> {
+    pub const fn base_value(&self) -> Option<f64> {
         self.base_value
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn pay(&self) -> bool {
+    pub const fn pay(&self) -> bool {
         self.pay
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn earn_by_chat(&self) -> bool {
+    pub const fn earn_by_chat(&self) -> bool {
         self.earn_by_chat
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn channels_is_whitelist(&self) -> bool {
+    pub const fn channels_is_whitelist(&self) -> bool {
         self.channels_is_whitelist
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn roles_is_whitelist(&self) -> bool {
+    pub const fn roles_is_whitelist(&self) -> bool {
         self.roles_is_whitelist
     }
 
@@ -267,17 +268,17 @@ impl Currency {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn earn_min(&self) -> f64 {
+    pub const fn earn_min(&self) -> f64 {
         self.earn_min
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn earn_max(&self) -> f64 {
+    pub const fn earn_max(&self) -> f64 {
         self.earn_max
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn earn_timeout(&self) -> Duration {
+    pub const fn earn_timeout(&self) -> Duration {
         self.earn_timeout
     }
 
@@ -339,6 +340,7 @@ impl Currency {
             (self__.guild_id.to_string(), new_name),
             Arc::new(Mutex::new(Some(self__.clone())))
         );
+        drop(self_);
         Ok(())
     }
 
@@ -598,7 +600,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         // check if that channel is present in the whitelist
         let filterdoc2 =
@@ -642,7 +644,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -669,7 +671,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         // check if that role is present in the whitelist
         let filterdoc2 =
@@ -713,7 +715,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -740,7 +742,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         // check if that channel is present in the blacklist
         let filterdoc2 =
@@ -784,7 +786,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -811,7 +813,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         // check if that role is present in the blacklist
         let filterdoc2 =
@@ -855,7 +857,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -885,7 +887,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -912,7 +914,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -942,7 +944,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -969,7 +971,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -996,7 +998,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -1023,7 +1025,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -1050,7 +1052,7 @@ impl Currency {
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
 
         coll.update_one(filterdoc, updatedoc, None).await?;
 
@@ -1081,20 +1083,25 @@ impl Currency {
         // Also this should make all other Arcs be dropped when None is seen.
 
         // Remove the currency from the cache.
-        cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
+        let popped = cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
         // Keep the cache past this point so that another task
         // will not try to get the currency from the db while we're deleting it.
 
         // Delete the currency from the database.
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Currency> = db.collection("currencies");
+        let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
             "GuildId": self__.guild_id.to_string(),
             "CurrName": self__.curr_name.clone(),
         };
-        coll.delete_one(filterdoc, None).await?;
-
+        if let Err(e) = coll.delete_one(filterdoc, None).await {
+            if let Some(v) = popped {
+                cache.put((self__.guild_id.to_string(), self__.curr_name.clone()), v);
+            }
+            return Err(e.into());
+        }
+        drop(cache);
         Ok(())
     }
 }
@@ -1112,14 +1119,15 @@ mod test {
         crate::init_env().await;
         let guild_id: u64 = 123_456_789; // Test currency present in the database.
         let curr_name = "test";
-        let currency = Currency::try_from_name(guild_id, curr_name.to_string()).await
+        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
             .unwrap()
             .unwrap();
         let currency = currency.lock().await;
-        let currency = currency.as_ref().unwrap();
-        dbg!(&currency);
-        assert_eq!(currency.guild_id, DbGuildId::from(guild_id.to_string()));
-        assert_eq!(currency.curr_name, curr_name);
+        let currency_ = currency.as_ref().unwrap();
+        dbg!(&currency_);
+        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
+        assert_eq!(currency_.curr_name, curr_name);
+        drop(currency);
     }
 
     // Must test multithreading
@@ -1129,11 +1137,11 @@ mod test {
         let guild_id: u64 = 123_456_789;
         let curr_name = "test";
         let mut rng = thread_rng();
-        let mut threads: Vec<_> = (0..20000)
-            .map(|i| sleepy_fetch_currency(guild_id, curr_name, rng.gen_range(0..5000), i))
-            .collect();
+        let mut threads = (0..20000).map(|i|
+            sleepy_fetch_currency(guild_id, curr_name, rng.gen_range(0..5000), i)
+        );
 
-        let mut handles: Vec<_> = threads.into_iter().map(tokio::spawn).collect();
+        let mut handles: Vec<_> = threads.map(tokio::spawn).collect();
 
         for h in handles {
             h.await.unwrap();
@@ -1145,11 +1153,9 @@ mod test {
         crate::init_env().await;
         let guild_id: u64 = 123_456_789;
         let curr_name = "test";
-        let mut threads: Vec<_> = (0..20000)
-            .map(|i| sleepy_fetch_currency(guild_id, curr_name, 0, i))
-            .collect();
+        let mut threads = (0..20000).map(|i| sleepy_fetch_currency(guild_id, curr_name, 0, i));
 
-        let mut handles: Vec<_> = threads.into_iter().map(tokio::spawn).collect();
+        let mut handles: Vec<_> = threads.map(tokio::spawn).collect();
 
         for h in handles {
             h.await.unwrap();
@@ -1159,13 +1165,14 @@ mod test {
     async fn sleepy_fetch_currency(guild_id: u64, curr_name: &str, millis: u64, i: usize) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
         println!("T{i}");
-        let currency = Currency::try_from_name(guild_id, curr_name.to_string()).await
+        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
             .unwrap()
             .unwrap();
         let currency = currency.lock().await;
-        let currency = currency.as_ref().unwrap();
-        assert_eq!(currency.guild_id, DbGuildId::from(guild_id.to_string()));
-        assert_eq!(currency.curr_name, curr_name);
+        let currency_ = currency.as_ref().unwrap();
+        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
+        assert_eq!(currency_.curr_name, curr_name);
+        drop(currency)
     }
 
     #[tokio::test]

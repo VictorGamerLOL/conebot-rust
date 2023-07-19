@@ -20,6 +20,7 @@ lazy_static! {
     static ref TIMEOUTS: Arc<Mutex<HashSet<Timeout>>> = Arc::new(Mutex::new(HashSet::new()));
 }
 
+#[allow(clippy::significant_drop_tightening)]
 pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     let user: DbUserId = new_message.author.id.into();
     let guild: DbGuildId = if let Some(g) = new_message.guild_id {
@@ -44,6 +45,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         info!("Removing timeout: {:?}", timeout);
         let mut timeouts = TIMEOUTS.lock().await;
         timeouts.remove(&timeout);
+        drop(timeouts);
     });
     Ok(())
 }

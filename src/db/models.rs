@@ -1,4 +1,4 @@
-mod balances;
+pub mod balances;
 pub mod currency;
 mod drop_table;
 pub mod global;

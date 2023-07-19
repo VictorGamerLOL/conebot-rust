@@ -30,7 +30,7 @@ pub struct Builder {
 
 impl Builder {
     #[must_use]
-    pub fn new(guild_id: DbGuildId, curr_name: String, symbol: String) -> Self {
+    pub const fn new(guild_id: DbGuildId, curr_name: String, symbol: String) -> Self {
         Self {
             guild_id,
             curr_name,
@@ -117,7 +117,7 @@ impl Builder {
         let roles_blacklist = self.roles_blacklist;
         let earn_min = self.earn_min.unwrap_or(1.0);
         let earn_max = self.earn_max.unwrap_or(100.0);
-        let earn_timeout = self.earn_timeout.unwrap_or(Duration::seconds(30));
+        let earn_timeout = self.earn_timeout.unwrap_or_else(|| Duration::seconds(30));
 
         let curr = Currency {
             guild_id,
@@ -151,6 +151,7 @@ impl Builder {
             tokio::sync::Mutex::new(Some(curr))
         );
         cache.push((self.guild_id.to_string(), self.curr_name.clone()), arc_currency.clone());
+        drop(cache);
         Ok(arc_currency)
     }
 

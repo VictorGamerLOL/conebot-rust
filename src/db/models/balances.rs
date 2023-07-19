@@ -32,7 +32,7 @@ use super::Currency;
 pub struct Balances {
     guild_id: DbGuildId,
     user_id: DbUserId,
-    pub balances: Vec<Balance>,
+    balances: Vec<Balance>,
 }
 
 /// This struct represents the balance for a certain user in a specific guild for a specific currency.
@@ -86,7 +86,7 @@ impl Balances {
 
         let balances = Arc::new(
             Mutex::new(
-                Some(Balances {
+                Some(Self {
                     guild_id: guild_id.clone(),
                     user_id: user_id.clone(),
                     balances: res,
@@ -94,11 +94,18 @@ impl Balances {
             )
         );
         cache.put((guild_id, user_id), balances.clone());
+        drop(cache);
         Ok(balances)
     }
 
+    #[allow(clippy::must_use_candidate)]
     pub fn balances(&self) -> &[Balance] {
-        return &self.balances;
+        &self.balances
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn balances_mut(&mut self) -> &mut [Balance] {
+        &mut self.balances
     }
 
     /// Adds another balance for this user for a certain currency.
@@ -108,10 +115,18 @@ impl Balances {
     /// Returns an error if:
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
-    pub async fn create_balance(&mut self, curr_name: String) -> Result<()> {
-        let bal = Balance::new(self.guild_id.clone(), self.user_id.clone(), curr_name).await?;
+    pub async fn create_balance(&mut self, curr_name: String) -> Result<&Balance> {
+        let bal = Balance::new(
+            self.guild_id.clone(),
+            self.user_id.clone(),
+            curr_name.clone()
+        ).await?;
         self.balances.push(bal);
-        Ok(())
+
+        self.balances
+            .iter()
+            .find(|b| b.curr_name() == curr_name)
+            .ok_or_else(|| anyhow!("Created balance but could not find it afterwards, strange."))
     }
 
     #[allow(clippy::must_use_candidate)]
@@ -161,17 +176,16 @@ impl Balance {
             curr_name: curr_name.clone(),
             amount: 0.0,
         };
-        // mem copy into another since there is no clone
-        let user_balance2: Balance = unsafe { std::mem::transmute_copy(&user_balance) };
-        /*
-         * Since there is no clone, unsafe comes to the rescue! Because I cannot allow myself to
-         * clone a `Balance` since that in itself would be unsafe. This operation should be safe
-         * because rust guarantees that 2 instances of the same type *will* have the same memory
-         * layout. Unlike 2 types which have the same fields in the same order, those are not
-         * guaranteed to have the same memory layout. So this should be safe, I think...
-         */
+        let user_balance2 = Self {
+            guild_id: guild_id.clone(),
+            user_id: user_id.clone(),
+            curr_name: curr_name.clone(),
+            amount: 0.0,
+        }; // no clone so manually make new one
+        // I tried to use transmute_copy beforehand. Terrible mistake,
+        // the currency name ended up being invalid unicode.
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Balance> = db.collection("balances");
+        let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
             doc! {
@@ -197,12 +211,12 @@ impl Balance {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn guild_id(&self) -> &DbGuildId {
+    pub const fn guild_id(&self) -> &DbGuildId {
         &self.guild_id
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn user_id(&self) -> &DbUserId {
+    pub const fn user_id(&self) -> &DbUserId {
         &self.user_id
     }
 
@@ -212,7 +226,7 @@ impl Balance {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub fn amount(&self) -> f64 {
+    pub const fn amount(&self) -> f64 {
         self.amount
     }
     /// Sets the amount of the currency that the user said to the specified amount.
@@ -260,7 +274,7 @@ impl Balance {
         } else {
             (amount * 100.0).round() * 0.01 // multiplication is faster than division
         };
-        let new_amount = (self.amount * 100.0 + amount * 100.0).round() * 0.01;
+        let new_amount = self.amount.mul_add(100.0, amount * 100.0).round() * 0.01;
         if new_amount.is_infinite() {
             return Err(anyhow!("Cannot add that amount, would overflow to infinity."));
         } else if new_amount.is_nan() {
@@ -292,7 +306,7 @@ impl Balance {
         if amount > self.amount {
             return Err(anyhow!("Cannot subtract more than the current amount."));
         }
-        let new_amount = (self.amount * 100.0 - amount * 100.0).round() * 0.01;
+        let new_amount = self.amount.mul_add(100.0, -amount * 100.0).round() * 0.01;
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
         }
@@ -312,7 +326,7 @@ impl Balance {
             return Err(anyhow!("Cannot subtract NaN."));
         }
         amount = (amount * 100.0).round() / 100.0;
-        let new_amount = (self.amount * 100.0 - amount * 100.0).round() / 100.0;
+        let new_amount = self.amount.mul_add(100.0, -amount * 100.0).round() / 100.0;
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
         }
@@ -333,7 +347,7 @@ impl Balance {
             return Err(anyhow!("Cannot add NaN."));
         }
         amount = (amount * 100.0).round() / 100.0;
-        let new_amount = (self.amount * 100.0 + amount * 100.0).round() / 100.0;
+        let new_amount = self.amount.mul_add(100.0, amount * 100.0).round() / 100.0;
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot add that amount, would cause a NaN."));
         }
@@ -353,7 +367,7 @@ impl Balance {
         }
         amount = (amount * 100.0).round() / 100.0;
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Balance> = db.collection("balances");
+        let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
             doc! {
@@ -412,7 +426,7 @@ impl Balance {
     /// - If the amount of deleted documents is 0.
     pub async fn delete(self) -> Result<(), (anyhow::Error, Self)> {
         let mut db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Balance> = db.collection("balances");
+        let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
             doc! {
@@ -445,8 +459,9 @@ mod test {
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances = balances.as_mut().unwrap();
-        assert_eq!(balances.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
+        let mut balances_ = balances.as_mut().unwrap();
+        assert_eq!(balances_.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
+        drop(balances); // please the clippy nursery
     }
 
     #[tokio::test]
@@ -457,8 +472,8 @@ mod test {
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances = balances.as_mut().unwrap();
-        let mut balance = balances.balances
+        let mut balances_ = balances.as_mut().unwrap();
+        let mut balance = balances_.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();
@@ -496,6 +511,8 @@ mod test {
         assert_eq!(balance.amount, 0.11);
 
         balance.set_amount(30.0).await.unwrap(); // Reset amount
+
+        drop(balances);
     }
 
     #[tokio::test]
@@ -505,8 +522,8 @@ mod test {
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances = balances.as_mut().unwrap();
-        let mut balance = balances.balances
+        let mut balances_ = balances.as_mut().unwrap();
+        let mut balance = balances_.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();
@@ -527,5 +544,7 @@ mod test {
 
         assert!(balance.add_amount_unchecked(f64::NAN).await.is_err()); // NaN check
         assert!(balance.sub_amount_unchecked(f64::NAN).await.is_err());
+
+        drop(balances);
     }
 }

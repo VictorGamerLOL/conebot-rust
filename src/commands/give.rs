@@ -41,7 +41,7 @@ pub async fn run(
         .cloned()
         .map(
             |o| -> Result<(String, CommandDataOptionValue)> {
-                let res = o.resolved.ok_or(anyhow!("Failed to resolve {}", o.name))?;
+                let res = o.resolved.ok_or_else(|| anyhow!("Failed to resolve {}", o.name))?;
                 Ok((o.name, res))
             }
         )
@@ -82,11 +82,16 @@ pub async fn run(
 
     amount = truncate_2dp(amount);
 
-    if Currency::try_from_name(command.guild_id.unwrap(), currency.clone()).await?.is_none() {
+    if Currency::try_from_name(command.guild_id.unwrap().into(), currency.clone()).await?.is_none() {
         return Err(anyhow!("Currency {} does not exist.", currency));
     }
 
-    if command.guild_id.unwrap().member(http.clone(), member.id).await.is_err() {
+    if
+        command.guild_id
+            .ok_or_else(|| anyhow!("Cannot use commands in DMs."))?
+            .member(http.clone(), member.id).await
+            .is_err()
+    {
         return Err(anyhow!("Member {} does not exist.", member.id));
     }
 
@@ -96,15 +101,21 @@ pub async fn run(
     ).await?;
     let mut balances = balances.lock().await;
 
-    let Some(mut balances) = balances.as_mut() else {
+    let Some(mut balances_) = balances.as_mut() else {
         return Err(anyhow!("{}'s balances are being used in a breaking operation.", member.id));
     };
 
-    let mut balance = balances.balances.iter_mut().find(|b| b.curr_name == currency);
+    let mut balance = balances_
+        .balances_mut()
+        .iter_mut()
+        .find(|b| b.curr_name == currency);
 
     if balance.is_none() {
-        balances.create_balance(currency.clone()).await?;
-        balance = balances.balances.iter_mut().find(|b| b.curr_name == currency);
+        balances_.create_balance(currency.clone()).await?;
+        balance = balances_
+            .balances_mut()
+            .iter_mut()
+            .find(|b| b.curr_name == currency);
     }
 
     let Some(mut balance) = balance else {
@@ -118,6 +129,8 @@ pub async fn run(
     };
 
     balance.add_amount_unchecked(amount).await?;
+
+    drop(balances);
 
     command.edit_original_interaction_response(http, |m| {
         m.content(format!("{} has been given {} of {}.", member.name, amount, currency))

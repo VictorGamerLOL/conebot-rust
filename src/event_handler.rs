@@ -4,6 +4,9 @@ use std::sync::{ Arc, Mutex };
 
 use crate::commands;
 use anyhow::anyhow;
+use anyhow::Result;
+use serenity::model::prelude::application_command::ApplicationCommandInteraction;
+use serenity::model::prelude::application_command::CommandDataOption;
 // What the FUCK Rust?
 use crate::event_handler::message::message;
 use lazy_static::lazy_static;
@@ -15,9 +18,28 @@ use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::{ Message, Ready };
 use serenity::prelude::Context;
 use tracing::{ debug, error, info, instrument, trace, warn };
-
 #[derive(Debug)]
 pub struct Handler;
+
+impl Handler {
+    async unsafe fn handle_command<'a>(
+        &self,
+        command: &ApplicationCommandInteraction,
+        ctx: &Context
+    ) -> Result<()> {
+        match command.data.name.as_str() {
+            "ping" => commands::ping::run(&command.data.options, command, ctx).await?,
+            "test" => commands::test1::run(&command.data.options, command, ctx).await?,
+            "currency" => commands::currency::run(&command.data.options, command, ctx).await?,
+            "balance" => commands::balance::run(&command.data.options, command, ctx).await?,
+            "give" => commands::give::run(&command.data.options, command, ctx).await?,
+            _ => {
+                return Err(anyhow!("Unknown command: {}", command.data.name));
+            }
+        }
+        Ok(())
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -40,7 +62,8 @@ impl EventHandler for Handler {
                     commands::ping::application_command(),
                     commands::test1::application_command(),
                     commands::currency::application_command(),
-                    commands::balance::application_command()
+                    commands::balance::application_command(),
+                    commands::give::application_command()
                 ]
             )
         }).await.expect("Failed to register commands.");
@@ -49,7 +72,7 @@ impl EventHandler for Handler {
     /// This function is responsible for handling all incoming interactions.
     ///
     /// New commands must be entered here when added due to the nature of Rust.
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) -> () {
         if let Interaction::ApplicationCommand(command) = interaction {
             info!("Received command interaction: {:#?}", command.data.name);
             command
@@ -59,16 +82,7 @@ impl EventHandler for Handler {
                     ).interaction_response_data(|msg| msg.ephemeral(true))
                 }).await
                 .unwrap_or_else(|e| error!("Error creating response: {}", e)); // This returns
-            let res = match command.data.name.as_str() {
-                "ping" => commands::ping::run(&command.data.options, &command, &ctx.http).await,
-                "test" => commands::test1::run(&command.data.options, &command, &ctx.http).await,
-                "currency" => {
-                    commands::currency::run(&command.data.options, &command, &ctx.http).await
-                }
-                "balance" =>
-                    commands::balance::run(&command.data.options, &command, &ctx.http).await,
-                _ => Err(anyhow!("Unknown command: {}", command.data.name)),
-            };
+            let res = unsafe { self.handle_command(&command, &ctx).await };
             if let Err(e) = res {
                 if let Some(e) = e.downcast_ref::<serenity::Error>() {
                     // If it's serenity's fault it is futile to try to respond to the user

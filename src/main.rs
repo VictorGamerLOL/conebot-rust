@@ -3,8 +3,10 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(clippy::await_holding_lock)]
-#![warn(clippy::pedantic)]
+// #![warn(clippy::pedantic)] // TODO Enable this when finishing code.
+#![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
+#![deny(elided_lifetimes_in_paths)]
 
 pub mod commands;
 pub mod db;

@@ -24,6 +24,7 @@
 
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
+use anyhow::{ anyhow, Result };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -35,9 +36,10 @@ impl From<u64> for DbGuildId {
     }
 }
 
-impl From<DbGuildId> for u64 {
-    fn from(id: DbGuildId) -> Self {
-        id.0.parse().unwrap()
+impl TryFrom<DbGuildId> for u64 {
+    type Error = anyhow::Error;
+    fn try_from(id: DbGuildId) -> Result<Self> {
+        Ok(id.0.parse()?)
     }
 }
 
@@ -47,9 +49,10 @@ impl From<GuildId> for DbGuildId {
     }
 }
 
-impl From<DbGuildId> for GuildId {
-    fn from(id: DbGuildId) -> Self {
-        Self(id.0.parse().unwrap())
+impl TryFrom<DbGuildId> for GuildId {
+    type Error = anyhow::Error;
+    fn try_from(id: DbGuildId) -> Result<Self> {
+        Ok(Self(id.0.parse()?))
     }
 }
 
@@ -92,9 +95,10 @@ impl From<u64> for DbUserId {
     }
 }
 
-impl From<DbUserId> for u64 {
-    fn from(id: DbUserId) -> Self {
-        id.0.parse().unwrap()
+impl TryFrom<DbUserId> for u64 {
+    type Error = anyhow::Error;
+    fn try_from(id: DbUserId) -> Result<Self> {
+        Ok(id.0.parse()?)
     }
 }
 
@@ -104,9 +108,10 @@ impl From<UserId> for DbUserId {
     }
 }
 
-impl From<DbUserId> for UserId {
-    fn from(id: DbUserId) -> Self {
-        Self(id.0.parse().unwrap())
+impl TryFrom<DbUserId> for UserId {
+    type Error = anyhow::Error;
+    fn try_from(id: DbUserId) -> Result<Self> {
+        Ok(Self(id.0.parse()?))
     }
 }
 
@@ -150,9 +155,10 @@ impl From<u64> for DbChannelId {
     }
 }
 
-impl From<DbChannelId> for u64 {
-    fn from(id: DbChannelId) -> Self {
-        id.0.parse().unwrap()
+impl TryFrom<DbChannelId> for u64 {
+    type Error = anyhow::Error;
+    fn try_from(id: DbChannelId) -> Result<Self> {
+        Ok(id.0.parse()?)
     }
 }
 
@@ -162,9 +168,10 @@ impl From<ChannelId> for DbChannelId {
     }
 }
 
-impl From<DbChannelId> for ChannelId {
-    fn from(id: DbChannelId) -> Self {
-        Self(id.0.parse().unwrap())
+impl TryFrom<DbChannelId> for ChannelId {
+    type Error = anyhow::Error;
+    fn try_from(id: DbChannelId) -> Result<Self> {
+        Ok(Self(id.0.parse()?))
     }
 }
 
@@ -208,9 +215,10 @@ impl From<u64> for DbRoleId {
     }
 }
 
-impl From<DbRoleId> for u64 {
-    fn from(id: DbRoleId) -> Self {
-        id.0.parse().unwrap()
+impl TryFrom<DbRoleId> for u64 {
+    type Error = anyhow::Error;
+    fn try_from(id: DbRoleId) -> Result<Self> {
+        Ok(id.0.parse()?)
     }
 }
 
@@ -220,9 +228,10 @@ impl From<RoleId> for DbRoleId {
     }
 }
 
-impl From<DbRoleId> for RoleId {
-    fn from(id: DbRoleId) -> Self {
-        Self(id.0.parse().unwrap())
+impl TryFrom<DbRoleId> for RoleId {
+    type Error = anyhow::Error;
+    fn try_from(id: DbRoleId) -> Result<Self> {
+        Ok(Self(id.0.parse()?))
     }
 }
 

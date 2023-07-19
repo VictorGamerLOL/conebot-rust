@@ -11,8 +11,8 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Create
   - [x] Delete
   - [x] Per-guild per-currency member balances
-  - [ ] Display member balances <!-- backend done, in progress -->
-  - [ ] Give to members <!--backend done -->
+  - [x] Display member balances
+  - [x] Give to members
   - [ ] Take from members <!-- backend done -->
   - [ ] Changing config values <!-- backend done -->
   - [ ] Chat earning
