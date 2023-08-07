@@ -20,19 +20,16 @@
 //! fair for everyone.
 pub mod builder;
 
-use std::{ hash::Hash, num::NonZeroUsize, sync::Arc };
+use std::{ num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
-use lru::{ DefaultHasher, LruCache };
-use mongodb::{ bson::{ doc, Document, RawDocument, RawDocumentBuf }, Collection };
-use once_cell::sync::OnceCell;
-use parking_lot::FairMutex;
+use lru::LruCache;
+use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
 use serde_with::{ serde_as, DurationSeconds };
-use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::db::{
@@ -1111,7 +1108,6 @@ mod test {
     use std::io::Write;
 
     use super::*;
-    use futures::Future;
     use rand::prelude::*;
 
     #[tokio::test]

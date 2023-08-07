@@ -1,18 +1,11 @@
 pub mod models;
 
-use std::hash::Hash;
 use std::sync::Arc;
 
-use anyhow::Result;
 use async_once::AsyncOnce;
-use dotenv::dotenv;
-use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
-use mongodb::{ bson::Document, Client, Cursor };
-use parking_lot::FairMutex;
-use serde::de::DeserializeOwned;
-use serde::{ Deserialize, Serialize };
+use mongodb::Client;
 
 // Do not, and I repeat, DO NOT try to replace the tokio mutexes with
 // a parking_lot or std mutex. It will not work. It will hang with mongodb operations
@@ -33,6 +26,7 @@ lazy_static! {
 
 #[tokio::test]
 async fn test_new_client() {
+    use dotenv::dotenv;
     dotenv().ok();
     let uri = std::env::var("MONGO_URI").expect("MONGO_URI must be set");
     let client = Client::with_uri_str(&uri).await.unwrap();

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(unused_mut)]
+#![allow(unused_imports)]
 #![allow(clippy::await_holding_lock)]
 // #![warn(clippy::pedantic)] // TODO Enable this when finishing code.
 #![warn(clippy::nursery)]
@@ -16,8 +16,8 @@ pub mod util;
 use dotenv::dotenv;
 use serenity::{ prelude::GatewayIntents, Client };
 use std::env;
-use tracing::{ debug, error, info, instrument, span, trace, warn };
-use tracing_subscriber::{ fmt, fmt::format, EnvFilter, FmtSubscriber };
+use tracing::{ debug, error, info, span, trace, warn };
+use tracing_subscriber::{ fmt, fmt::format, EnvFilter };
 
 #[tokio::main]
 async fn main() {

@@ -1,15 +1,11 @@
 mod message;
 
-use std::sync::{ Arc, Mutex };
-
 use crate::commands;
 use anyhow::anyhow;
 use anyhow::Result;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::application_command::CommandDataOption;
 // What the FUCK Rust?
 use crate::event_handler::message::message;
-use lazy_static::lazy_static;
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::model::application::command::Command;
@@ -17,7 +13,7 @@ use serenity::model::application::interaction::Interaction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::{ Message, Ready };
 use serenity::prelude::Context;
-use tracing::{ debug, error, info, instrument, trace, warn };
+use tracing::{ error, info, instrument };
 #[derive(Debug)]
 pub struct Handler;
 

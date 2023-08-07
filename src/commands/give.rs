@@ -9,8 +9,6 @@ use serenity::{
                 CommandDataOption,
                 CommandDataOptionValue,
             },
-            Member,
-            PartialMember,
             command::CommandOptionType,
         },
         user::User,

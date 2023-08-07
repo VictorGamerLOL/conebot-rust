@@ -1,5 +1,5 @@
 use crate::db::models::Currency;
-use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
+use crate::db::id::DbGuildId;
 use anyhow::{ anyhow, Result };
 use serenity::builder::CreateApplicationCommandOption;
 use serenity::http::Http;

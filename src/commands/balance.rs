@@ -1,6 +1,6 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
-    builder::{ CreateApplicationCommand, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter },
+    builder::{ CreateApplicationCommand, CreateEmbed, CreateEmbedAuthor },
     http::{ Http, CacheHttp },
     model::{
         prelude::{
@@ -13,15 +13,12 @@ use serenity::{
             command::CommandOptionType,
             GuildId,
             PartialMember,
-            Embed,
         },
         user::User,
-        Timestamp,
     },
     utils::Colour,
 };
-use time::OffsetDateTime;
-use futures::{ Stream, StreamExt, TryStream, TryStreamExt, future::{ join_all, try_join_all } };
+use futures::future::try_join_all;
 
 use crate::db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioMutexOption };
 
@@ -144,7 +141,7 @@ fn single_currency_embed<'a>(
     embed.description(format!("{}{}", currency.symbol(), balance.amount()));
     embed.colour(Colour::DARK_GREEN);
     embed.image(target.face());
-    embed.timestamp(OffsetDateTime::now_utc());
+    embed.timestamp(chrono::Utc::now());
     embed
 }
 

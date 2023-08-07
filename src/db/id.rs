@@ -24,7 +24,7 @@
 
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
-use anyhow::{ anyhow, Result };
+use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]

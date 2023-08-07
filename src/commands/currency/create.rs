@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
-use serde_json::Value;
 use serenity::model::prelude::application_command::CommandDataOptionValue;
 use serenity::{
     builder::CreateApplicationCommandOption,
@@ -12,7 +9,6 @@ use serenity::{
         prelude::{ application_command::CommandDataOption, command::CommandOptionType },
     },
 };
-use tokio::sync::Mutex;
 
 use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
 
