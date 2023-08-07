@@ -258,7 +258,6 @@ dependencies = [
  "serde_with 3.0.0",
  "serenity",
  "thiserror",
- "time 0.3.23",
  "tokio",
  "tracing",
  "tracing-subscriber",

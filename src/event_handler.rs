@@ -1,4 +1,5 @@
 mod message;
+pub mod command_handler;
 
 use crate::commands;
 use anyhow::anyhow;
@@ -14,15 +15,18 @@ use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::{ Message, Ready };
 use serenity::prelude::Context;
 use tracing::{ error, info, instrument };
+
+use self::command_handler::CommandOptions;
 #[derive(Debug)]
 pub struct Handler;
 
 impl Handler {
-    async unsafe fn handle_command<'a>(
+    async fn handle_command<'a>(
         &self,
         command: &ApplicationCommandInteraction,
         ctx: &Context
     ) -> Result<()> {
+        let mut options: CommandOptions = command.data.options.clone().into();
         match command.data.name.as_str() {
             "ping" => commands::ping::run(&command.data.options, command, ctx).await?,
             "test" => commands::test1::run(&command.data.options, command, ctx).await?,
@@ -78,7 +82,7 @@ impl EventHandler for Handler {
                     ).interaction_response_data(|msg| msg.ephemeral(true))
                 }).await
                 .unwrap_or_else(|e| error!("Error creating response: {}", e)); // This returns
-            let res = unsafe { self.handle_command(&command, &ctx).await };
+            let res = self.handle_command(&command, &ctx).await;
             if let Err(e) = res {
                 if let Some(e) = e.downcast_ref::<serenity::Error>() {
                     // If it's serenity's fault it is futile to try to respond to the user

@@ -16,7 +16,6 @@ tokio = { version = "^1.29.1", features = [
     "rt-multi-thread",
 ] }
 chrono = { version = "^0.4.26", features = ["serde"] }
-time = "^0.3.23"
 futures = "^0.3.28"
 lazy_static = "^1.4.0"
 once_cell = "1.18.0"

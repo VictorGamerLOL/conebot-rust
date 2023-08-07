@@ -13,7 +13,7 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Per-guild per-currency member balances
   - [x] Display member balances
   - [x] Give to members
-  - [ ] Take from members <!-- backend done -->
+  - [x] Take from members
   - [ ] Changing config values <!-- backend done -->
   - [ ] Chat earning
   - [ ] Whitelisting and blacklisting earning
