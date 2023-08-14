@@ -26,7 +26,7 @@ use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 use anyhow::Result;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbGuildId(pub String);
 
@@ -85,7 +85,7 @@ impl AsRef<str> for DbGuildId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbUserId(pub String);
 
@@ -145,7 +145,7 @@ impl AsRef<str> for DbUserId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbChannelId(pub String);
 
@@ -205,7 +205,7 @@ impl AsRef<str> for DbChannelId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbRoleId(pub String);
 

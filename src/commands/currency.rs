@@ -1,5 +1,6 @@
 pub mod create;
 mod delete;
+pub mod config;
 
 use anyhow::{ anyhow, Result };
 use serenity::{

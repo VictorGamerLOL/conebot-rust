@@ -15,11 +15,14 @@ pub use inventory::{ Inventory, InventoryEntry };
 pub use item::Item;
 pub use multipliers::{ Multiplier, Multipliers };
 pub use role_rewards::{ RoleReward, RoleRewards };
+use serde_json::Value;
 pub use store_entry::StoreEntry;
+use serde::{ Serialize, Deserialize };
+use anyhow::{ anyhow, Result };
 
 use once_cell::sync::OnceCell;
 
-use super::id::DbGuildId;
+use super::id::{ DbGuildId, DbUserId, DbChannelId, DbRoleId };
 
 pub struct BotGuild {
     guild_id: DbGuildId,
@@ -46,3 +49,27 @@ impl BotGuild {
         }
     }
 }
+
+pub trait ToKVs: Serialize {
+    /// Tries to serialize itself into a JSON object,
+    /// then deserialize itself into `Result<Vec<(String, String)>>`.
+    ///
+    /// # Errors
+    /// This will return an error if the value provided
+    /// cannot be interpreted as a json object, such as a
+    /// regular string, number or `Vec`.
+    fn try_to_kvs(&self) -> Result<Vec<(String, String)>> {
+        match serde_json::to_value(self)? {
+            Value::Object(o) =>
+                Ok(
+                    o
+                        .into_iter()
+                        .map(|(k, v)| (k, v.to_string()))
+                        .collect()
+                ),
+            _ => Err(anyhow!("Could not convert to json object.")),
+        }
+    }
+}
+
+impl<T> ToKVs for T where T: Serialize {}
