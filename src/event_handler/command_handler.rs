@@ -72,7 +72,7 @@ impl CommandOptions {
     pub fn get_value_by_name(&self, name: &str) -> Option<CommandDataOptionValue> {
         self.args
             .iter()
-            .find(|arg| arg.name == name)?
+            .find(|arg| dbg!(arg).name == name)?
             .value.clone()
     }
 
@@ -84,6 +84,7 @@ impl CommandOptions {
     /// - If the option does not exist with `None`.
     /// - If the option is optional and there is no value with `None`.
     pub fn get_string_value(&self, name: &str) -> Option<Result<String>> {
+        dbg!(&self.args);
         let t = self.get_value_by_name(name)?;
         if let CommandDataOptionValue::String(s) = t {
             Some(Ok(s))
@@ -179,13 +180,13 @@ impl CommandOptions {
     /// # Errors
     /// - If there is more or less than one option.
     /// - If the only option is not a subcommand or subcommand group.
-    pub fn get_subcommand_args(&self) -> Option<(String, Self)> {
+    pub fn get_subcommand_args_and_name(&self) -> Option<(String, Self)> {
         if self.args.len() != 1 {
             return None;
         }
         let first_option = self.args.first()?.clone();
         if
-            first_option.kind != CommandOptionType::SubCommand ||
+            first_option.kind != CommandOptionType::SubCommand &&
             first_option.kind != CommandOptionType::SubCommandGroup
         {
             return None;

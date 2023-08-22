@@ -9,6 +9,8 @@ use serenity::{
     model::prelude::application_command::{ ApplicationCommandInteraction, CommandDataOption },
 };
 
+use crate::event_handler::command_handler::CommandOptions;
+
 /// # Errors
 /// Serenity stuff.
 pub async fn run(
@@ -17,9 +19,11 @@ pub async fn run(
     http: impl AsRef<Http> + Send + Sync + Clone + CacheHttp
 ) -> Result<()> {
     let cmd_name = options[0].name.as_str();
+    let cmd_options: CommandOptions = options[0].options.clone().into();
     match cmd_name {
         "create" => create::run(&options[0].options, command, http.clone()).await?,
         "delete" => delete::run(&options[0].options, command, http.clone()).await?,
+        "config" => config::run(cmd_options, command, &http).await?,
         _ => {
             return Err(anyhow!("Unknown subcommand: {}", cmd_name));
         }
@@ -35,6 +39,7 @@ pub fn application_command() -> CreateApplicationCommand {
         .description("Commands related to managing currencies.")
         .dm_permission(false)
         .add_option(create::option())
-        .add_option(delete::option());
+        .add_option(delete::option())
+        .add_option(config::option());
     command
 }

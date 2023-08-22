@@ -7,12 +7,110 @@ use serenity::{
     http::{ Http, CacheHttp },
 };
 use anyhow::{ Result, anyhow };
+use tokio::sync::MutexGuard;
 
 use crate::{
     event_handler::command_handler::CommandOptions,
     db::models::{ Currency, ToKVs },
     commands::currency,
 };
+
+#[derive(Debug)]
+pub struct CurrencyConfigPrettifier<'a, T> where T: ToKVs {
+    pub options: MutexGuard<'a, T>,
+}
+
+impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
+    pub const fn new(options: MutexGuard<'a, T>) -> Self {
+        Self {
+            options,
+        }
+    }
+
+    pub fn pretty(self) -> Result<CreateEmbed> {
+        let mut embed = CreateEmbed::default();
+        let kvs = self.options.try_to_kvs()?.into_iter();
+        let mut channels_is_whitelist: bool = false;
+        let mut roles_is_whitelist: bool = false;
+        let mut embed_title: String = String::from("Config for {SYMBOL}{CURR_NAME}");
+        for (k, v) in kvs.as_ref() {
+            match k.as_str() {
+                "GuildId" => (),
+                "CurrName" => {
+                    embed_title = embed_title.replace("{CURR_NAME}", &v.replace('\"', ""));
+                }
+                "Symbol" => {
+                    embed_title = embed_title.replace("{SYMBOL}", &v.replace('\"', ""));
+                }
+                "ChannelsIsWhitelist" => {
+                    channels_is_whitelist = v.to_ascii_lowercase().parse()?;
+                }
+                "RolesIsWhitelist" => {
+                    roles_is_whitelist = v.to_ascii_lowercase().parse()?;
+                }
+                &_ => {
+                    // convert K from PascalCase to Sentence case
+                    if k.is_empty() {
+                        continue;
+                    }
+                    let mut k = k.chars();
+                    let mut k_ = String::new();
+                    k_.push(k.next().unwrap().to_ascii_uppercase());
+                    for c in k {
+                        if c.is_ascii_uppercase() {
+                            k_.push(' ');
+                        }
+                        k_.push(c);
+                    }
+                    embed.field(k_, v, true);
+                }
+            }
+        }
+        for (k, v) in kvs {
+            match k.as_str() {
+                "GuildId" | "CurrName" | "Symbol" => (),
+                "channelsWhitelist" => {
+                    if channels_is_whitelist {
+                        embed.field("Channels Whitelist", v, true);
+                    }
+                }
+                "ChannelsBlacklist" => {
+                    if !channels_is_whitelist {
+                        embed.field("Channels Blacklist", v, true);
+                    }
+                }
+                "RolesWhitelist" => {
+                    if roles_is_whitelist {
+                        embed.field("Roles Whitelist", v, true);
+                    }
+                }
+                "RolesBlacklist" => {
+                    if !roles_is_whitelist {
+                        embed.field("Roles Blacklist", v, true);
+                    }
+                }
+                &_ => {
+                    // convert K from PascalCase to Sentence case
+                    if k.is_empty() {
+                        continue;
+                    }
+                    let mut k = k.chars();
+                    let mut k_ = String::new();
+                    k_.push(k.next().unwrap().to_ascii_uppercase());
+                    for c in k {
+                        if c.is_ascii_uppercase() {
+                            k_.push(' ');
+                        }
+                        k_.push(c.to_ascii_lowercase());
+                    }
+                    embed.field(k_, v, true);
+                }
+            }
+        }
+        embed.title(embed_title);
+        Ok(embed)
+    }
+}
 
 const COMMAND_OPTION_CURRENCY: &str = "currency";
 
@@ -21,34 +119,16 @@ pub async fn run(
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Clone + CacheHttp
 ) -> Result<()> {
-    let currency = options
-        .get_string_value(COMMAND_OPTION_CURRENCY)
-        .ok_or_else(|| anyhow!("Could not find currency."))??;
+    let currency = dbg!(options.get_string_value(COMMAND_OPTION_CURRENCY)).ok_or_else(||
+        anyhow!("Could not find currency.")
+    )??;
 
     let currency = Currency::try_from_name(
         command.guild_id.ok_or_else(|| anyhow!("Command may not be performed in DMs"))?.into(),
         currency.clone()
     ).await?.ok_or_else(move || anyhow!("Currency {} does not exist.", currency))?;
 
-    let mut embed = CreateEmbed::default();
-
-    let currency = currency.lock().await;
-
-    let mut currency_ = currency.try_to_kvs()?.into_iter();
-
-    embed.title(
-        format!(
-            "Config for {}",
-            currency_.next().ok_or_else(|| anyhow!("Invalid currency object"))?.1
-        )
-    );
-
-    for (k, v) in currency_ {
-        //TODO: Add prettifier for some of the embed fields.
-        embed.field(k, v, true);
-    }
-
-    drop(currency);
+    let embed = CurrencyConfigPrettifier::new(currency.lock().await).pretty()?;
 
     command.edit_original_interaction_response(http, |m| { m.add_embed(embed) }).await?;
 
