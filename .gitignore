@@ -3,6 +3,3 @@
 /.vscode
 /.env
 /.idea
-/*/target
-/*/.env
-/*/Cargo.lock
