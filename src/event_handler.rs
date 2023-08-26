@@ -56,17 +56,21 @@ impl EventHandler for Handler {
     #[instrument(skip_all)] // Required for tracing, since this would fill the output with a lot of junk if arguments were to be logged.
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is running!", ready.user.name);
-        Command::set_global_application_commands(&ctx.http, |commands| {
-            commands.set_application_commands(
-                vec![
-                    commands::ping::application_command(),
-                    commands::test1::application_command(),
-                    commands::currency::application_command(),
-                    commands::balance::application_command(),
-                    commands::give::application_command()
-                ]
-            )
-        }).await.expect("Failed to register commands.");
+        if
+            let Err(e) = Command::set_global_application_commands(&ctx.http, |commands| {
+                commands.set_application_commands(
+                    vec![
+                        commands::ping::application_command(),
+                        commands::test1::application_command(),
+                        commands::currency::application_command(),
+                        commands::balance::application_command(),
+                        commands::give::application_command()
+                    ]
+                )
+            }).await
+        {
+            error!("Error registering commands: {}", e);
+        };
     }
 
     /// This function is responsible for handling all incoming interactions.

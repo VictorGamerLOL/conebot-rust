@@ -72,7 +72,7 @@ impl CommandOptions {
     pub fn get_value_by_name(&self, name: &str) -> Option<CommandDataOptionValue> {
         self.args
             .iter()
-            .find(|arg| dbg!(arg).name == name)?
+            .find(|arg| arg.name == name)?
             .value.clone()
     }
 

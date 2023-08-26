@@ -34,6 +34,23 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
         let mut roles_is_whitelist: bool = false;
         let mut embed_title: String = String::from("Config for {SYMBOL}{CURR_NAME}");
         for (k, v) in kvs.as_ref() {
+            // I need this only twice just in this function, so might as well just write it here.
+            fn default(k: &str, v: &str, embed: &mut CreateEmbed) {
+                if k.is_empty() {
+                    return;
+                }
+                let mut k = k.chars();
+                let mut k_ = String::new();
+                k_.push(k.next().unwrap().to_ascii_uppercase());
+                for c in k {
+                    if c.is_ascii_uppercase() {
+                        k_.push(' ');
+                    }
+                    k_.push(c);
+                }
+                embed.field(k_, v, true);
+            }
+
             match k.as_str() {
                 "GuildId" => (),
                 "CurrName" => {
@@ -41,6 +58,7 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                 }
                 "Symbol" => {
                     embed_title = embed_title.replace("{SYMBOL}", &v.replace('\"', ""));
+                    default(k, v, &mut embed);
                 }
                 "ChannelsIsWhitelist" => {
                     channels_is_whitelist = v.to_ascii_lowercase().parse()?;
@@ -49,20 +67,7 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                     roles_is_whitelist = v.to_ascii_lowercase().parse()?;
                 }
                 &_ => {
-                    // convert K from PascalCase to Sentence case
-                    if k.is_empty() {
-                        continue;
-                    }
-                    let mut k = k.chars();
-                    let mut k_ = String::new();
-                    k_.push(k.next().unwrap().to_ascii_uppercase());
-                    for c in k {
-                        if c.is_ascii_uppercase() {
-                            k_.push(' ');
-                        }
-                        k_.push(c);
-                    }
-                    embed.field(k_, v, true);
+                    default(k, v, &mut embed);
                 }
             }
         }
@@ -119,9 +124,9 @@ pub async fn run(
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Clone + CacheHttp
 ) -> Result<()> {
-    let currency = dbg!(options.get_string_value(COMMAND_OPTION_CURRENCY)).ok_or_else(||
-        anyhow!("Could not find currency.")
-    )??;
+    let currency = options
+        .get_string_value(COMMAND_OPTION_CURRENCY)
+        .ok_or_else(|| anyhow!("Could not find currency."))??;
 
     let currency = Currency::try_from_name(
         command.guild_id.ok_or_else(|| anyhow!("Command may not be performed in DMs"))?.into(),
