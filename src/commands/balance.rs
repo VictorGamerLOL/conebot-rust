@@ -20,7 +20,10 @@ use serenity::{
 };
 use futures::future::try_join_all;
 
-use crate::db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioMutexOption };
+use crate::{
+    db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioMutexOption },
+    event_handler::command_handler::CommandOptions,
+};
 
 /// # Errors
 /// TODO
@@ -29,7 +32,7 @@ use crate::db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcToki
 /// TODO
 #[allow(clippy::unused_async)]
 pub async fn run<'a>(
-    options: &[CommandDataOption],
+    options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl CacheHttp + AsRef<Http> + Clone
 ) -> Result<()> {
@@ -196,39 +199,24 @@ struct Options {
 }
 
 async fn parse_options<'a>(
-    options: &'a [CommandDataOption],
+    options: CommandOptions,
     guild_id: DbGuildId,
     http: impl AsRef<Http> + CacheHttp + Clone + 'a
 ) -> Result<Options> {
-    let mut user: Option<(User, PartialMember)> = None;
-    let mut currency: Option<String> = None;
-
-    let options: Vec<(String, CommandDataOptionValue)> = options
-        .iter()
-        .cloned()
+    // Get the user, change it from Option<Result<(User, Option<PartialMember>)>> to Result<Option<(User, Option<PartialMember>)>>,
+    // return if the result is Err, then map the Option<(User, Option<PartialMember>)> to Option<Result<(User, PartialMember)>>
+    // then also change that to Result<Option<(User, PartialMember)>>, then return if the result is Err to finally get
+    // Option<(User, PartialMember)>. Easy enough.
+    let mut user: Option<(User, PartialMember)> = options
+        .get_user_value("user")
+        .transpose()?
         .map(
-            |o| -> Result<(String, CommandDataOptionValue)> {
-                let res = o.resolved.ok_or_else(|| anyhow!("Failed to resolve {}", o.name))?;
-                Ok((o.name, res))
+            |(u, m)| -> Result<(User, PartialMember)> {
+                Ok((u, m.ok_or_else(|| anyhow!("DMs not allowed"))?))
             }
         )
-        .collect::<Result<Vec<(String, CommandDataOptionValue)>>>()?;
-
-    for (name, option) in options {
-        if name == *"currency" {
-            currency = if let CommandDataOptionValue::String(s) = option {
-                Some(s)
-            } else {
-                return Err(anyhow!("Did not find a string for currency name."));
-            };
-        } else if name == *"user" {
-            user = if let CommandDataOptionValue::User(u, m) = option {
-                Some((u, m.ok_or_else(|| anyhow!("Did not find a member for user."))?))
-            } else {
-                return Err(anyhow!("Did not find a user for user."));
-            };
-        }
-    }
+        .transpose()?;
+    let mut currency: Option<String> = options.get_string_value("currency").transpose()?;
 
     let currency: Option<ArcTokioMutexOption<Currency>> = if let Some(currency) = currency {
         Currency::try_from_name(guild_id.clone(), currency).await?

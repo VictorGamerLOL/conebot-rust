@@ -21,7 +21,7 @@ pub async fn run(
     let cmd_name = options[0].name.as_str();
     let cmd_options: CommandOptions = options[0].options.clone().into();
     match cmd_name {
-        "create" => create::run(&options[0].options, command, http.clone()).await?,
+        "create" => create::run(cmd_options, command, http.clone()).await?,
         "delete" => delete::run(&options[0].options, command, http.clone()).await?,
         "config" => config::run(cmd_options, command, &http).await?,
         _ => {

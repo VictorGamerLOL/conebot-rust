@@ -16,7 +16,11 @@ use serenity::{
     },
 };
 
-use crate::{ util::currency::truncate_2dp, db::models::{ Balances, Currency } };
+use crate::{
+    util::currency::truncate_2dp,
+    db::models::{ Balances, Currency },
+    event_handler::command_handler::CommandOptions,
+};
 
 /// # Errors
 /// TODO
@@ -26,48 +30,20 @@ use crate::{ util::currency::truncate_2dp, db::models::{ Balances, Currency } };
 #[allow(clippy::unused_async)]
 #[allow(clippy::cast_precision_loss)]
 pub async fn run(
-    options: &[CommandDataOption],
+    options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync + Clone + CacheHttp
 ) -> Result<()> {
-    let mut amount: f64 = 0.0;
-    let mut currency = String::new();
-    let mut member: User = User::default();
-
-    let options: Vec<(String, CommandDataOptionValue)> = options
-        .iter()
-        .cloned()
-        .map(
-            |o| -> Result<(String, CommandDataOptionValue)> {
-                let res = o.resolved.ok_or_else(|| anyhow!("Failed to resolve {}", o.name))?;
-                Ok((o.name, res))
-            }
-        )
-        .collect::<Result<Vec<(String, CommandDataOptionValue)>>>()?;
-
-    for (name, option) in options {
-        if name == *"currency" {
-            currency = if let CommandDataOptionValue::String(s) = option {
-                s
-            } else {
-                return Err(anyhow!("Did not find a string for currency name."));
-            };
-        } else if name == *"amount" {
-            amount = if let CommandDataOptionValue::Number(f) = option {
-                f
-            } else if let CommandDataOptionValue::Integer(i) = option {
-                i as f64
-            } else {
-                return Err(anyhow!("Did not find a number or integer for amount."));
-            };
-        } else if name == *"member" {
-            member = if let CommandDataOptionValue::User(u, _) = option {
-                u
-            } else {
-                return Err(anyhow!("Did not find a user for member."));
-            };
-        }
-    }
+    let mut amount: f64 = options
+        .get_int_or_number_value("amount")
+        .ok_or_else(|| anyhow!("No amount was provided."))??
+        .cast_to_f64();
+    let mut currency = options
+        .get_string_value("currency")
+        .ok_or_else(|| anyhow!("No currency name was provided."))??;
+    let (mut member, _) = options
+        .get_user_value("member")
+        .ok_or_else(|| anyhow!("No member was provided."))??;
 
     // I know the options are required, but you never know.
     if currency == String::new() {

@@ -31,8 +31,9 @@ impl Handler {
             "ping" => commands::ping::run(&command.data.options, command, ctx).await?,
             "test" => commands::test1::run(&command.data.options, command, ctx).await?,
             "currency" => commands::currency::run(&command.data.options, command, ctx).await?,
-            "balance" => commands::balance::run(&command.data.options, command, ctx).await?,
-            "give" => commands::give::run(&command.data.options, command, ctx).await?,
+            "balance" => commands::balance::run(options, command, ctx).await?,
+            "give" => commands::give::run(options, command, ctx).await?,
+            "take" => commands::take::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }

@@ -11,6 +11,7 @@ use serenity::{
 };
 
 use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
+use crate::event_handler::command_handler::CommandOptions;
 
 /// Runs the create currency subcommand.
 ///
@@ -28,7 +29,7 @@ use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
 /// It shouldn't panic. This is done to please the linter.
 #[allow(clippy::too_many_lines)] // Can't be asked.
 pub async fn run(
-    options: &[CommandDataOption],
+    options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
@@ -37,128 +38,44 @@ pub async fn run(
         String::new(), // This will be set because it is a required option in the slash command
         String::new() // Same as above
     );
-    let mut name = String::new();
-    let mut symbol = String::new();
-    for option in options.iter() {
-        match option.name.as_str() {
-            // The values of command options are serde_json Values which need to be converted to the correct Rust type.
-            // A solid amount of this is just error handling.
-            "name" => {
-                name = match
-                    option.resolved.clone().ok_or_else(|| anyhow!("Failed to resolve name"))?
-                {
-                    CommandDataOptionValue::String(s) => s,
-                    _ => {
-                        return Err(anyhow!("Expected string but found something else"));
-                    }
-                };
-                // remove trailing and leading whitespace from name
-                name = name.trim().to_string();
-                if name.is_empty() {
-                    return Err(anyhow!("Currency name cannot be empty"));
-                }
-                currency_builder.curr_name(name.clone());
-            }
-            "symbol" => {
-                symbol = option.value
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("Symbol value not found"))?
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Failed to convert symbol value to str"))?
-                    .to_string();
-                symbol = symbol.trim().to_string();
-                if symbol.is_empty() {
-                    return Err(anyhow!("Symbol cannot be empty"));
-                }
-                currency_builder.symbol(symbol.clone());
-            }
-            "visible" => {
-                currency_builder.visible(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Visible value provided but not found"))?
-                        .as_bool()
-                        .ok_or_else(|| anyhow!("Failed to parse visible value to bool"))?
-                );
-            }
-            "base" => {
-                currency_builder.base(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Base value provided but not found"))?
-                        .as_bool()
-                        .ok_or_else(|| anyhow!("Failed to parse base value to bool"))?
-                );
-            }
-            "base_value" => {
-                currency_builder.base_value(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Base_value value provided but not found"))?
-                        .as_f64()
-                        .ok_or_else(|| anyhow!("Failed to parse base_value value to f64"))?
-                );
-            }
-            "pay" => {
-                currency_builder.pay(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Pay value provided but not found"))?
-                        .as_bool()
-                        .ok_or_else(|| anyhow!("Failed to parse pay value to bool"))?
-                );
-            }
-            "earn_by_chat" => {
-                currency_builder.earn_by_chat(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Each_by_chat value provided but not found"))?
-                        .as_bool()
-                        .ok_or_else(|| anyhow!("Failed to parse earn_by_chat value to bool"))?
-                );
-            }
-            "channels_is_whitelist" => {
-                currency_builder.channels_is_whitelist(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(||
-                            anyhow!("Channels_is_whitelist value provided but not found")
-                        )?
-                        .as_bool()
-                        .ok_or_else(||
-                            anyhow!("Failed to parse channels_is_whitelist value to bool")
-                        )?
-                );
-            }
-            "roles_is_whitelist" => {
-                currency_builder.roles_is_whitelist(
-                    option.value
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("Roles_is_whitelist value provided but not found"))?
-                        .as_bool()
-                        .ok_or_else(|| anyhow!("Failed to parse roles_is_whitelist value to bool"))?
-                );
-            }
-            "earn_min" => {
-                currency_builder.earn_min(option.value.as_ref().unwrap().as_f64().unwrap());
-            }
-            "earn_max" => {
-                currency_builder.earn_max(option.value.as_ref().unwrap().as_f64().unwrap());
-            }
-            "earn_timeout" => {
-                currency_builder.earn_timeout(
-                    Duration::seconds(
-                        option.value
-                            .as_ref()
-                            .ok_or_else(|| anyhow!("earn_timeout value provided but not found"))?
-                            .as_i64()
-                            .ok_or_else(|| anyhow!("Failed to parse earn_timeout value to i64"))?
-                    )
-                );
-            }
-            &_ => {}
-        };
-    }
+    let mut name = options
+        .get_string_value("name")
+        .ok_or_else(|| anyhow!("Name value not found"))??;
+    let mut symbol = options
+        .get_string_value("symbol")
+        .ok_or_else(|| anyhow!("Symbol value not found"))??;
+    currency_builder.visible(options.get_bool_value("visible").transpose()?);
+    currency_builder.base(options.get_bool_value("base").transpose()?);
+    currency_builder.base_value(
+        options
+            .get_int_or_number_value("base_value")
+            .transpose()?
+            .map(|n| n.cast_to_f64())
+    );
+    currency_builder.pay(options.get_bool_value("pay").transpose()?);
+    currency_builder.earn_by_chat(options.get_bool_value("earn_by_chat").transpose()?);
+    currency_builder.channels_is_whitelist(
+        options.get_bool_value("channels_is_whitelist").transpose()?
+    );
+    currency_builder.roles_is_whitelist(options.get_bool_value("roles_is_whitelist").transpose()?);
+    currency_builder.earn_min(
+        options
+            .get_int_or_number_value("earn_min")
+            .transpose()?
+            .map(|n| n.cast_to_f64())
+    );
+    currency_builder.earn_max(
+        options
+            .get_int_or_number_value("earn_max")
+            .transpose()?
+            .map(|n| n.cast_to_f64())
+    );
+    currency_builder.earn_timeout(
+        options
+            .get_int_or_number_value("earn_timeout")
+            .transpose()?
+            .map(|n| Duration::seconds(n.cast_to_i64()))
+    );
     currency_builder.build().await?;
     command.edit_original_interaction_response(http, |m| {
         m.content(format!("Made currency {symbol}{name}"))
