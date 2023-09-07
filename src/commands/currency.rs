@@ -14,16 +14,17 @@ use crate::event_handler::command_handler::CommandOptions;
 /// # Errors
 /// Serenity stuff.
 pub async fn run(
-    options: &[CommandDataOption],
+    options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync + Clone + CacheHttp
 ) -> Result<()> {
-    let cmd_name = options[0].name.as_str();
-    let cmd_options: CommandOptions = options[0].options.clone().into();
-    match cmd_name {
-        "create" => create::run(cmd_options, command, http.clone()).await?,
-        "delete" => delete::run(&options[0].options, command, http.clone()).await?,
-        "config" => config::run(cmd_options, command, &http).await?,
+    let (cmd_name, options) = options
+        .get_subcommand_args_and_name()
+        .ok_or_else(|| anyhow!("No subcommand found"))?;
+    match cmd_name.as_str() {
+        "create" => create::run(options, command, &http).await?,
+        "delete" => delete::run(options, command, &http).await?,
+        "config" => config::run(options, command, &http).await?,
         _ => {
             return Err(anyhow!("Unknown subcommand: {}", cmd_name));
         }

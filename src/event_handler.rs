@@ -28,9 +28,9 @@ impl Handler {
     ) -> Result<()> {
         let mut options: CommandOptions = command.data.options.clone().into();
         match command.data.name.as_str() {
-            "ping" => commands::ping::run(&command.data.options, command, ctx).await?,
-            "test" => commands::test1::run(&command.data.options, command, ctx).await?,
-            "currency" => commands::currency::run(&command.data.options, command, ctx).await?,
+            "ping" => commands::ping::run(options, command, ctx).await?,
+            "test" => commands::test1::run(options, command, ctx).await?,
+            "currency" => commands::currency::run(options, command, ctx).await?,
             "balance" => commands::balance::run(options, command, ctx).await?,
             "give" => commands::give::run(options, command, ctx).await?,
             "take" => commands::take::run(options, command, ctx).await?,

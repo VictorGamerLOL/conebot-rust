@@ -1,5 +1,6 @@
 use crate::db::models::Currency;
 use crate::db::id::DbGuildId;
+use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, Result };
 use serenity::builder::CreateApplicationCommandOption;
 use serenity::http::Http;
@@ -10,16 +11,14 @@ use serenity::model::prelude::application_command::{
 use serenity::model::prelude::command::CommandOptionType;
 
 pub async fn run(
-    options: &[CommandDataOption],
+    options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
-    let currency_name = (unsafe { options.get_unchecked(0) }).value
-        .clone()
-        .ok_or_else(|| anyhow!("No currency name found."))?
-        .as_str()
-        .ok_or_else(|| anyhow!("Failed to convert currency name to str."))?
-        .to_owned(); // its there just trust me on this one
+    let currency_name = options
+        .get_string_value("name")
+        .transpose()?
+        .ok_or_else(|| anyhow!("No currency name was found"))?;
     let mut currency = Currency::try_from_name(
         DbGuildId::from(command.guild_id.unwrap()),
         currency_name

@@ -8,10 +8,12 @@ use serenity::{
     },
 };
 
+use crate::event_handler::command_handler::CommandOptions;
+
 /// # Errors
 /// Serenity stuff.
 pub async fn run(
-    _options: &[CommandDataOption],
+    _options: CommandOptions,
     command: &ApplicationCommandInteraction,
     http: impl AsRef<Http> + Send + Sync
 ) -> Result<()> {
