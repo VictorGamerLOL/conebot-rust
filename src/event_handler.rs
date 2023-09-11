@@ -46,7 +46,7 @@ impl Handler {
 impl EventHandler for Handler {
     #[instrument(skip(self, _ctx), level = "debug")]
     async fn message(&self, _ctx: Context, _new_message: Message) {
-        let _ = message(_ctx, _new_message).await;
+        // e
     }
 
     /// This function is responsible for initializing the global application commands.

@@ -8,7 +8,6 @@ use serenity::{
 };
 use anyhow::{ Result, anyhow };
 use tokio::sync::MutexGuard;
-
 use crate::{
     event_handler::command_handler::CommandOptions,
     db::models::{ Currency, ToKVs },
@@ -33,32 +32,33 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
         let mut channels_is_whitelist: bool = false;
         let mut roles_is_whitelist: bool = false;
         let mut embed_title: String = String::from("Config for {SYMBOL}{CURR_NAME}");
-        for (k, v) in kvs.as_ref() {
-            // I need this only twice just in this function, so might as well just write it here.
-            fn default(k: &str, v: &str, embed: &mut CreateEmbed) {
-                if k.is_empty() {
-                    return;
-                }
-                let mut k = k.chars();
-                let mut k_ = String::new();
-                k_.push(k.next().unwrap().to_ascii_uppercase());
-                for c in k {
-                    if c.is_ascii_uppercase() {
-                        k_.push(' ');
-                    }
-                    k_.push(c);
-                }
-                embed.field(k_, v, true);
+        // I need this only twice just in this function, so might as well just write it here.
+        fn embed_field_default(k: &str, v: &str, embed: &mut CreateEmbed) {
+            if k.is_empty() {
+                return;
             }
-
+            let mut k = k.chars();
+            let mut k_ = String::new();
+            k_.push(k.next().unwrap().to_ascii_uppercase());
+            for c in k {
+                if c.is_ascii_uppercase() {
+                    k_.push(' ');
+                }
+                k_.push(c);
+            }
+            embed.field(k_, v, true);
+        }
+        for (k, v) in kvs.as_ref() {
             match k.as_str() {
+                // For fields that need special treatment like name symbol and stuff that need to be included in the title.
                 "GuildId" => (),
                 "CurrName" => {
                     embed_title = embed_title.replace("{CURR_NAME}", &v.replace('\"', ""));
+                    embed_field_default(k, v, &mut embed);
                 }
                 "Symbol" => {
                     embed_title = embed_title.replace("{SYMBOL}", &v.replace('\"', ""));
-                    default(k, v, &mut embed);
+                    embed_field_default(k, v, &mut embed);
                 }
                 "ChannelsIsWhitelist" => {
                     channels_is_whitelist = v.to_ascii_lowercase().parse()?;
@@ -67,13 +67,13 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                     roles_is_whitelist = v.to_ascii_lowercase().parse()?;
                 }
                 &_ => {
-                    default(k, v, &mut embed);
+                    embed_field_default(k, v, &mut embed);
                 }
             }
         }
         for (k, v) in kvs {
             match k.as_str() {
-                "GuildId" | "CurrName" | "Symbol" => (),
+                "GuildId" => (),
                 "channelsWhitelist" => {
                     if channels_is_whitelist {
                         embed.field("Channels Whitelist", v, true);
@@ -95,20 +95,7 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                     }
                 }
                 &_ => {
-                    // convert K from PascalCase to Sentence case
-                    if k.is_empty() {
-                        continue;
-                    }
-                    let mut k = k.chars();
-                    let mut k_ = String::new();
-                    k_.push(k.next().unwrap().to_ascii_uppercase());
-                    for c in k {
-                        if c.is_ascii_uppercase() {
-                            k_.push(' ');
-                        }
-                        k_.push(c.to_ascii_lowercase());
-                    }
-                    embed.field(k_, v, true);
+                    embed_field_default(&k, &v, &mut embed);
                 }
             }
         }

@@ -1,4 +1,5 @@
 pub mod list;
+pub mod edit;
 
 use anyhow::{ Result, anyhow };
 use serenity::{
