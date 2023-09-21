@@ -14,7 +14,7 @@ pub mod event_handler;
 pub mod util;
 
 use dotenv::dotenv;
-use serenity::{ prelude::GatewayIntents, Client };
+use serenity::{ model::gateway::GatewayIntents, Client };
 use std::env;
 use tracing::{ debug, error, info, span, trace, warn };
 use tracing_subscriber::{ fmt, fmt::format, EnvFilter };

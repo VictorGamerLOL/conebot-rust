@@ -14,7 +14,7 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Display member balances
   - [x] Give to members
   - [x] Take from members
-  - [ ] Changing config values <!-- backend done -->
+  - [x] Changing config values
   - [ ] Chat earning
   - [ ] Whitelisting and blacklisting earning
     - [ ] Channels

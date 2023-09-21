@@ -71,5 +71,3 @@ pub trait ToKVs: Serialize {
         }
     }
 }
-
-impl<T> ToKVs for T where T: Serialize {}

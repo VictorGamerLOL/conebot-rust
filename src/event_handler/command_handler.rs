@@ -10,6 +10,7 @@ use serenity::model::{
     },
     user::User,
 };
+use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 
 /// If a command expects a number but an integer is given, do not worry
 /// too much as this exists. This is here to take either and convert it into
@@ -84,7 +85,6 @@ impl CommandOptions {
     /// - If the option does not exist with `None`.
     /// - If the option is optional and there is no value with `None`.
     pub fn get_string_value(&self, name: &str) -> Option<Result<String>> {
-        dbg!(&self.args);
         let t = self.get_value_by_name(name)?;
         if let CommandDataOptionValue::String(s) = t {
             Some(Ok(s))

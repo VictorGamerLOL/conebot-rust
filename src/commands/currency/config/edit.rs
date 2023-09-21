@@ -23,7 +23,9 @@ pub async fn run(
     let field_name = options
         .get_string_value(FIELD_OPTION_NAME)
         .ok_or_else(|| anyhow!("Field name not found."))??;
-    let value = options.get_string_value("value").ok_or_else(|| anyhow!("Value not found."))??;
+    let value = options
+        .get_string_value(VALUE_OPTION_NAME)
+        .ok_or_else(|| anyhow!("Value not found."))??;
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command may not be performed in DMs"))?;
 
     let field_name = field_name.to_lowercase().trim().replace(' ', "_");
@@ -50,6 +52,7 @@ pub async fn run(
             // count.
             possible_fut = Some(Currency::update_name(currency.clone(), value.clone()));
         }
+        //TODO: Generate nicer error messages for users.
         "symbol" => currency__.update_symbol(value.clone()).await?,
         "visible" => currency__.update_visible(value.parse()?).await?,
         "base" => currency__.update_base(value.parse()?).await?,
@@ -85,6 +88,7 @@ pub async fn run(
 
 const CURRENCY_OPTION_NAME: &str = "currency";
 const FIELD_OPTION_NAME: &str = "field";
+const VALUE_OPTION_NAME: &str = "value";
 
 #[must_use]
 pub fn option() -> CreateApplicationCommandOption {
@@ -106,7 +110,7 @@ pub fn option() -> CreateApplicationCommandOption {
                 .required(true)
         })
         .create_sub_option(|o| {
-            o.name("value")
+            o.name(VALUE_OPTION_NAME)
                 .description("The value to set the field to.")
                 .kind(CommandOptionType::String)
                 .required(true)

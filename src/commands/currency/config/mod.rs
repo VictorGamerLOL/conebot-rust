@@ -1,5 +1,6 @@
 pub mod list;
 pub mod edit;
+pub mod edit_list;
 
 use anyhow::{ Result, anyhow };
 use serenity::{
@@ -23,6 +24,8 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Provided argument does not contain a subcommand."))?;
     match cmd_name.as_str() {
         "list" => list::run(cmd_options, command, http).await?,
+        "edit" => edit::run(cmd_options, command, http).await?,
+        "edit_list" => edit_list::run(cmd_options, command, http).await?,
         &_ => anyhow::bail!("Unknown currency config subcommand."),
     }
     Ok(())
@@ -34,6 +37,8 @@ pub fn option() -> CreateApplicationCommandOption {
         .name("config")
         .kind(CommandOptionType::SubCommandGroup)
         .description("Configure various things about currencies or view them.")
-        .add_sub_option(list::option());
+        .add_sub_option(list::option())
+        .add_sub_option(edit::option())
+        .add_sub_option(edit_list::option());
     option
 }

@@ -15,12 +15,12 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct CurrencyConfigPrettifier<'a, T> where T: ToKVs {
-    pub options: MutexGuard<'a, T>,
+pub struct CurrencyConfigPrettifier<'a> {
+    pub options: &'a Currency,
 }
 
-impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
-    pub const fn new(options: MutexGuard<'a, T>) -> Self {
+impl<'a> CurrencyConfigPrettifier<'a> {
+    pub const fn new(options: &'a Currency) -> Self {
         Self {
             options,
         }
@@ -62,10 +62,14 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                 }
                 "ChannelsIsWhitelist" => {
                     channels_is_whitelist = v.to_ascii_lowercase().parse()?;
+                    embed_field_default(k, v, &mut embed);
                 }
                 "RolesIsWhitelist" => {
                     roles_is_whitelist = v.to_ascii_lowercase().parse()?;
+                    embed_field_default(k, v, &mut embed);
                 }
+                "ChannelsWhitelist" | "ChannelsBlacklist" | "RolesWhitelist" | "RolesBlacklist" =>
+                    (),
                 &_ => {
                     embed_field_default(k, v, &mut embed);
                 }
@@ -94,9 +98,7 @@ impl<'a, T> CurrencyConfigPrettifier<'a, T> where T: ToKVs {
                         embed.field("Roles Blacklist", v, true);
                     }
                 }
-                &_ => {
-                    embed_field_default(&k, &v, &mut embed);
-                }
+                &_ => {}
             }
         }
         embed.title(embed_title);
@@ -120,7 +122,15 @@ pub async fn run(
         currency.clone()
     ).await?.ok_or_else(move || anyhow!("Currency {} does not exist.", currency))?;
 
-    let embed = CurrencyConfigPrettifier::new(currency.lock().await).pretty()?;
+    let currency = currency.lock().await;
+
+    let currency_ = currency
+        .as_ref()
+        .ok_or_else(|| anyhow!("Currency is being used in breaking operation."))?;
+
+    let embed = CurrencyConfigPrettifier::new(currency_).pretty()?;
+
+    drop(currency);
 
     command.edit_original_interaction_response(http, |m| { m.add_embed(embed) }).await?;
 

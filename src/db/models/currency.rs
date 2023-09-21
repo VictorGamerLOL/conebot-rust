@@ -31,8 +31,12 @@ use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
 use serde_json::{ Value, Map };
 use serde_with::{ serde_as, DurationSeconds };
+use serenity::model::id::ChannelId;
+use serenity::model::mention::Mention;
+use serenity::model::prelude::RoleId;
 use tokio::sync::Mutex;
 
+use crate::db::id;
 use crate::db::{
     id::DbChannelId,
     id::DbGuildId,
@@ -40,6 +44,7 @@ use crate::db::{
     ArcTokioMutexOption,
     TokioMutexCache,
 };
+use crate::db::models::ToKVs;
 
 // #[derive(Debug, Clone, Error)]
 // pub enum CurrencyError {
@@ -1101,6 +1106,85 @@ impl Currency {
         }
         drop(cache);
         Ok(())
+    }
+}
+
+impl ToKVs for Currency {
+    fn try_to_kvs(&self) -> Result<Vec<(String, String)>> {
+        match serde_json::to_value(self)? {
+            Value::Object(o) =>
+                Ok(
+                    o
+                        .into_iter()
+                        .map(|(k, v)| {
+                            dbg!(&v);
+                            if k == "ChannelsBlacklist" || k == "ChannelsWhitelist" {
+                                // take string array, make it into json array, iterate over that,
+                                // and for every value convert to str, then to string, then replace
+                                // quotation marks to nothing. Then use the string obtained to make a DB
+                                // channel ID, then use that to try to make a regular channel ID, then finally
+                                // convert that into a mention. After that convert each mention to "Mention, ",
+                                // and with the final string remove the ", " at the end.
+                                let list = v
+                                    .as_array()
+                                    .ok_or_else(|| anyhow!("Could not convert to json array."))?
+                                    .iter()
+                                    .map(|v| {
+                                        let val = v
+                                            .as_str()
+                                            .ok_or_else(||
+                                                anyhow!("Could not convert to json string.")
+                                            )?
+                                            .to_string()
+                                            .replace('"', "");
+                                        let db_id: DbChannelId = val.into();
+                                        let id: ChannelId = db_id.try_into()?;
+                                        Ok(format!("{}, ", Mention::from(id)))
+                                    })
+                                    .collect::<Result<Vec<_>>>()?;
+                                Ok((
+                                    k,
+                                    list
+                                        .into_iter()
+                                        .collect::<String>()
+                                        .trim_end_matches(&[' ', ','])
+                                        .to_owned(),
+                                ))
+                            } else if k == "RolesBlacklist" || k == "RolesWhitelist" {
+                                // same here.
+                                let list = v
+                                    .as_array()
+                                    .ok_or_else(|| anyhow!("Could not convert to json array."))?
+                                    .iter()
+                                    .map(|v| {
+                                        let val = v
+                                            .as_str()
+                                            .ok_or_else(||
+                                                anyhow!("Could not convert to json string.")
+                                            )?
+                                            .to_string()
+                                            .replace('"', "");
+                                        let db_id: DbRoleId = val.into();
+                                        let id: RoleId = db_id.try_into()?;
+                                        Ok(format!("{}, ", Mention::from(id)))
+                                    })
+                                    .collect::<Result<Vec<_>>>()?;
+                                Ok((
+                                    k,
+                                    list
+                                        .into_iter()
+                                        .collect::<String>()
+                                        .trim_end_matches(&[' ', ','])
+                                        .to_owned(),
+                                ))
+                            } else {
+                                Ok((k, v.to_string()))
+                            }
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                ),
+            _ => Err(anyhow!("Could not convert to json object.")),
+        }
     }
 }
 
