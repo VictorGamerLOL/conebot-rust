@@ -46,6 +46,9 @@ impl Handler {
 impl EventHandler for Handler {
     #[instrument(skip(self, _ctx), level = "debug")]
     async fn message(&self, _ctx: Context, _new_message: Message) {
+        if let Err(e) = message(_ctx, _new_message).await {
+            error!("Error handling message: {}", e);
+        }
         // e
     }
 
@@ -65,7 +68,8 @@ impl EventHandler for Handler {
                         commands::test1::application_command(),
                         commands::currency::application_command(),
                         commands::balance::application_command(),
-                        commands::give::application_command()
+                        commands::give::application_command(),
+                        commands::take::application_command()
                     ]
                 )
             }).await

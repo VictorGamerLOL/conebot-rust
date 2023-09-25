@@ -134,6 +134,20 @@ impl Balances {
         self.balances.iter().any(|bal| bal.curr_name == curr_name)
     }
 
+    /// Checks if the user has a balance of a certain currency, and if they don't,
+    /// make a balance for said currency. Returns false if the balance has just been
+    /// created and true if the balance was already there.
+    ///
+    /// # Errors
+    /// - Any `MongoDB` error occurs.
+    pub async fn ensure_has_currency(&mut self, curr_name: &str) -> Result<bool> {
+        if self.has_currency(curr_name) {
+            return Ok(true);
+        }
+        self.create_balance(curr_name.to_owned()).await?;
+        Ok(false)
+    }
+
     /// Delete the balance for the specified currency for the user in the guild.
     ///
     /// # Errors
@@ -176,14 +190,6 @@ impl Balance {
             curr_name: curr_name.clone(),
             amount: 0.0,
         };
-        let user_balance2 = Self {
-            guild_id: guild_id.clone(),
-            user_id: user_id.clone(),
-            curr_name: curr_name.clone(),
-            amount: 0.0,
-        }; // no clone so manually make new one
-        // I tried to use transmute_copy beforehand. Terrible mistake,
-        // the currency name ended up being invalid unicode.
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
 
@@ -198,7 +204,7 @@ impl Balance {
             return Err(anyhow!("User already has a balance for that currency in that guild."));
         }
 
-        coll.insert_one(user_balance2, None).await?;
+        coll.insert_one(&user_balance, None).await?;
         Ok(user_balance)
     }
 

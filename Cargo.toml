@@ -33,6 +33,7 @@ mongodb = { version = "2.6.0", features = [
     "bson-serde_with",
     "bson-uuid-1",
 ] }
+rand = "^0.8.5"
 
 [dependencies.serenity]
 default-features = false
@@ -49,10 +50,6 @@ features = [
     "chrono",
 ]
 git = "https://github.com/serenity-rs/serenity"
-
-# test dependencies
-[dev-dependencies]
-rand = "^0.8.5"
 
 
 [profile.release]
