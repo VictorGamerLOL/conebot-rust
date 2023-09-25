@@ -16,9 +16,9 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Take from members
   - [x] Changing config values
   - [x] Chat earning
-  - [ ] Whitelisting and blacklisting earning
-    - [ ] Channels
-    - [ ] Roles
+  - [x] Whitelisting and blacklisting earning
+    - [x] Channels
+    - [x] Roles
   - [ ] Exchanging between currencies
 - [ ] Items
   - [ ] Trophies
