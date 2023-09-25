@@ -1,11 +1,11 @@
-use crate::db::id::{ DbGuildId, DbUserId };
+use crate::db::id::{ DbGuildId, DbUserId, DbChannelId, DbRoleId };
 use crate::db::models::{ Currency, Balance, Balances };
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use serenity::client::Context;
 use serenity::model::channel::Message;
-use serenity::model::prelude::{ UserId, GuildId };
+use serenity::model::prelude::{ UserId, GuildId, Member, Channel, RoleId };
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -56,7 +56,6 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         let currency_name = currency_.curr_name().to_owned();
         let earn_min = currency_.earn_min();
         let earn_max = currency_.earn_max();
-        drop(currency);
 
         let timeout = Timeout {
             user,
@@ -69,6 +68,28 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         if timeouts.contains(&timeout) {
             continue;
         }
+
+        let member = match new_message.member(&_ctx.http).await {
+            Ok(m) => m,
+            Err(e) => {
+                warn!("Failed to get member: {}", e);
+                continue;
+            }
+        };
+
+        let channel = match new_message.channel(&_ctx.http).await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to get channel: {}", e);
+                continue;
+            }
+        };
+
+        if !check_can_earn(guild_id, member.clone(), channel.clone(), currency_) {
+            continue;
+        }
+
+        drop(currency);
 
         balances_.ensure_has_currency(&currency_name).await?;
         let mut balance = if
@@ -107,6 +128,64 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     Ok(())
 }
 
-async fn pay(balance: &mut Balance, amount: f64) -> Result<()> {
-    balance.add_amount(amount).await
+fn check_can_earn(
+    guild_id: GuildId,
+    member: Member,
+    channel: Channel,
+    currency: &Currency
+) -> bool {
+    let mut can_earn = true;
+    if currency.roles_is_whitelist() {
+        let roles = currency.roles_whitelist();
+        if check_contains_role(guild_id, member.roles, roles) {
+            return true;
+        } else {
+            can_earn = false;
+        }
+    } else {
+        let roles = currency.roles_blacklist();
+        if check_contains_role(guild_id, member.roles, roles) {
+            return false;
+        }
+    }
+    if currency.channels_is_whitelist() {
+        let channels = currency.channels_whitelist();
+        if check_contains_channel(guild_id, channel, channels) {
+            return true;
+        } else {
+            can_earn = false;
+        }
+    } else {
+        let channels = currency.channels_blacklist();
+        if check_contains_channel(guild_id, channel, channels) {
+            return false;
+        }
+    }
+    can_earn
+}
+
+fn check_contains_channel(
+    guild_id: GuildId,
+    current_channel: Channel,
+    channels: &[DbChannelId]
+) -> bool {
+    for db_channel in channels {
+        if current_channel.id().0.to_string() == db_channel.0 {
+            return true;
+        } else {
+            continue;
+        }
+    }
+    false
+}
+
+fn check_contains_role(guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[DbRoleId]) -> bool {
+    for role in current_roles {
+        if roles.contains(&crate::db::id::DbRoleId(role.0.to_string())) {
+            return true;
+        } else {
+            continue;
+        }
+    }
+    false
 }
