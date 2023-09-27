@@ -228,6 +228,12 @@ impl Currency {
         self.base
     }
 
+    /// Literally just an alias to `base()`
+    #[allow(clippy::must_use_candidate)]
+    pub const fn is_base(&self) -> bool {
+        self.base
+    }
+
     #[allow(clippy::must_use_candidate)]
     pub const fn base_value(&self) -> Option<f64> {
         self.base_value
