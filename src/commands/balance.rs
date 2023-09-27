@@ -21,7 +21,7 @@ use serenity::{
 use futures::future::try_join_all;
 
 use crate::{
-    db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioMutexOption },
+    db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 
@@ -86,13 +86,13 @@ async fn multi_currency<'a>(
 }
 
 async fn single_currency<'a>(
-    c: std::sync::Arc<tokio::sync::Mutex<Option<Currency>>>,
+    c: std::sync::Arc<tokio::sync::RwLock<Option<Currency>>>,
     balances: &'a std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
     guild_id: GuildId,
     user: &'a (User, Member),
     command: &ApplicationCommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
-    let mut currency = c.lock().await;
+    let mut currency = c.read().await;
     let currency_ = currency
         .as_ref()
         .ok_or_else(|| anyhow!("Currency is being used in a breaking operation."))?;
@@ -170,7 +170,7 @@ async fn multi_currency_embed(
         .map(|(a, b, c)| (a.unwrap(), b, c))
         .collect::<Vec<_>>();
     for (curr, n, a) in t {
-        let currency = curr.lock().await;
+        let currency = curr.read().await;
         let Some(currency_) = currency.as_ref() else {
             continue;
         };
@@ -196,7 +196,7 @@ async fn multi_currency_embed(
 
 struct Options {
     user: Option<(User, Member)>,
-    currency: Option<ArcTokioMutexOption<Currency>>,
+    currency: Option<ArcTokioRwLockOption<Currency>>,
 }
 
 async fn parse_options<'a>(
@@ -219,7 +219,7 @@ async fn parse_options<'a>(
         .transpose()?;
     let mut currency: Option<String> = options.get_string_value("currency").transpose()?;
 
-    let currency: Option<ArcTokioMutexOption<Currency>> = if let Some(currency) = currency {
+    let currency: Option<ArcTokioRwLockOption<Currency>> = if let Some(currency) = currency {
         Currency::try_from_name(guild_id.clone(), currency).await?
     } else {
         None

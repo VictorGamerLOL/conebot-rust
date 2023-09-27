@@ -34,14 +34,14 @@ use serde_with::{ serde_as, DurationSeconds };
 use serenity::model::id::ChannelId;
 use serenity::model::mention::Mention;
 use serenity::model::prelude::RoleId;
-use tokio::sync::Mutex;
+use tokio::sync::{ Mutex, RwLock };
 
 use crate::db::id;
 use crate::db::{
     id::DbChannelId,
     id::DbGuildId,
     id::DbRoleId,
-    ArcTokioMutexOption,
+    ArcTokioRwLockOption,
     TokioMutexCache,
 };
 use crate::db::models::ToKVs;
@@ -111,7 +111,7 @@ pub struct Currency {
 
 lazy_static! {
     // Need me that concurrency.
-    static ref CACHE_CURRENCY: TokioMutexCache<(String, String), ArcTokioMutexOption<Currency>> =
+    static ref CACHE_CURRENCY: TokioMutexCache<(String, String), ArcTokioRwLockOption<Currency>> =
         Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
@@ -131,7 +131,7 @@ impl Currency {
     pub async fn try_from_name(
         guild_id: DbGuildId,
         curr_name: String
-    ) -> Result<Option<ArcTokioMutexOption<Self>>> {
+    ) -> Result<Option<ArcTokioRwLockOption<Self>>> {
         let guild_id = guild_id.to_string();
 
         // Try to get from cache first.
@@ -166,7 +166,7 @@ impl Currency {
                 if cfg!(test) || cfg!(debug_assertions) {
                     println!("Cache miss!");
                 }
-                let tmp = Arc::new(Mutex::new(Some(curr)));
+                let tmp = Arc::new(RwLock::new(Some(curr)));
                 cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
                 Ok(Some(tmp))
             }
@@ -179,7 +179,7 @@ impl Currency {
     ///
     /// # Errors
     /// - If any mongodb errors occur.
-    pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioMutexOption<Self>>> {
+    pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioRwLockOption<Self>>> {
         let guild_id = guild_id.to_string();
 
         let mut cache = CACHE_CURRENCY.lock().await;
@@ -195,7 +195,7 @@ impl Currency {
         let mut currencies = Vec::new();
         while let Some(curr) = res.try_next().await? {
             let curr_name = curr.curr_name().to_owned();
-            let tmp = Arc::new(Mutex::new(Some(curr)));
+            let tmp = Arc::new(RwLock::new(Some(curr)));
             currencies.push(tmp.clone());
             cache.put((guild_id.clone(), curr_name), tmp.clone());
         }
@@ -288,6 +288,11 @@ impl Currency {
         self.earn_timeout
     }
 
+    #[inline]
+    pub fn as_base(&self, amount: f64) -> Option<f64> {
+        if self.base { Some(amount) } else { self.base_value.map(|base_value| amount * base_value) }
+    }
+
     /// Attempts to change the name of this currency.
     ///
     /// # Errors
@@ -297,8 +302,8 @@ impl Currency {
     /// # Panics
     ///
     /// It shouldn't, this is here to please the linter.
-    pub async fn update_name(self_: ArcTokioMutexOption<Self>, new_name: String) -> Result<()> {
-        let mut self_ = self_.lock().await;
+    pub async fn update_name(self_: ArcTokioRwLockOption<Self>, new_name: String) -> Result<()> {
+        let mut self_ = self_.write().await;
         let mut cache = CACHE_CURRENCY.lock().await;
         // Get the cache so no other task tries to use this while it is being updated.
         if self_.is_none() {
@@ -344,7 +349,7 @@ impl Currency {
         cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
         cache.put(
             (self__.guild_id.to_string(), new_name),
-            Arc::new(Mutex::new(Some(self__.clone())))
+            Arc::new(RwLock::new(Some(self__.clone())))
         );
         drop(self_); // please the linter
         drop(cache); // all hail the linter
@@ -1078,10 +1083,10 @@ impl Currency {
     /// # Panics
     ///
     /// It should not. This is here to please the linter.
-    pub async fn delete_currency(self_: ArcTokioMutexOption<Self>) -> Result<()> {
+    pub async fn delete_currency(self_: ArcTokioRwLockOption<Self>) -> Result<()> {
         let mut cache = CACHE_CURRENCY.lock().await; // Get the cache here so no other task
         // can get the currency while were working on it.
-        let mut self_ = self_.lock().await;
+        let mut self_ = self_.write().await;
         let self__ = if let Some(c) = self_.take() {
             c
         } else {
@@ -1207,7 +1212,7 @@ mod test {
         let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
             .unwrap()
             .unwrap();
-        let currency = currency.lock().await;
+        let currency = currency.read().await;
         let currency_ = currency.as_ref().unwrap();
         dbg!(&currency_);
         assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
@@ -1253,7 +1258,7 @@ mod test {
         let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
             .unwrap()
             .unwrap();
-        let currency = currency.lock().await;
+        let currency = currency.read().await;
         let currency_ = currency.as_ref().unwrap();
         assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
         assert_eq!(currency_.curr_name, curr_name);

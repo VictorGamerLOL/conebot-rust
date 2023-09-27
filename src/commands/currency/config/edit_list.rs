@@ -16,7 +16,7 @@ use core::str::FromStr;
 
 use crate::{
     event_handler::command_handler::CommandOptions,
-    db::{ models::Currency, id::DbGuildId, ArcTokioMutexOption },
+    db::{ models::Currency, id::DbGuildId, ArcTokioRwLockOption },
 };
 
 pub async fn run(
@@ -47,7 +47,7 @@ pub async fn run(
         anyhow!("Currency not found.")
     )?;
 
-    let mut currency = currency.lock().await;
+    let mut currency = currency.write().await;
 
     let mut currency_ = currency
         .as_mut()

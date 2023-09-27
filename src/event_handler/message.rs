@@ -47,7 +47,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     let mut currencies = Currency::try_from_guild(guild_id.into()).await?;
     // giant for loop moment
     for curr in currencies {
-        let mut currency = curr.lock().await;
+        let mut currency = curr.read().await;
         let currency_ = if let Some(c) = currency.as_ref() {
             c
         } else {

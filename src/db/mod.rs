@@ -15,6 +15,7 @@ pub type TokioMutexCache<K, V> = tokio::sync::Mutex<LruCache<K, V>>;
 // if a breaking change were to occur such as renaming or the name field
 // or deleting said thing from the database. Dropping it from the cache
 // is not enough because already existing arcs will still be valid.
+pub type ArcTokioRwLockOption<T> = Arc<tokio::sync::RwLock<Option<T>>>;
 pub type ArcTokioMutexOption<T> = Arc<tokio::sync::Mutex<Option<T>>>;
 
 lazy_static! {

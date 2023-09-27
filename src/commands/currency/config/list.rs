@@ -122,7 +122,7 @@ pub async fn run(
         currency.clone()
     ).await?.ok_or_else(move || anyhow!("Currency {} does not exist.", currency))?;
 
-    let currency = currency.lock().await;
+    let currency = currency.read().await;
 
     let currency_ = currency
         .as_ref()

@@ -35,7 +35,7 @@ pub async fn run(
         currency_name.clone()
     ).await?.ok_or_else(|| anyhow!("Currency {} does not exist.", currency_name))?;
 
-    let mut currency_ = currency.lock().await;
+    let mut currency_ = currency.write().await;
 
     let mut currency__ = currency_
         .as_mut()

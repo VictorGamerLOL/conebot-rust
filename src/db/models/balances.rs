@@ -11,7 +11,7 @@
 //!
 
 use crate::db::id::{ DbGuildId, DbUserId };
-use crate::db::{ ArcTokioMutexOption, TokioMutexCache };
+use crate::db::{ ArcTokioRwLockOption, TokioMutexCache, ArcTokioMutexOption };
 use anyhow::{ anyhow, Result };
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
@@ -21,7 +21,7 @@ use mongodb::Collection;
 use serde::{ Deserialize, Serialize };
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{ Mutex, RwLock };
 
 use super::Currency;
 
@@ -224,7 +224,7 @@ impl Balance {
     /// # Errors
     /// - Any `MongoDB` error occurs.
     /// - The currency does not exist.
-    pub async fn currency(&self) -> Result<Option<ArcTokioMutexOption<Currency>>> {
+    pub async fn currency(&self) -> Result<Option<ArcTokioRwLockOption<Currency>>> {
         Currency::try_from_name(self.guild_id.clone(), self.curr_name.clone()).await
     }
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::db::{ id::{ DbChannelId, DbGuildId, DbRoleId }, ArcTokioMutexOption };
+use crate::db::{ id::{ DbChannelId, DbGuildId, DbRoleId }, ArcTokioRwLockOption };
 use anyhow::{ Ok, Result };
 use chrono::Duration;
 use mongodb::{ bson::doc, Collection };
@@ -91,7 +91,7 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if the currency already exists, or if any mongodb operation errors.
-    pub async fn build(self) -> Result<ArcTokioMutexOption<Currency>> {
+    pub async fn build(self) -> Result<ArcTokioRwLockOption<Currency>> {
         // check if currency already exists
         let db = super::super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
@@ -147,8 +147,8 @@ impl Builder {
 
         let mut cache = super::CACHE_CURRENCY.lock().await;
         coll.insert_one(curr.clone(), None).await?;
-        let arc_currency: ArcTokioMutexOption<Currency> = Arc::new(
-            tokio::sync::Mutex::new(Some(curr))
+        let arc_currency: ArcTokioRwLockOption<Currency> = Arc::new(
+            tokio::sync::RwLock::new(Some(curr))
         );
         cache.push((self.guild_id.to_string(), self.curr_name.clone()), arc_currency.clone());
         drop(cache);
@@ -377,7 +377,7 @@ async fn test_currency_builder() {
         .earn_max(Some(10.0))
         .earn_timeout(Some(Duration::seconds(60)));
     let curr = curr.build().await.unwrap();
-    let curr = curr.lock().await;
+    let curr = curr.read().await;
     let curr2 = curr.clone();
     drop(curr);
     let curr = curr2.unwrap();
