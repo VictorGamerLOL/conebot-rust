@@ -98,6 +98,18 @@ impl Balances {
         Ok(balances)
     }
 
+    pub async fn delete_currency(currency: &Currency) -> Result<()> {
+        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Balance> = db.collection("balances");
+        let filterdoc =
+            doc! {
+            "GuildId": currency.guild_id().to_string(),
+            "CurrName": currency.curr_name().to_owned(),
+        };
+        coll.delete_many(filterdoc, None).await?;
+        Ok(())
+    }
+
     #[allow(clippy::must_use_candidate)]
     pub fn balances(&self) -> &[Balance] {
         &self.balances

@@ -157,13 +157,11 @@ async fn multi_currency_embed(
 ) -> Result<CreateEmbed> {
     let mut field_data: Vec<(String, String, bool)> = Vec::new();
     let mut t = try_join_all(
-        balances.iter().map(|b| {
-            let b2: &'static Balance = unsafe { std::mem::transmute(b) }; // ik what im doing ok?
-            tokio::spawn(async move {
-                let cur = b2.currency().await?;
-                anyhow::Ok((cur, b2.curr_name.clone(), b2.amount))
+        balances
+            .iter()
+            .map(|b| async {
+                b.currency().await.map(|c| anyhow::Ok((c, b.curr_name(), b.amount())))
             })
-        })
     ).await?
         .into_iter()
         .collect::<Result<Vec<_>>>()?
@@ -176,6 +174,9 @@ async fn multi_currency_embed(
         let Some(currency_) = currency.as_ref() else {
             continue;
         };
+        if !currency_.visible() {
+            continue;
+        }
         let symbol = currency_.symbol().to_owned();
         let title = format!("{}{n}", symbol.clone());
         let description = format!("{symbol}{a}");

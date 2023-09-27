@@ -155,7 +155,7 @@ impl Currency {
         drop(db); // Drop locks on mutexes as soon as possible.
 
         // If the currency exists, put it in the cache and return it.
-        res.map_or_else(
+        let return_val = res.map_or_else(
             || {
                 if cfg!(test) || cfg!(debug_assertions) {
                     println!("Cache miss and not found in database!");
@@ -170,7 +170,9 @@ impl Currency {
                 cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
                 Ok(Some(tmp))
             }
-        )
+        );
+        drop(cache); // please the linter
+        return_val
     }
 
     /// Attempts to fetch all of the currencies that a guild has made.
@@ -197,6 +199,7 @@ impl Currency {
             currencies.push(tmp.clone());
             cache.put((guild_id.clone(), curr_name), tmp.clone());
         }
+        drop(cache); // please the linter
         Ok(currencies)
     }
 
@@ -343,7 +346,8 @@ impl Currency {
             (self__.guild_id.to_string(), new_name),
             Arc::new(Mutex::new(Some(self__.clone())))
         );
-        drop(self_);
+        drop(self_); // please the linter
+        drop(cache); // all hail the linter
         Ok(())
     }
 
@@ -1078,12 +1082,11 @@ impl Currency {
         let mut cache = CACHE_CURRENCY.lock().await; // Get the cache here so no other task
         // can get the currency while were working on it.
         let mut self_ = self_.lock().await;
-        if self_.is_none() {
+        let self__ = if let Some(c) = self_.take() {
+            c
+        } else {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
-        }
-
-        let self__ = self_.take().unwrap(); // Save b/c we just checked that it's not None.
-        // Also this should make all other Arcs be dropped when None is seen.
+        };
 
         // Remove the currency from the cache.
         let popped = cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
@@ -1104,7 +1107,8 @@ impl Currency {
             }
             return Err(e.into());
         }
-        drop(cache);
+        drop(self_); // please the linter
+        drop(cache); // all hail the linter
         Ok(())
     }
 }

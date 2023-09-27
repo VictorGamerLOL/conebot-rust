@@ -45,6 +45,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     };
 
     let mut currencies = Currency::try_from_guild(guild_id.into()).await?;
+    // giant for loop moment
     for curr in currencies {
         let mut currency = curr.lock().await;
         let currency_ = if let Some(c) = currency.as_ref() {
@@ -52,6 +53,9 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         } else {
             continue;
         };
+        if !currency_.earn_by_chat() {
+            continue;
+        }
         let timeout_duration = currency_.earn_timeout();
         let currency_name = currency_.curr_name().to_owned();
         let earn_min = currency_.earn_min();
@@ -125,6 +129,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             drop(timeouts);
         });
     }
+    drop(balances); // please the linter
     Ok(())
 }
 
