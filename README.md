@@ -19,7 +19,7 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Whitelisting and blacklisting earning
     - [x] Channels
     - [x] Roles
-  - [ ] Exchanging between currencies
+  - [x] Exchanging between currencies
 - [ ] Items
   - [ ] Trophies
   - [ ] Consumables
