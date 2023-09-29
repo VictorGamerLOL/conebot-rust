@@ -44,6 +44,8 @@ pub async fn run(
     let mut symbol = options
         .get_string_value("symbol")
         .ok_or_else(|| anyhow!("Symbol value not found"))??;
+    currency_builder.curr_name(name.clone());
+    currency_builder.symbol(symbol.clone());
     currency_builder.visible(options.get_bool_value("visible").transpose()?);
     currency_builder.base(options.get_bool_value("base").transpose()?);
     currency_builder.base_value(
@@ -76,6 +78,7 @@ pub async fn run(
             .transpose()?
             .map(|n| Duration::seconds(n.cast_to_i64()))
     );
+    dbg!(&currency_builder);
     currency_builder.build().await?;
     command.edit_original_interaction_response(http, |m| {
         m.content(format!("Made currency {symbol}{name}"))

@@ -1,6 +1,7 @@
 pub mod create;
-mod delete;
+pub mod delete;
 pub mod config;
+pub mod exchange;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
@@ -25,6 +26,7 @@ pub async fn run(
         "create" => create::run(options, command, &http).await?,
         "delete" => delete::run(options, command, &http).await?,
         "config" => config::run(options, command, &http).await?,
+        "exchange" => exchange::run(options, command, &http).await?,
         _ => {
             return Err(anyhow!("Unknown subcommand: {}", cmd_name));
         }
@@ -41,6 +43,7 @@ pub fn application_command() -> CreateApplicationCommand {
         .dm_permission(false)
         .add_option(create::option())
         .add_option(delete::option())
-        .add_option(config::option());
+        .add_option(config::option())
+        .add_option(exchange::option());
     command
 }

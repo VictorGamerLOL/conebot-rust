@@ -5,7 +5,7 @@ use crate::commands;
 use anyhow::anyhow;
 use anyhow::Result;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
-// What the FUCK Rust?
+// What the heck Rust?
 use crate::event_handler::message::message;
 use serenity::async_trait;
 use serenity::client::EventHandler;

@@ -4,29 +4,51 @@ use anyhow::{ bail, Result, anyhow };
 use serenity::model::prelude::Member;
 use tokio::sync::RwLock;
 
-use crate::db::models::{ Currency, Balances, Balance };
+use crate::{ db::models::{ Currency, Balances, Balance }, util::currency::truncate_2dp };
 
+/// Exchanges one currency for another.
+/// Returns the amount of the output currency that was given.
+///
+/// # Arguments
+///
+/// * `input` - The currency to exchange from.
+/// * `output` - The currency to exchange to.
+/// * `amount` - The amount of the input currency to exchange.
+/// * `user` - The user that is exchanging the currency and who's balances will be used.
+///
+/// # Errors
+///
+/// * If the input currency is not a base currency and does not have a base value.
+/// * If the output currency is not a base currency and does not have a base value.
+/// * If the user does not have enough of the input currency.
+/// * If any of the currencies cannot be exchanged.
+/// * If the exchange amount is infinite or NaN.
+/// * If the exchange would lead to the user an infinite or NaN amount of the output currency.
+/// * Any MongoDB errors.
 pub async fn exchange(
     input: &Currency,
     output: &Currency,
     amount: f64,
     user: Member
-) -> Result<bool> {
+) -> Result<f64> {
     let input_base_value = if let Some(f) = input.base_value() {
         f
-    } else {
+    } else if !input.base() {
         bail!("{} cannot be exchanged.", input.curr_name());
+    } else {
+        1.0 // if it is a base currency, then it's base value is 1, because it is worth itself
     };
     let output_base_value = if let Some(f) = output.base_value() {
         f
-    } else {
+    } else if !output.base() {
         bail!("{} cannot be exchanged.", output.curr_name());
+    } else {
+        1.0 // same here
     };
 
     let mut currencies = Currency::try_from_guild(user.guild_id.into()).await?;
 
-    let base_currency = get_base_currency(currencies).await?;
-    let mut base_currency = base_currency.read().await;
+    get_base_currency(currencies).await?;
 
     let to_give = (amount * input_base_value) / output_base_value;
 
@@ -67,7 +89,7 @@ pub async fn exchange(
         bail!("You don't have enough {}.", input.curr_name());
     }
 
-    let to_give = (input_base_value * amount) / output_base_value;
+    let to_give = truncate_2dp((input_base_value * amount) / output_base_value);
     if to_give.is_infinite() || to_give.is_nan() {
         bail!("Invalid exchange rate result.");
     }
@@ -81,7 +103,7 @@ pub async fn exchange(
     balance_out.add_amount_unchecked(to_give).await?;
     drop(balances); // please the linter
 
-    Ok(true)
+    Ok(to_give)
 }
 
 async fn get_base_currency(

@@ -383,6 +383,12 @@ impl Balance {
         if amount.is_nan() {
             return Err(anyhow!("Cannot set NaN."));
         }
+        // -0 on a balance sheet looks a bit odd, so we just set it to 0
+        // praying that somehow it is not a special kind of -0 that cannot
+        // be compared to this -0 we have here.
+        if amount == -0.0 {
+            amount = 0.0;
+        }
         amount = (amount * 100.0).round() / 100.0;
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
