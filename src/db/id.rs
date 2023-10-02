@@ -85,6 +85,12 @@ impl AsRef<str> for DbGuildId {
     }
 }
 
+impl Default for DbGuildId {
+    fn default() -> Self {
+        Self("0".into())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbUserId(pub String);
@@ -142,6 +148,12 @@ impl From<&str> for DbUserId {
 impl AsRef<str> for DbUserId {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Default for DbUserId {
+    fn default() -> Self {
+        Self("0".into())
     }
 }
 
@@ -205,6 +217,12 @@ impl AsRef<str> for DbChannelId {
     }
 }
 
+impl Default for DbChannelId {
+    fn default() -> Self {
+        Self("0".into())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbRoleId(pub String);
@@ -262,5 +280,11 @@ impl From<&str> for DbRoleId {
 impl AsRef<str> for DbRoleId {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Default for DbRoleId {
+    fn default() -> Self {
+        Self("0".into())
     }
 }

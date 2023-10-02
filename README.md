@@ -7,7 +7,7 @@ These currencies can also be setup by the guild staff to be exchangeable between
 
 This bot aims to make everything highly configurable and be as feature packed as possible to act as a replacement for many bots. The bot supports at the moment:
 
-- [ ] Currencies
+- [x] Currencies
   - [x] Create
   - [x] Delete
   - [x] Per-guild per-currency member balances
@@ -21,13 +21,15 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [x] Roles
   - [x] Exchanging between currencies
 - [ ] Items
-  - [ ] Trophies
+  - [x] Trophies <!-- These do nothing they are pretty much done -->
   - [ ] Consumables
     - [ ] Message
     - [ ] Role giving
     - [ ] Lootboxes (must complete below)
   - [ ] Instant consumables
     - [ ] Same as above
+  - [ ] Changing config values <!-- Backend done -->
+  - [ ] Inventories for each member
 - [ ] Lootboxes
   - [ ] Create loot tables
   - [ ] Delete loot tables
