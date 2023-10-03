@@ -65,7 +65,6 @@ impl Builder {
             tradeable,
             currency_value,
             value,
-            message,
             item_type,
         };
 

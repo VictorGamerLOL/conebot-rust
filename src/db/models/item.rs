@@ -24,7 +24,6 @@ pub struct Item {
     value: f64,
     #[serde(flatten)]
     item_type: ItemType,
-    message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -33,10 +32,12 @@ pub enum ItemType {
     #[default]
     Trophy,
     Consumable {
+        message: String,
         #[serde(flatten)]
         action_type: ItemActionType,
     },
     InstantConsumable {
+        message: String,
         #[serde(flatten)]
         action_type: ItemActionType,
     },
@@ -115,10 +116,6 @@ impl Item {
 
     pub const fn value(&self) -> f64 {
         self.value
-    }
-
-    pub fn message(&self) -> &str {
-        &self.message
     }
 
     pub const fn item_type(&self) -> &ItemType {
@@ -254,25 +251,6 @@ impl Item {
         Ok(())
     }
 
-    pub async fn update_message(&mut self, new_message: String) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let collection = db.collection::<Self>("items");
-        let filter =
-            doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
-        };
-        let update =
-            doc! {
-            "$set": {
-                "Message": new_message.clone(),
-            }
-        };
-        collection.update_one(filter, update, None).await?;
-        self.message = new_message;
-        Ok(())
-    }
-
     pub async fn update_item_type(&mut self, new_item_type: ItemType) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
@@ -287,6 +265,7 @@ impl Item {
                 "ActionType": "",
                 "RoleId": "",
                 "DropTableName": "",
+                "Message": ""
             },
             "$set": {
             }
@@ -297,7 +276,8 @@ impl Item {
             ItemType::Trophy => {
                 update_set.insert("ActionType", "Trophy");
             }
-            ItemType::Consumable { action_type } => {
+            ItemType::Consumable { message, action_type } => {
+                update_set.insert("Message", message);
                 update_set.insert("ActionType", "Consumable");
                 match action_type {
                     ItemActionType::None => {}
@@ -309,7 +289,8 @@ impl Item {
                     }
                 }
             }
-            ItemType::InstantConsumable { action_type } => {
+            ItemType::InstantConsumable { message, action_type } => {
+                update_set.insert("Message", message);
                 update_set.insert("ActionType", "InstantConsumable");
                 match action_type {
                     ItemActionType::None => {}
@@ -336,6 +317,7 @@ mod test {
         let mut item = Item {
             item_type: ItemType::Consumable {
                 action_type: ItemActionType::Role { role_id: DbRoleId::default() },
+                message: "A".to_string(),
             },
             ..Default::default()
         };
