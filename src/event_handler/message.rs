@@ -111,7 +111,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         let amount = truncate_2dp(rand.gen_range(earn_min..=earn_max));
         balance.add_amount(amount).await?;
 
-        timeouts.insert(dbg!(timeout.clone()));
+        timeouts.insert(timeout.clone());
         drop(timeouts);
 
         tokio::spawn(async move {

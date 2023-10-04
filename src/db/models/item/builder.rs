@@ -30,8 +30,8 @@ impl Builder {
     }
 
     pub async fn build(self) -> Result<ArcTokioRwLockOption<Item>> {
-        if let Some(s) = self.sellable {
-            if self.currency_value.is_none() || self.value.is_none() {
+        if let Some(can_sell) = self.sellable {
+            if (self.currency_value.is_none() || self.value.is_none()) && can_sell {
                 bail!("Sellable items must have a currency value and a value");
             }
         }

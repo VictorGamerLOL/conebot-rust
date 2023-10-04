@@ -137,9 +137,6 @@ impl Currency {
         // Try to get from cache first.
         let mut cache = CACHE_CURRENCY.lock().await;
         if let Some(currency) = cache.get(&(guild_id.clone(), curr_name.clone())) {
-            if cfg!(test) || cfg!(debug_assertions) {
-                println!("Cache hit!");
-            }
             return Ok(Some(currency.clone()));
         }
         // If not in cache, try to get from database. Keep holding the lock on the cache
@@ -156,16 +153,8 @@ impl Currency {
 
         // If the currency exists, put it in the cache and return it.
         let return_val = res.map_or_else(
-            || {
-                if cfg!(test) || cfg!(debug_assertions) {
-                    println!("Cache miss and not found in database!");
-                }
-                Ok(None)
-            },
+            || { Ok(None) },
             |curr| {
-                if cfg!(test) || cfg!(debug_assertions) {
-                    println!("Cache miss!");
-                }
                 let tmp = Arc::new(RwLock::new(Some(curr)));
                 cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
                 Ok(Some(tmp))
@@ -1132,7 +1121,6 @@ impl ToKVs for Currency {
                     o
                         .into_iter()
                         .map(|(k, v)| {
-                            dbg!(&v);
                             if k == "ChannelsBlacklist" || k == "ChannelsWhitelist" {
                                 // take string array, make it into json array, iterate over that,
                                 // and for every value convert to str, then to string, then replace
@@ -1145,15 +1133,19 @@ impl ToKVs for Currency {
                                     .ok_or_else(|| anyhow!("Could not convert to json array."))?
                                     .iter()
                                     .map(|v| {
+                                        // this is where we take the `v` Value and convert it to a String.
                                         let val = v
                                             .as_str()
                                             .ok_or_else(||
+                                                // ***12 indentation levels***
                                                 anyhow!("Could not convert to json string.")
                                             )?
                                             .to_string()
                                             .replace('"', "");
+                                        // Then to a DbChannelId then to a ChannelId.
                                         let db_id: DbChannelId = val.into();
                                         let id: ChannelId = db_id.try_into()?;
+                                        // Then a stringified mention with leading comma and a space.
                                         Ok(format!("{}, ", Mention::from(id)))
                                     })
                                     .collect::<Result<Vec<_>>>()?;
@@ -1161,6 +1153,7 @@ impl ToKVs for Currency {
                                     k,
                                     list
                                         .into_iter()
+                                        // VV merge all mentions into one string and trim the end of the last comma and space.
                                         .collect::<String>()
                                         .trim_end_matches(&[' ', ','])
                                         .to_owned(),
@@ -1196,6 +1189,7 @@ impl ToKVs for Currency {
                                 Ok((k, v.to_string()))
                             }
                         })
+                        // And finally collect all of them into a Result<Vec<(String, String)>>
                         .collect::<Result<Vec<_>>>()?
                 ),
             _ => Err(anyhow!("Could not convert to json object.")),
@@ -1220,7 +1214,6 @@ mod test {
             .unwrap();
         let currency = currency.read().await;
         let currency_ = currency.as_ref().unwrap();
-        dbg!(&currency_);
         assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
         assert_eq!(currency_.curr_name, curr_name);
         drop(currency);
@@ -1260,7 +1253,6 @@ mod test {
 
     async fn sleepy_fetch_currency(guild_id: u64, curr_name: &str, millis: u64, i: usize) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
-        println!("T{i}");
         let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
             .unwrap()
             .unwrap();

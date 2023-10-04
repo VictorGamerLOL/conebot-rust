@@ -78,7 +78,6 @@ pub async fn run(
             .transpose()?
             .map(|n| Duration::seconds(n.cast_to_i64()))
     );
-    dbg!(&currency_builder);
     currency_builder.build().await?;
     command.edit_original_interaction_response(http, |m| {
         m.content(format!("Made currency {symbol}{name}"))
