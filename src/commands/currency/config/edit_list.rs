@@ -1,22 +1,22 @@
+use anyhow::{ anyhow, bail, Result };
+use core::str::FromStr;
 use serenity::{
     builder::CreateApplicationCommandOption,
+    http::{ CacheHttp, Http },
     model::prelude::{
-        command::CommandOptionType,
         application_command::ApplicationCommandInteraction,
-        GuildId,
+        command::CommandOptionType,
         ChannelId,
-        RoleId,
+        GuildId,
         Mention,
+        RoleId,
     },
-    http::{ Http, CacheHttp },
 };
-use anyhow::{ Result, anyhow, bail };
 use tokio::sync::MutexGuard;
-use core::str::FromStr;
 
 use crate::{
+    db::{ id::DbGuildId, models::Currency, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
-    db::{ models::Currency, id::DbGuildId, ArcTokioRwLockOption },
 };
 
 pub async fn run(
@@ -74,25 +74,33 @@ pub async fn run(
 
 async fn add(currency: &mut Currency, field_name: &str, value: Mention) -> Result<()> {
     match field_name {
-        "roles_whitelist" => if let Mention::Role(r) = value {
-            currency.add_whitelisted_role(r.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "roles_whitelist" => {
+            if let Mention::Role(r) = value {
+                currency.add_whitelisted_role(r.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "roles_blacklist" => if let Mention::Role(r) = value {
-            currency.add_blacklisted_role(r.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "roles_blacklist" => {
+            if let Mention::Role(r) = value {
+                currency.add_blacklisted_role(r.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "channels_whitelist" => if let Mention::Channel(c) = value {
-            currency.add_whitelisted_channel(c.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "channels_whitelist" => {
+            if let Mention::Channel(c) = value {
+                currency.add_whitelisted_channel(c.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "channels_blacklist" => if let Mention::Channel(c) = value {
-            currency.add_blacklisted_channel(c.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "channels_blacklist" => {
+            if let Mention::Channel(c) = value {
+                currency.add_blacklisted_channel(c.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
         _ => bail!("Invalid field name."),
     }
@@ -101,25 +109,33 @@ async fn add(currency: &mut Currency, field_name: &str, value: Mention) -> Resul
 
 async fn remove(currency: &mut Currency, field_name: &str, value: Mention) -> Result<()> {
     match field_name {
-        "roles_whitelist" => if let Mention::Role(r) = value {
-            currency.remove_whitelisted_role(r.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "roles_whitelist" => {
+            if let Mention::Role(r) = value {
+                currency.remove_whitelisted_role(r.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "roles_blacklist" => if let Mention::Role(r) = value {
-            currency.remove_blacklisted_role(r.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "roles_blacklist" => {
+            if let Mention::Role(r) = value {
+                currency.remove_blacklisted_role(r.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "channels_whitelist" => if let Mention::Channel(c) = value {
-            currency.remove_whitelisted_channel(c.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "channels_whitelist" => {
+            if let Mention::Channel(c) = value {
+                currency.remove_whitelisted_channel(c.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
-        "channels_blacklist" => if let Mention::Channel(c) = value {
-            currency.remove_blacklisted_channel(c.into()).await?;
-        } else {
-            bail!("Invalid value type for field {}", field_name);
+        "channels_blacklist" => {
+            if let Mention::Channel(c) = value {
+                currency.remove_blacklisted_channel(c.into()).await?;
+            } else {
+                bail!("Invalid value type for field {}", field_name);
+            }
         }
         _ => bail!("Invalid field name."),
     }

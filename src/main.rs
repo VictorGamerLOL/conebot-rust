@@ -11,8 +11,8 @@
 pub mod commands;
 pub mod db;
 pub mod event_handler;
-pub mod util;
 pub mod mechanics;
+pub mod util;
 
 use dotenv::dotenv;
 use serenity::{ model::gateway::GatewayIntents, Client };

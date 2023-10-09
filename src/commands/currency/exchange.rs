@@ -1,17 +1,17 @@
+use anyhow::{ anyhow, bail, Result };
 use serenity::{
+    builder::CreateApplicationCommandOption,
     http::{ CacheHttp, Http },
     model::prelude::{
         application_command::ApplicationCommandInteraction,
         command::CommandOptionType,
     },
-    builder::CreateApplicationCommandOption,
 };
-use anyhow::{ Result, bail, anyhow };
 use tokio::join;
 
 use crate::{
-    event_handler::command_handler::CommandOptions,
     db::models::Currency,
+    event_handler::command_handler::CommandOptions,
     mechanics::exchange::exchange,
 };
 

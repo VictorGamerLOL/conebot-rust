@@ -1,12 +1,12 @@
+pub mod config;
 pub mod create;
 pub mod delete;
-pub mod config;
 pub mod exchange;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
     builder::CreateApplicationCommand,
-    http::{ Http, CacheHttp },
+    http::{ CacheHttp, Http },
     model::prelude::application_command::{ ApplicationCommandInteraction, CommandDataOption },
 };
 

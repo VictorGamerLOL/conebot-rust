@@ -1,5 +1,5 @@
-mod message;
 pub mod command_handler;
+mod message;
 
 use crate::commands;
 use anyhow::anyhow;

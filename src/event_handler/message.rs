@@ -1,16 +1,16 @@
-use crate::db::id::{ DbGuildId, DbUserId, DbChannelId, DbRoleId };
-use crate::db::models::{ Currency, Balance, Balances };
+use crate::db::id::{DbChannelId, DbGuildId, DbRoleId, DbUserId};
+use crate::db::models::{Balance, Balances, Currency};
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
 use lazy_static::lazy_static;
+use rand::prelude::*;
 use serenity::client::Context;
 use serenity::model::channel::Message;
-use serenity::model::prelude::{ UserId, GuildId, Member, Channel, RoleId };
+use serenity::model::prelude::{Channel, GuildId, Member, RoleId, UserId};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{ info, warn, error, debug };
-use rand::prelude::*;
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Timeout {
@@ -96,11 +96,10 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         drop(currency);
 
         balances_.ensure_has_currency(&currency_name).await?;
-        let mut balance = if
-            let Some(b) = balances_
-                .balances_mut()
-                .iter_mut()
-                .find(|b| b.curr_name == currency_name)
+        let mut balance = if let Some(b) = balances_
+            .balances_mut()
+            .iter_mut()
+            .find(|b| b.curr_name == currency_name)
         {
             b
         } else {
@@ -118,7 +117,10 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             let std_duration = if let Ok(timeout_duration) = timeout_duration.to_std() {
                 timeout_duration
             } else {
-                error!("Failed to convert chrono duration {:?} to std duration", timeout_duration);
+                error!(
+                    "Failed to convert chrono duration {:?} to std duration",
+                    timeout_duration
+                );
                 return;
             };
             debug!("Sleeping for {:?}", std_duration);
@@ -137,7 +139,7 @@ fn check_can_earn(
     guild_id: GuildId,
     member: Member,
     channel: Channel,
-    currency: &Currency
+    currency: &Currency,
 ) -> bool {
     let mut can_earn = true;
     if currency.roles_is_whitelist() {
@@ -172,7 +174,7 @@ fn check_can_earn(
 fn check_contains_channel(
     guild_id: GuildId,
     current_channel: Channel,
-    channels: &[DbChannelId]
+    channels: &[DbChannelId],
 ) -> bool {
     for db_channel in channels {
         if current_channel.id().0.to_string() == db_channel.0 {

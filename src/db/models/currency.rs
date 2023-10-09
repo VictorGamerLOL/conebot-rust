@@ -29,14 +29,16 @@ use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
-use serde_json::{ Value, Map };
+use serde_json::{ Map, Value };
 use serde_with::{ serde_as, DurationSeconds };
 use serenity::model::id::ChannelId;
 use serenity::model::mention::Mention;
 use serenity::model::prelude::RoleId;
+use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock };
 
 use crate::db::id;
+use crate::db::models::ToKVs;
 use crate::db::{
     id::DbChannelId,
     id::DbGuildId,
@@ -44,19 +46,18 @@ use crate::db::{
     ArcTokioRwLockOption,
     TokioMutexCache,
 };
-use crate::db::models::ToKVs;
 
-// #[derive(Debug, Clone, Error)]
-// pub enum CurrencyError {
-//     #[error("Currency not found")]
-//     NotFound,
-//     #[error("Currency already exists")]
-//     AlreadyExists,
-//     #[error("Database error")]
-//     DatabaseError,
-// }
+#[derive(Debug, Error)]
+pub enum CurrencyError {
+    #[error("Currency not found.")]
+    NotFound,
+    #[error("Currency already exists.")]
+    AlreadyExists,
+    #[error(transparent)] Other(#[from] anyhow::Error),
+}
 
 // Might need ^this^ later.
+// I was right I did indeed need this later.
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -153,7 +154,7 @@ impl Currency {
 
         // If the currency exists, put it in the cache and return it.
         let return_val = res.map_or_else(
-            || { Ok(None) },
+            || Ok(None),
             |curr| {
                 let tmp = Arc::new(RwLock::new(Some(curr)));
                 cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
@@ -1101,12 +1102,8 @@ impl Currency {
             "GuildId": self__.guild_id.to_string(),
             "CurrName": self__.curr_name.clone(),
         };
-        if let Err(e) = coll.delete_one(filterdoc, None).await {
-            if let Some(v) = popped {
-                cache.put((self__.guild_id.to_string(), self__.curr_name.clone()), v);
-            }
-            return Err(e.into());
-        }
+        coll.delete_one(filterdoc, None).await?;
+
         drop(self_); // please the linter
         drop(cache); // all hail the linter
         Ok(())

@@ -1,18 +1,18 @@
+use crate::{
+    commands::currency,
+    db::models::{ Currency, ToKVs },
+    event_handler::command_handler::CommandOptions,
+};
+use anyhow::{ anyhow, Result };
 use serenity::{
     builder::{ CreateApplicationCommandOption, CreateEmbed },
+    http::{ CacheHttp, Http },
     model::prelude::{
-        command::CommandOptionType,
         application_command::ApplicationCommandInteraction,
+        command::CommandOptionType,
     },
-    http::{ Http, CacheHttp },
 };
-use anyhow::{ Result, anyhow };
 use tokio::sync::MutexGuard;
-use crate::{
-    event_handler::command_handler::CommandOptions,
-    db::models::{ Currency, ToKVs },
-    commands::currency,
-};
 
 #[derive(Debug)]
 pub struct CurrencyConfigPrettifier<'a> {
@@ -21,9 +21,7 @@ pub struct CurrencyConfigPrettifier<'a> {
 
 impl<'a> CurrencyConfigPrettifier<'a> {
     pub const fn new(options: &'a Currency) -> Self {
-        Self {
-            options,
-        }
+        Self { options }
     }
 
     pub fn pretty(self) -> Result<CreateEmbed> {
@@ -68,8 +66,10 @@ impl<'a> CurrencyConfigPrettifier<'a> {
                     roles_is_whitelist = v.to_ascii_lowercase().parse()?;
                     embed_field_default(k, v, &mut embed);
                 }
-                "ChannelsWhitelist" | "ChannelsBlacklist" | "RolesWhitelist" | "RolesBlacklist" =>
-                    (),
+                | "ChannelsWhitelist"
+                | "ChannelsBlacklist"
+                | "RolesWhitelist"
+                | "RolesBlacklist" => {}
                 &_ => {
                     embed_field_default(k, v, &mut embed);
                 }
@@ -132,7 +132,7 @@ pub async fn run(
 
     drop(currency);
 
-    command.edit_original_interaction_response(http, |m| { m.add_embed(embed) }).await?;
+    command.edit_original_interaction_response(http, |m| m.add_embed(embed)).await?;
 
     Ok(())
 }

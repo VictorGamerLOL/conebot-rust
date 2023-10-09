@@ -1,7 +1,7 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
     builder::CreateApplicationCommand,
-    http::{ Http, CacheHttp },
+    http::{ CacheHttp, Http },
     model::{
         prelude::{
             application_command::{
@@ -17,9 +17,9 @@ use serenity::{
 };
 
 use crate::{
-    util::currency::truncate_2dp,
     db::models::{ Balances, Currency },
     event_handler::command_handler::CommandOptions,
+    util::currency::truncate_2dp,
 };
 
 /// # Errors

@@ -3,26 +3,26 @@ pub mod currency;
 mod drop_table;
 pub mod global;
 mod inventory;
-mod item;
+pub mod item;
 mod multipliers;
 mod role_rewards;
 mod store_entry;
 
+use anyhow::{ anyhow, Result };
 pub use balances::{ Balance, Balances };
 pub use currency::Currency;
 pub use drop_table::DropTable;
 pub use inventory::{ Inventory, InventoryEntry };
-pub use item::Item;
+pub use item::{ Item, ItemError };
 pub use multipliers::{ Multiplier, Multipliers };
 pub use role_rewards::{ RoleReward, RoleRewards };
+use serde::{ Deserialize, Serialize };
 use serde_json::Value;
 pub use store_entry::StoreEntry;
-use serde::{ Serialize, Deserialize };
-use anyhow::{ anyhow, Result };
 
 use once_cell::sync::OnceCell;
 
-use super::id::{ DbGuildId, DbUserId, DbChannelId, DbRoleId };
+use super::id::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 
 pub struct BotGuild {
     guild_id: DbGuildId,

@@ -1,15 +1,15 @@
-pub mod list;
 pub mod edit;
 pub mod edit_list;
+pub mod list;
 
-use anyhow::{ Result, anyhow };
+use anyhow::{ anyhow, Result };
 use serenity::{
     builder::CreateApplicationCommandOption,
-    model::prelude::{
-        command::CommandOptionType,
-        application_command::ApplicationCommandInteraction,
-    },
     http::{ CacheHttp, Http },
+    model::prelude::{
+        application_command::ApplicationCommandInteraction,
+        command::CommandOptionType,
+    },
 };
 
 use crate::event_handler::command_handler::CommandOptions;

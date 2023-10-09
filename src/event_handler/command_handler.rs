@@ -1,16 +1,13 @@
-use anyhow::{ anyhow, Result };
+use anyhow::{anyhow, Result};
+use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 use serenity::model::{
     prelude::{
+        application_command::{CommandDataOption, CommandDataOptionValue},
         command::CommandOptionType,
-        application_command::{ CommandDataOption, CommandDataOptionValue },
-        PartialMember,
-        Role,
-        Channel,
-        PartialChannel,
+        Channel, PartialChannel, PartialMember, Role,
     },
     user::User,
 };
-use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 
 /// If a command expects a number but an integer is given, do not worry
 /// too much as this exists. This is here to take either and convert it into
@@ -71,10 +68,7 @@ impl CommandOptions {
     /// - If the option does not exist.
     /// - If the option is optional and there is no value.
     pub fn get_value_by_name(&self, name: &str) -> Option<CommandDataOptionValue> {
-        self.args
-            .iter()
-            .find(|arg| arg.name == name)?
-            .value.clone()
+        self.args.iter().find(|arg| arg.name == name)?.value.clone()
     }
 
     /// Given the name of the parameter, returns the value of the argument
@@ -185,9 +179,8 @@ impl CommandOptions {
             return None;
         }
         let first_option = self.args.first()?.clone();
-        if
-            first_option.kind != CommandOptionType::SubCommand &&
-            first_option.kind != CommandOptionType::SubCommandGroup
+        if first_option.kind != CommandOptionType::SubCommand
+            && first_option.kind != CommandOptionType::SubCommandGroup
         {
             return None;
         }
@@ -199,13 +192,11 @@ impl From<Vec<CommandDataOption>> for CommandOptions {
     fn from(args: Vec<CommandDataOption>) -> Self {
         let cmd_args = args
             .into_iter()
-            .map(|arg| {
-                Opt {
-                    name: arg.name,
-                    kind: arg.kind,
-                    options: arg.options,
-                    value: arg.resolved,
-                }
+            .map(|arg| Opt {
+                name: arg.name,
+                kind: arg.kind,
+                options: arg.options,
+                value: arg.resolved,
             })
             .collect::<Vec<_>>();
         Self { args: cmd_args }

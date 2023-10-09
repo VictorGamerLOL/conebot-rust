@@ -4,13 +4,15 @@ pub mod builder;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
+use crate::db::{ id::{ DbGuildId, DbRoleId }, ArcTokioRwLockOption, TokioMutexCache };
+use anyhow::{ anyhow, bail, Result };
+use futures::StreamExt;
+use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::bson::doc;
 use serde::{ Deserialize, Serialize };
+use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock };
-use crate::db::{ id::{ DbGuildId, DbRoleId }, TokioMutexCache, ArcTokioRwLockOption };
-use lazy_static::lazy_static;
-use anyhow::{ anyhow, Result, bail };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -56,15 +58,23 @@ pub enum ItemActionType {
     },
 }
 
+#[derive(Debug, Error)]
+pub enum ItemError {
+    #[error("The item has not been found in the database.")]
+    ItemNotFound,
+    #[error(transparent)] Other(#[from] anyhow::Error),
+}
+
 lazy_static! {
-    static ref CACHE_ITEM: TokioMutexCache<(DbGuildId, String), ArcTokioRwLockOption<Item>> = Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
+    static ref CACHE_ITEM: TokioMutexCache<(DbGuildId, String), ArcTokioRwLockOption<Item>> =
+        Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
 impl Item {
     pub async fn try_from_name(
         guild_id: DbGuildId,
         item_name: String
-    ) -> anyhow::Result<ArcTokioRwLockOption<Self>> {
+    ) -> anyhow::Result<ArcTokioRwLockOption<Self>, ItemError> {
         let key = (guild_id.clone(), item_name.clone());
         if let Some(item) = CACHE_ITEM.lock().await.get(&key) {
             return Ok(item.clone());
@@ -77,7 +87,7 @@ impl Item {
     async fn try_from_name_uncached(
         guild_id: DbGuildId,
         item_name: String
-    ) -> Result<ArcTokioRwLockOption<Self>> {
+    ) -> Result<ArcTokioRwLockOption<Self>, ItemError> {
         // i am using mongodb by the way
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
@@ -88,10 +98,37 @@ impl Item {
         };
         let item = match collection.find_one(filter, None).await {
             Ok(Some(a)) => a,
-            Ok(None) => bail!("Item not found"),
-            Err(e) => bail!(e),
+            Ok(None) => {
+                return Err(ItemError::ItemNotFound);
+            }
+            Err(e) => {
+                return Err(ItemError::Other(e.into()));
+            }
         };
         Ok(Arc::new(RwLock::new(Some(item))))
+    }
+
+    pub async fn try_from_guild(
+        guild_id: DbGuildId
+    ) -> anyhow::Result<Vec<ArcTokioRwLockOption<Self>>> {
+        // don't forget to use the cache
+        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let collection = db.collection::<Self>("items");
+        let filter = doc! {
+            "GuildID": guild_id.to_string(),
+        };
+        let mut cursor = collection.find(filter, None).await?;
+        let mut items = Vec::new();
+        let mut cache = CACHE_ITEM.lock().await;
+        while let Some(item) = cursor.next().await {
+            let item = item?;
+            let item_name = item.item_name.clone();
+            let item_ptr = Arc::new(RwLock::new(Some(item)));
+            cache.put((guild_id.clone(), item_name), item_ptr.clone());
+            items.push(item_ptr);
+        }
+        drop(cache);
+        Ok(items)
     }
 
     pub fn name(&self) -> &str {
@@ -307,6 +344,28 @@ impl Item {
         self.item_type = new_item_type;
         Ok(())
     }
+
+    pub async fn delete_item(self_: ArcTokioRwLockOption<Self>) -> Result<()> {
+        let mut cache = CACHE_ITEM.lock().await;
+        let mut self_ = self_.write().await;
+        let taken = self_.take(); // this must be a separate line or the linter cries abt it.
+        let mut self__ = match taken {
+            Some(a) => a,
+            None => bail!("Item is already being used in breaking operation."),
+        };
+        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let collection = db.collection::<Self>("items");
+        let filter =
+            doc! {
+            "GuildID": self__.guild_id.to_string(),
+            "ItemName": self__.item_name.clone(),
+        };
+        collection.delete_one(filter, None).await?;
+        cache.pop(&(self__.guild_id.clone(), self__.item_name.clone()));
+        drop(self_);
+        drop(cache);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -316,7 +375,9 @@ mod test {
     fn test_serialization() {
         let mut item = Item {
             item_type: ItemType::Consumable {
-                action_type: ItemActionType::Role { role_id: DbRoleId::default() },
+                action_type: ItemActionType::Role {
+                    role_id: DbRoleId::default(),
+                },
                 message: "A".to_string(),
             },
             ..Default::default()

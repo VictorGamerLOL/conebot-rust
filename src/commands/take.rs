@@ -1,22 +1,22 @@
+use anyhow::{ anyhow, Result };
 use serenity::{
+    builder::CreateApplicationCommand,
+    http::{ CacheHttp, Http },
     model::{
         prelude::{
-            application_command::{ CommandDataOption, ApplicationCommandInteraction },
+            application_command::{ ApplicationCommandInteraction, CommandDataOption },
             command::CommandOptionType,
             GuildId,
         },
-        Permissions,
         user::User,
+        Permissions,
     },
-    http::{ CacheHttp, Http },
-    builder::CreateApplicationCommand,
 };
-use anyhow::{ anyhow, Result };
 
 use crate::{
+    db::{ id::DbGuildId, models::{ Balances, Currency } },
     event_handler::command_handler::CommandOptions,
     util::currency::truncate_2dp,
-    db::{ models::{ Currency, Balances }, id::DbGuildId },
 };
 
 pub async fn run(

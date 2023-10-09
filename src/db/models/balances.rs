@@ -11,7 +11,7 @@
 //!
 
 use crate::db::id::{ DbGuildId, DbUserId };
-use crate::db::{ ArcTokioRwLockOption, TokioMutexCache, ArcTokioMutexOption };
+use crate::db::{ ArcTokioMutexOption, ArcTokioRwLockOption, TokioMutexCache };
 use anyhow::{ anyhow, Result };
 use futures::TryStreamExt;
 use lazy_static::lazy_static;

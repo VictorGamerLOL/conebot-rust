@@ -1,7 +1,8 @@
 use anyhow::{ anyhow, Result };
+use futures::future::try_join_all;
 use serenity::{
     builder::{ CreateApplicationCommand, CreateEmbed, CreateEmbedAuthor },
-    http::{ Http, CacheHttp },
+    http::{ CacheHttp, Http },
     model::{
         prelude::{
             application_command::{
@@ -9,19 +10,18 @@ use serenity::{
                 CommandDataOption,
                 CommandDataOptionValue,
             },
-            Member,
             command::CommandOptionType,
             GuildId,
+            Member,
             PartialMember,
         },
         user::User,
     },
     utils::Colour,
 };
-use futures::future::try_join_all;
 
 use crate::{
-    db::{ models::{ Balances, Currency, Balance }, id::DbGuildId, ArcTokioRwLockOption },
+    db::{ id::DbGuildId, models::{ Balance, Balances, Currency }, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 
@@ -57,9 +57,9 @@ pub async fn run<'a>(
         multi_currency(balances, guild_id.try_into()?, &user, command).await?
     };
 
-    command.edit_original_interaction_response(http, |m| {
+    command.edit_original_interaction_response(http, |m|
         m.add_embed(embed).content("\u{200b}")
-    }).await?;
+    ).await?;
     Ok(())
 }
 
@@ -72,9 +72,9 @@ async fn multi_currency<'a>(
     let mut balances = balances.lock().await;
     let mut balances_ = balances
         .as_ref()
-        .ok_or_else(||
+        .ok_or_else(|| {
             anyhow!("This user's balances are already being used in a breaking operation.")
-        )?;
+        })?;
     let embed = multi_currency_embed(
         balances_.balances(),
         guild_id,
@@ -99,9 +99,9 @@ async fn single_currency<'a>(
     let mut balances = balances.lock().await;
     let mut balances_ = balances
         .as_mut()
-        .ok_or_else(||
+        .ok_or_else(|| {
             anyhow!("This user's balances are already being used in a breaking operation.")
-        )?;
+        })?;
     let mut balance = balances_
         .balances()
         .iter()
@@ -232,10 +232,7 @@ async fn parse_options<'a>(
     } else {
         None
     };
-    Ok(Options {
-        user,
-        currency,
-    })
+    Ok(Options { user, currency })
 }
 
 #[must_use]

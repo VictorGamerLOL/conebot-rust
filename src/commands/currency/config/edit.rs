@@ -1,16 +1,16 @@
+use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use serenity::{
+    builder::CreateApplicationCommandOption,
+    http::CacheHttp,
+    http::Http,
     model::prelude::{
         application_command::ApplicationCommandInteraction,
         command::CommandOptionType,
     },
-    http::CacheHttp,
-    http::Http,
-    builder::CreateApplicationCommandOption,
 };
-use anyhow::{ anyhow, Result };
 
-use crate::{ event_handler::command_handler::CommandOptions, db::models::Currency };
+use crate::{ db::models::Currency, event_handler::command_handler::CommandOptions };
 
 pub async fn run(
     options: CommandOptions,
@@ -39,7 +39,9 @@ pub async fn run(
 
     let mut currency__ = currency_
         .as_mut()
-        .ok_or_else(|| anyhow!("Currency {} is being used in breaking operation", currency_name))?;
+        .ok_or_else(|| {
+            anyhow!("Currency {} is being used in breaking operation", currency_name)
+        })?;
 
     // You'll see soon why we need this.
     let mut possible_fut = None;
@@ -59,14 +61,18 @@ pub async fn run(
         "base_value" => currency__.update_base_value(value.parse().ok()).await?,
         "pay" => currency__.update_pay(value.parse()?).await?,
         "earn_by_chat" => currency__.update_earn_by_chat(value.parse()?).await?,
-        "channels_is_whitelist" => currency__.update_channels_is_whitelist(value.parse()?).await?,
+        "channels_is_whitelist" => {
+            currency__.update_channels_is_whitelist(value.parse()?).await?;
+        }
         "roles_is_whitelist" => currency__.update_roles_is_whitelist(value.parse()?).await?,
         "earn_min" => currency__.update_earn_min(value.parse()?).await?,
         "earn_max" => currency__.update_earn_max(value.parse()?).await?,
-        "earn_timeout" =>
-            currency__.update_earn_timeout(Duration::seconds(value.parse::<i64>()?)).await?,
-        "channels_whitelist" | "channels_blacklist" | "roles_blacklist" | "roles_whitelist" =>
-            anyhow::bail!("List field is not editable with this command"),
+        "earn_timeout" => {
+            currency__.update_earn_timeout(Duration::seconds(value.parse::<i64>()?)).await?;
+        }
+        "channels_whitelist" | "channels_blacklist" | "roles_blacklist" | "roles_whitelist" => {
+            anyhow::bail!("List field is not editable with this command");
+        }
         _ => anyhow::bail!("Unknown field: {}", field_name),
     }
 
