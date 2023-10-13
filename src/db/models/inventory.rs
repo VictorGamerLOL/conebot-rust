@@ -66,6 +66,15 @@ impl Inventory {
     ///
     /// # Errors
     /// - Any mongodb error occurs.
+    ///
+    /// # Panics
+    /// Will not panic. I just use a direct vector access in there after i find
+    /// the index of the item I want because there is a bug in the Rust borrow
+    /// checker, and yes they are aware it exists. No they don't know how to
+    /// fix it. This section is here to, once again, ***please the linter***.
+    /// Whoever inspects this code and starts crying at the sight of a `vec[i]`,
+    /// stop, I assure you what I did here won't crash unless `position()` fails
+    /// colossally.
     pub async fn get_or_make_item(&mut self, item_name: String) -> Result<&mut InventoryEntry> {
         // There is something wrong with the borrow checker so i need to do the thing below instead.
         if let Some(i) = self.inventory.iter().position(|e| e.item_name == item_name) {
@@ -88,9 +97,9 @@ impl Inventory {
 
         let filterdoc =
             doc! {
-            "guild_id": self.guild_id.to_string(),
-            "user_id": self.user_id.to_string(),
-            "item_name": &item_name,
+            "GuildId": self.guild_id.to_string(),
+            "UserId": self.user_id.to_string(),
+            "ItemName": &item_name,
         };
 
         coll.delete_one(filterdoc, None).await?;
@@ -114,9 +123,9 @@ impl InventoryEntry {
 
         let filterdoc =
             doc! {
-            "guild_id": guild_id.to_string(),
-            "user_id": user_id.to_string(),
-            "item_name": item_name.clone(),
+            "GuildId": guild_id.to_string(),
+            "UserId": user_id.to_string(),
+            "ItemName": item_name.clone(),
         };
 
         if coll.find_one(filterdoc, None).await?.is_some() {
@@ -147,8 +156,8 @@ impl InventoryEntry {
 
         let filterdoc =
             doc! {
-            "guild_id": guild_id.to_string(),
-            "user_id": user_id.to_string(),
+            "GuildId": guild_id.to_string(),
+            "UserId": user_id.to_string(),
         };
 
         let mut res = coll.find(filterdoc, None).await?;
@@ -176,9 +185,9 @@ impl InventoryEntry {
 
         let mut filterdoc =
             doc! {
-            "guild_id": guild_id.to_string(),
-            "user_id": user_id.to_string(),
-            "item_name": item_name,
+            "GuildId": guild_id.to_string(),
+            "UserId": user_id.to_string(),
+            "ItemName": item_name,
         };
         coll.find_one(filterdoc, None).await.map_err(|e| e.into())
     }
@@ -201,9 +210,9 @@ impl InventoryEntry {
 
         let mut filterdoc =
             doc! {
-            "guild_id": guild_id.to_string(),
-            "user_id": user_id.to_string(),
-            "item_name": { "$regex": search_query, "$options": "i" },
+            "GuildId": guild_id.to_string(),
+            "UserId": user_id.to_string(),
+            "ItemName": { "$regex": search_query, "$options": "i" },
         };
         let mut res = coll.find(filterdoc, None).await?;
 
@@ -247,14 +256,14 @@ impl InventoryEntry {
 
         let filterdoc =
             doc! {
-            "guild_id": self.guild_id.to_string(),
-            "user_id": self.user_id.to_string(),
-            "item_name": self.item_name.clone(),
+            "GuildId": self.guild_id.to_string(),
+            "UserId": self.user_id.to_string(),
+            "ItemName": self.item_name.clone(),
         };
         let updatedoc =
             doc! {
             "$set": {
-                "amount": amount,
+                "Amount": amount,
             }
         };
 

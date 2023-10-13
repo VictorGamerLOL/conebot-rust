@@ -96,7 +96,7 @@ impl Builder {
         let db = super::super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
         let filter =
-            doc! { "guild_id": self.guild_id.to_string(), "curr_name": self.curr_name.clone() };
+            doc! { "GuildId": self.guild_id.to_string(), "CurrName": self.curr_name.clone() };
         let curr = coll.find_one(filter, None).await?;
         if curr.is_some() {
             return Err(anyhow::anyhow!("Currency already exists"));
@@ -140,8 +140,8 @@ impl Builder {
         };
         // if base is set to true, check if there is another currency where base is true and set it to false
         if curr.base {
-            let filter = doc! { "guild_id": curr.guild_id.to_string(), "base": true };
-            let update = doc! { "$set": {"base": false} };
+            let filter = doc! { "GuildId": curr.guild_id.to_string(), "Base": true };
+            let update = doc! { "$set": {"Base": false} };
             coll.update_one(filter, update, None).await?;
         }
 

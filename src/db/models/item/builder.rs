@@ -41,8 +41,8 @@ impl Builder {
 
         let filter =
             doc! {
-            "guild_id": self.guild_id.to_string(),
-            "item_name": self.item_name.clone()
+            "GuildId": self.guild_id.to_string(),
+            "ItemName": self.item_name.clone()
         };
         let item = coll.find_one(filter, None).await?;
         if item.is_some() {
@@ -77,5 +77,85 @@ impl Builder {
         cache.push((self.guild_id, self.item_name.clone()), item.clone());
         drop(cache);
         Ok(item)
+    }
+
+    pub fn description(&mut self, description: Option<String>) -> &mut Self {
+        self.description = description;
+        self
+    }
+
+    pub fn sellable(&mut self, sellable: Option<bool>) -> &mut Self {
+        self.sellable = sellable;
+        self
+    }
+
+    pub fn tradeable(&mut self, tradeable: Option<bool>) -> &mut Self {
+        self.tradeable = tradeable;
+        self
+    }
+
+    pub fn currency_value(&mut self, currency_value: Option<String>) -> &mut Self {
+        self.currency_value = currency_value;
+        self
+    }
+
+    pub fn value(&mut self, value: Option<f64>) -> &mut Self {
+        self.value = value;
+        self
+    }
+
+    pub fn message(&mut self, message: Option<String>) -> &mut Self {
+        self.message = message;
+        self
+    }
+
+    pub fn item_type(&mut self, item_type: Option<ItemType>) -> &mut Self {
+        self.item_type = item_type;
+        self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io::Write;
+
+    use crate::init_env;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_builder_and_delete() {
+        init_env().await;
+        let guild_id = DbGuildId::default();
+        let item_name = "test_item".to_string();
+        let item = Builder::new(guild_id.clone(), item_name.clone()).build().await.unwrap();
+        let item_ = item.read().await;
+        assert!(item_.is_some());
+        let item__ = item_.as_ref().unwrap();
+        assert_eq!(item__.guild_id, guild_id);
+        assert_eq!(item__.item_name, item_name);
+        drop(item_);
+        for i in 0..15 {
+            print!("\rCheck the DB, {} second(s) remaining.  ", 15 - i);
+            std::io::stdout().flush().unwrap();
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+        println!();
+        super::super::Item
+            ::delete_item(item).await
+            .expect("Failed to delete item.\n !!THE ITEM MUST NOW BE DELETED MANUALLY!!");
+    }
+
+    #[tokio::test]
+    async fn test_builder_safety() {
+        init_env().await;
+        let guild_id = DbGuildId::default();
+        let item_name = "test_item".to_string();
+        let mut item_builder = Builder::new(guild_id.clone(), item_name.clone());
+        item_builder.sellable(Some(true));
+        assert!(item_builder.build().await.is_err());
+
+        let mut item_builder = Builder::new(guild_id.clone(), "existing_item".to_owned());
+        assert!(item_builder.build().await.is_err());
     }
 }

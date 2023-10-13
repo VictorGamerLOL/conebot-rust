@@ -13,6 +13,7 @@ use mongodb::bson::doc;
 use serde::{ Deserialize, Serialize };
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock };
+use tracing::instrument;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -345,6 +346,7 @@ impl Item {
         Ok(())
     }
 
+    // instrument at debug level with no skipping
     pub async fn delete_item(self_: ArcTokioRwLockOption<Self>) -> Result<()> {
         let mut cache = CACHE_ITEM.lock().await;
         let mut self_ = self_.write().await;
@@ -357,7 +359,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self__.guild_id.to_string(),
+            "GuildId": self__.guild_id.to_string(),
             "ItemName": self__.item_name.clone(),
         };
         collection.delete_one(filter, None).await?;

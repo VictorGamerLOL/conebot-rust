@@ -24,32 +24,39 @@ use once_cell::sync::OnceCell;
 
 use super::id::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 
-pub struct BotGuild {
-    guild_id: DbGuildId,
-    // Since we do not need to compute everything from the beginning as no command uses everything at once,
-    // we use OnceCell to lazily initialize the data.
-    pub(self) currencies: OnceCell<()>,
-    pub(self) members: OnceCell<()>,
-    pub(self) items: OnceCell<()>,
-    pub(self) drop_tables: OnceCell<()>,
-    pub(self) multipliers: OnceCell<()>,
-    pub(self) global_currencies: OnceCell<()>,
-}
+// pub struct BotGuild {
+//     guild_id: DbGuildId,
+//     // Since we do not need to compute everything from the beginning as no command uses everything at once,
+//     // we use OnceCell to lazily initialize the data.
+//     pub(self) currencies: OnceCell<()>,
+//     pub(self) members: OnceCell<()>,
+//     pub(self) items: OnceCell<()>,
+//     pub(self) drop_tables: OnceCell<()>,
+//     pub(self) multipliers: OnceCell<()>,
+//     pub(self) global_currencies: OnceCell<()>,
+// }
 
-impl BotGuild {
-    pub fn new<T>(guild_id: T) -> Self where T: Into<DbGuildId> {
-        Self {
-            guild_id: guild_id.into(),
-            currencies: OnceCell::new(),
-            members: OnceCell::new(),
-            items: OnceCell::new(),
-            drop_tables: OnceCell::new(),
-            multipliers: OnceCell::new(),
-            global_currencies: OnceCell::new(),
-        }
-    }
-}
+// impl BotGuild {
+//     pub fn new<T>(guild_id: T) -> Self where T: Into<DbGuildId> {
+//         Self {
+//             guild_id: guild_id.into(),
+//             currencies: OnceCell::new(),
+//             members: OnceCell::new(),
+//             items: OnceCell::new(),
+//             drop_tables: OnceCell::new(),
+//             multipliers: OnceCell::new(),
+//             global_currencies: OnceCell::new(),
+//         }
+//     }
+// }
 
+/// This trait exists to serialize any struct that implements
+/// serialize into pairs of strings, representing the field names and values.
+///
+/// This is used to display the information to the user in a readable
+/// format, such as in the `balance` command. It is up the code that
+/// receives these pairs to make them more readable, such as replacing
+/// underscores with spaces.
 pub trait ToKVs: Serialize {
     /// Tries to serialize itself into a JSON object,
     /// then deserialize itself into `Result<Vec<(String, String)>>`.
