@@ -10,6 +10,7 @@ use futures::StreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::bson::doc;
+use mongodb::ClientSession;
 use serde::{ Deserialize, Serialize };
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock };
@@ -34,12 +35,12 @@ pub struct Item {
 pub enum ItemType {
     #[default]
     Trophy,
-    Consumable {
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] Consumable {
         message: String,
         #[serde(flatten)]
         action_type: ItemActionType,
     },
-    InstantConsumable {
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] InstantConsumable {
         message: String,
         #[serde(flatten)]
         action_type: ItemActionType,
@@ -167,59 +168,75 @@ impl Item {
             Some(a) => a,
             None => bail!("Item is already being used in breaking operation."),
         };
-        self__.item_name = new_name;
+
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self__.guild_id.to_string(),
-            "ItemName": self__.item_name.clone(),
+            "GuildID": self__.guild_id.as_str(),
+            "ItemName": &self__.item_name,
         };
         let update =
             doc! {
             "$set": {
-                "ItemName": self__.item_name.clone(),
+                "ItemName": &new_name,
             }
         };
         collection.update_one(filter, update, None).await?;
+
+        self__.item_name = new_name;
+
         let mut cache = CACHE_ITEM.lock().await;
         cache.pop(&(self__.guild_id.clone(), self__.item_name.clone()));
         cache.put(
             (self__.guild_id.clone(), self__.item_name.clone()),
             Arc::new(RwLock::new(Some(self__)))
         );
+
         drop(self_);
         drop(cache);
         Ok(())
     }
 
-    pub async fn update_description(&mut self, new_description: String) -> Result<()> {
+    pub async fn update_description(
+        &mut self,
+        new_description: String,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let update =
             doc! {
             "$set": {
-                "Description": new_description.clone(),
+                "Description": &new_description,
             }
         };
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.description = new_description; // must be done at the end or it will leave undesired
         // side effects if the database update fails.
         Ok(())
     }
 
-    pub async fn update_sellable(&mut self, new_sellable: bool) -> Result<()> {
+    pub async fn update_sellable(
+        &mut self,
+        new_sellable: bool,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let update =
             doc! {
@@ -227,18 +244,26 @@ impl Item {
                 "Sellable": new_sellable,
             }
         };
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.sellable = new_sellable;
         Ok(())
     }
 
-    pub async fn update_tradeable(&mut self, new_tradeable: bool) -> Result<()> {
+    pub async fn update_tradeable(
+        &mut self,
+        new_tradeable: bool,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let update =
             doc! {
@@ -246,37 +271,53 @@ impl Item {
                 "Tradeable": new_tradeable,
             }
         };
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.tradeable = new_tradeable;
         Ok(())
     }
 
-    pub async fn update_currency_value(&mut self, new_currency_value: String) -> Result<()> {
+    pub async fn update_currency_value(
+        &mut self,
+        new_currency_value: String,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let update =
             doc! {
             "$set": {
-                "CurrencyValue": new_currency_value.clone(),
+                "CurrencyValue": &new_currency_value,
             }
         };
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.currency_value = new_currency_value;
         Ok(())
     }
 
-    pub async fn update_value(&mut self, new_value: f64) -> Result<()> {
+    pub async fn update_value(
+        &mut self,
+        new_value: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let update =
             doc! {
@@ -284,18 +325,26 @@ impl Item {
                 "Value": new_value,
             }
         };
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.value = new_value;
         Ok(())
     }
 
-    pub async fn update_item_type(&mut self, new_item_type: ItemType) -> Result<()> {
+    pub async fn update_item_type(
+        &mut self,
+        new_item_type: ItemType,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildID": self.guild_id.as_str(),
+            "ItemName": &self.item_name,
         };
         let mut update =
             doc! {
@@ -320,7 +369,7 @@ impl Item {
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
-                        update_set.insert("RoleId", role_id.to_string());
+                        update_set.insert("RoleId", role_id.as_str());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
                         update_set.insert("DropTableName", drop_table_name);
@@ -333,7 +382,7 @@ impl Item {
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
-                        update_set.insert("RoleId", role_id.to_string());
+                        update_set.insert("RoleId", role_id.as_str());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
                         update_set.insert("DropTableName", drop_table_name);

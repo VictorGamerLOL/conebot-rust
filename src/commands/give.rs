@@ -70,8 +70,8 @@ pub async fn run(
     }
 
     let mut balances = Balances::try_from_user(
-        command.guild_id.unwrap().into(),
-        member.id.into()
+        &command.guild_id.unwrap().into(),
+        &member.id.into()
     ).await?;
     let mut balances = balances.lock().await;
 
@@ -102,7 +102,7 @@ pub async fn run(
         );
     };
 
-    balance.add_amount_unchecked(amount).await?;
+    balance.add_amount_unchecked(amount, None).await?;
 
     drop(balances);
 

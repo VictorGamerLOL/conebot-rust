@@ -17,11 +17,11 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::bson::doc;
-use mongodb::Collection;
+use mongodb::{ Collection, ClientSession };
 use serde::{ Deserialize, Serialize };
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use tokio::sync::{ Mutex, RwLock };
+use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard, MutexGuard };
 
 use super::Currency;
 
@@ -63,8 +63,8 @@ impl Balances {
     /// Returns an error if:
     /// - Any `MongoDB` error occurs.
     pub async fn try_from_user(
-        guild_id: DbGuildId,
-        user_id: DbUserId
+        guild_id: &DbGuildId,
+        user_id: &DbUserId
     ) -> Result<ArcTokioMutexOption<Self>> {
         let mut cache = CACHE_BALANCES.lock().await;
         let balances = cache.get(&(guild_id.clone(), user_id.clone())).cloned();
@@ -77,8 +77,8 @@ impl Balances {
         let coll: Collection<Balance> = db.collection("balances");
         let filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
+            "GuildId": guild_id.as_str(),
+            "UserId": user_id.as_str(),
         };
         let res = coll.find(filterdoc, None).await?;
         let res = TryStreamExt::try_collect::<Vec<Balance>>(res).await?;
@@ -93,7 +93,7 @@ impl Balances {
                 })
             )
         );
-        cache.put((guild_id, user_id), balances.clone());
+        cache.put((guild_id.clone(), user_id.clone()), balances.clone());
         drop(cache);
         Ok(balances)
     }
@@ -127,7 +127,7 @@ impl Balances {
     /// Returns an error if:
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
-    pub async fn create_balance(&mut self, curr_name: String) -> Result<&Balance> {
+    pub async fn create_balance(&mut self, curr_name: String) -> Result<&mut Balance> {
         let bal = Balance::new(
             self.guild_id.clone(),
             self.user_id.clone(),
@@ -136,7 +136,7 @@ impl Balances {
         self.balances.push(bal);
 
         self.balances
-            .iter()
+            .iter_mut()
             .find(|b| b.curr_name() == curr_name)
             .ok_or_else(|| anyhow!("Created balance but could not find it afterwards, strange."))
     }
@@ -147,17 +147,15 @@ impl Balances {
     }
 
     /// Checks if the user has a balance of a certain currency, and if they don't,
-    /// make a balance for said currency. Returns false if the balance has just been
-    /// created and true if the balance was already there.
+    /// make a balance for said currency. Then returns it.
     ///
     /// # Errors
     /// - Any `MongoDB` error occurs.
-    pub async fn ensure_has_currency(&mut self, curr_name: &str) -> Result<bool> {
-        if self.has_currency(curr_name) {
-            return Ok(true);
+    pub async fn ensure_has_currency(&mut self, curr_name: &str) -> Result<&mut Balance> {
+        if let Some(i) = self.balances.iter().position(|b| b.curr_name == curr_name) {
+            return Ok(&mut self.balances[i]);
         }
-        self.create_balance(curr_name.to_owned()).await?;
-        Ok(false)
+        self.create_balance(curr_name.to_owned()).await
     }
 
     /// Delete the balance for the specified currency for the user in the guild.
@@ -185,6 +183,21 @@ impl Balances {
         }
         Ok(())
     }
+
+    pub async fn invalidate_cache(mut self_: MutexGuard<'_, Option<Self>>) -> Result<()> {
+        let take_res = self_.take();
+        let self__ = match take_res {
+            Some(s) => s,
+            None => {
+                return Err(anyhow!("Balances are being used in a breaking operation."));
+            }
+        };
+        let mut cache = CACHE_BALANCES.lock().await;
+        cache.pop(&(self__.guild_id, self__.user_id));
+        drop(cache);
+        drop(self_);
+        Ok(())
+    }
 }
 
 impl Balance {
@@ -196,25 +209,26 @@ impl Balance {
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
     pub async fn new(guild_id: DbGuildId, user_id: DbUserId, curr_name: String) -> Result<Self> {
-        let user_balance = Self {
-            guild_id: guild_id.clone(),
-            user_id: user_id.clone(),
-            curr_name: curr_name.clone(),
-            amount: 0.0,
-        };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
-            "CurrName": curr_name.clone(),
+            "GuildId": guild_id.as_str(),
+            "UserId": user_id.as_str(),
+            "CurrName": &curr_name,
         };
         let res = coll.find_one(filterdoc, None).await?;
         if res.is_some() {
             return Err(anyhow!("User already has a balance for that currency in that guild."));
         }
+
+        let user_balance = Self {
+            guild_id,
+            user_id,
+            curr_name,
+            amount: 0.0,
+        };
 
         coll.insert_one(&user_balance, None).await?;
         Ok(user_balance)
@@ -255,7 +269,11 @@ impl Balance {
     /// - If the amount specified is infinite.
     /// - If the amount specified is NaN.
     #[inline]
-    pub async fn set_amount(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn set_amount(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_infinite() {
             return Err(anyhow!("Amount cannot be infinite."));
         }
@@ -263,7 +281,7 @@ impl Balance {
             return Err(anyhow!("Amount cannot be NaN."));
         }
 
-        self.set_amount_unchecked(amount).await
+        self.set_amount_unchecked(amount, session).await
     }
 
     /// Adds the specified amount to the current amount.
@@ -276,7 +294,11 @@ impl Balance {
     /// - The specified amount would cause the balance to overflow to infinity.
     /// - The specified amount would cause a NaN.
     #[allow(clippy::float_cmp)] // we compare ***TRUNCATED*** values.
-    pub async fn add_amount(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn add_amount(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
         }
@@ -298,7 +320,7 @@ impl Balance {
         } else if new_amount.is_nan() {
             return Err(anyhow!("Cannot add that amount, would cause a NaN."));
         }
-        self.set_amount(new_amount).await
+        self.set_amount(new_amount, session).await
     }
 
     /// Subtracts the specified amount from the current amount.
@@ -310,7 +332,11 @@ impl Balance {
     /// - The specified amount is negative.
     /// - The specified amount is infinite.
     /// - The specified amount would cause a NaN.
-    pub async fn sub_amount(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn sub_amount(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
         }
@@ -328,7 +354,7 @@ impl Balance {
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
         }
-        self.set_amount(new_amount).await
+        self.set_amount(new_amount, session).await
     }
 
     /// Subtracts the specified amount from the current amount without checking if the balance
@@ -339,7 +365,11 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
     /// - The specified amount would cause a NaN.
-    pub async fn sub_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn sub_amount_unchecked(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
         }
@@ -348,7 +378,7 @@ impl Balance {
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot subtract that amount, would cause a NaN."));
         }
-        self.set_amount(new_amount).await
+        self.set_amount_unchecked(new_amount, session).await
     }
 
     /// Adds the specified amount to the current amount without checking if the balance
@@ -360,7 +390,11 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
     /// - The specified amount would cause a NaN.
-    pub async fn add_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn add_amount_unchecked(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
         }
@@ -369,7 +403,7 @@ impl Balance {
         if new_amount.is_nan() {
             return Err(anyhow!("Cannot add that amount, would cause a NaN."));
         }
-        self.set_amount(new_amount).await
+        self.set_amount_unchecked(new_amount, session).await
     }
 
     /// Sets the amount to the specified amount without checking if the amount is infinite.
@@ -379,7 +413,11 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
     /// - The specified amount is NaN.
-    pub async fn set_amount_unchecked(&mut self, mut amount: f64) -> Result<()> {
+    pub async fn set_amount_unchecked(
+        &mut self,
+        mut amount: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot set NaN."));
         }
@@ -395,9 +433,9 @@ impl Balance {
 
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "UserId": self.user_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "UserId": self.user_id.as_str(),
+            "CurrName": self.curr_name.as_str(),
         };
         let updatedoc =
             doc! {
@@ -406,7 +444,12 @@ impl Balance {
             },
         };
 
-        let res = coll.update_one(filterdoc, updatedoc, None).await?;
+        let res;
+        if let Some(session) = session {
+            res = coll.update_one_with_session(filterdoc, updatedoc, None, session).await?;
+        } else {
+            res = coll.update_one(filterdoc, updatedoc, None).await?;
+        }
         if res.modified_count == 0 {
             return Err(anyhow!("Failed to update balance."));
         }
@@ -422,8 +465,8 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
     #[inline]
-    pub async fn clear(&mut self) -> Result<()> {
-        self.set_amount(0.0).await
+    pub async fn clear(&mut self, mut session: Option<&mut ClientSession>) -> Result<()> {
+        self.set_amount(0.0, session).await
     }
 
     /// Checks if this balance belongs to a valid currency.
@@ -481,7 +524,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         assert_eq!(balances_.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
@@ -494,7 +537,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         let mut balance = balances_.balances
@@ -503,38 +546,40 @@ mod test {
             .unwrap();
         let error_margin: f64 = f64::EPSILON;
 
+        balance.set_amount(30.0, None).await.ok();
+
         assert!((balance.amount - 30.0).abs() < error_margin); // value in DB is 30.0
-        balance.add_amount(1.0).await.unwrap();
+        balance.add_amount(1.0, None).await.unwrap();
         assert!((balance.amount - 31.0).abs() < error_margin);
-        balance.sub_amount(1.0).await.unwrap();
+        balance.sub_amount(1.0, None).await.unwrap();
         assert!((balance.amount - 30.0).abs() < error_margin);
 
-        assert!(balance.add_amount(f64::INFINITY).await.is_err()); // inf check
-        assert!(balance.sub_amount(f64::INFINITY).await.is_err());
+        assert!(balance.add_amount(f64::INFINITY, None).await.is_err()); // inf check
+        assert!(balance.sub_amount(f64::INFINITY, None).await.is_err());
 
-        assert!(balance.add_amount(f64::MAX).await.is_err()); // overflow check
-        assert!(balance.sub_amount(32.0).await.is_err());
+        assert!(balance.add_amount(f64::MAX, None).await.is_err()); // overflow check
+        assert!(balance.sub_amount(32.0, None).await.is_err());
 
-        assert!(balance.add_amount(-1.0).await.is_err()); // negative check
-        assert!(balance.sub_amount(-1.0).await.is_err());
+        assert!(balance.add_amount(-1.0, None).await.is_err()); // negative check
+        assert!(balance.sub_amount(-1.0, None).await.is_err());
 
-        assert!(balance.add_amount(f64::NAN).await.is_err()); // NaN check
-        assert!(balance.sub_amount(f64::NAN).await.is_err());
+        assert!(balance.add_amount(f64::NAN, None).await.is_err()); // NaN check
+        assert!(balance.sub_amount(f64::NAN, None).await.is_err());
 
-        balance.set_amount(0.1).await.unwrap(); // Rounding to 2dp check.
-        balance.add_amount(0.2).await.unwrap(); // Precision cmp is required here without error margin.
+        balance.set_amount(0.1, None).await.unwrap(); // Rounding to 2dp check.
+        balance.add_amount(0.2, None).await.unwrap(); // Precision cmp is required here without error margin.
         assert_eq!(balance.amount, 0.3);
-        balance.sub_amount(0.2).await.unwrap();
+        balance.sub_amount(0.2, None).await.unwrap();
         assert_eq!(balance.amount, 0.1);
 
-        balance.set_amount(0.111).await.unwrap(); // Rounding to 2dp check part 2.
+        balance.set_amount(0.111, None).await.unwrap(); // Rounding to 2dp check part 2.
         assert_eq!(balance.amount, 0.11);
-        balance.add_amount(0.222).await.unwrap();
+        balance.add_amount(0.222, None).await.unwrap();
         assert_eq!(balance.amount, 0.33);
-        balance.sub_amount(0.222).await.unwrap();
+        balance.sub_amount(0.222, None).await.unwrap();
         assert_eq!(balance.amount, 0.11);
 
-        balance.set_amount(30.0).await.unwrap(); // Reset amount
+        balance.set_amount(30.0, None).await.ok(); // Reset amount
 
         drop(balances);
     }
@@ -544,7 +589,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         let mut balance = balances_.balances
@@ -554,20 +599,20 @@ mod test {
         let error_margin: f64 = f64::EPSILON;
         assert!(balance.amount - 30.0 < error_margin);
 
-        balance.add_amount_unchecked(f64::INFINITY).await.unwrap();
+        balance.add_amount_unchecked(f64::INFINITY, None).await.unwrap();
         assert!(balance.amount.is_infinite() && balance.amount.is_sign_positive());
-        balance.set_amount(30.0).await.unwrap();
-        balance.sub_amount_unchecked(f64::INFINITY).await.unwrap();
+        balance.set_amount(30.0, None).await.unwrap();
+        balance.sub_amount_unchecked(f64::INFINITY, None).await.unwrap();
         assert!(balance.amount.is_infinite() && balance.amount.is_sign_negative());
-        balance.set_amount(30.0).await.unwrap();
+        balance.set_amount(30.0, None).await.unwrap();
 
-        balance.add_amount_unchecked(-1.0).await.unwrap();
+        balance.add_amount_unchecked(-1.0, None).await.unwrap();
         assert!(balance.amount - 29.0 < error_margin);
-        balance.sub_amount_unchecked(-1.0).await.unwrap();
+        balance.sub_amount_unchecked(-1.0, None).await.unwrap();
         assert!(balance.amount - 30.0 < error_margin);
 
-        assert!(balance.add_amount_unchecked(f64::NAN).await.is_err()); // NaN check
-        assert!(balance.sub_amount_unchecked(f64::NAN).await.is_err());
+        assert!(balance.add_amount_unchecked(f64::NAN, None).await.is_err()); // NaN check
+        assert!(balance.sub_amount_unchecked(f64::NAN, None).await.is_err());
 
         drop(balances);
     }

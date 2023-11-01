@@ -49,7 +49,7 @@ pub async fn run<'a>(
         (user, member)
     };
 
-    let balances = Balances::try_from_user(guild_id.clone(), user.0.id.into()).await?;
+    let balances = Balances::try_from_user(&guild_id, &user.0.id.into()).await?;
 
     let embed = if let Some(c) = opts.currency {
         single_currency(c, &balances, guild_id.try_into()?, &user, command).await?

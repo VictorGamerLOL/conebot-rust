@@ -46,7 +46,7 @@ pub async fn run(
         return Err(anyhow!("Member {} is not in guild {}", member.id, guild_id));
     }
 
-    let mut balances = Balances::try_from_user(guild_id.into(), member.id.into()).await?;
+    let mut balances = Balances::try_from_user(&guild_id.into(), &member.id.into()).await?;
     let mut balances = balances.lock().await;
 
     let Some(mut balances_) = balances.as_mut() else {
@@ -76,7 +76,7 @@ pub async fn run(
         );
     };
 
-    balance.sub_amount_unchecked(amount).await?;
+    balance.sub_amount_unchecked(amount, None).await?;
 
     drop(balances);
 

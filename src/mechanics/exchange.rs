@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use anyhow::{ anyhow, bail, Result };
+use mongodb::Client;
 use serenity::model::prelude::Member;
 use tokio::sync::RwLock;
 
 use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::truncate_2dp };
+use crate::db::CLIENT;
 
 /// Exchanges one currency for another.
 /// Returns the amount of the output currency that was given.
@@ -29,7 +31,7 @@ pub async fn exchange(
     input: &Currency,
     output: &Currency,
     amount: f64,
-    user: Member
+    member: Member
 ) -> Result<f64> {
     let input_base_value = if let Some(f) = input.base_value() {
         f
@@ -46,7 +48,7 @@ pub async fn exchange(
         1.0 // same here
     };
 
-    let mut currencies = Currency::try_from_guild(user.guild_id.into()).await?;
+    let mut currencies = Currency::try_from_guild(member.guild_id.into()).await?;
 
     get_base_currency(currencies).await?;
 
@@ -56,7 +58,10 @@ pub async fn exchange(
         bail!("Invalid exchange rate.");
     }
 
-    let mut balances = Balances::try_from_user(user.guild_id.into(), user.user.id.into()).await?;
+    let mut balances = Balances::try_from_user(
+        &member.guild_id.into(),
+        &member.user.id.into()
+    ).await?;
 
     let mut balances = balances.lock().await;
 
@@ -67,8 +72,10 @@ pub async fn exchange(
     balances_.ensure_has_currency(input.curr_name()).await?;
     balances_.ensure_has_currency(output.curr_name()).await?;
 
-    let mut balance_in: Option<&mut Balance> = None;
-    let mut balance_out: Option<&mut Balance> = None;
+    let mut balance_in: Option<&mut Balance> = None; // Yes yes I know I made `ensure_has_currency` return a &mut Balance, but the thing is
+    let mut balance_out: Option<&mut Balance> = None; // I can't use it twice in a row because that would mean mutably borrowing from the same place twice.
+    // and I cannot do that, even if the names are different. I need to do it via the iterator below because then the borrow checker is absolutely sure
+    // I have a mutable borrow from 2 different parts of the vector within `balances_`.
 
     for balance in balances_.balances_mut().iter_mut() {
         if balance.curr_name() == input.curr_name() {
@@ -99,8 +106,17 @@ pub async fn exchange(
         bail!("Invalid exchange rate result.");
     }
 
-    balance_in.sub_amount_unchecked(amount).await?;
-    balance_out.add_amount_unchecked(to_give).await?;
+    let old_amount1 = balance_in.amount();
+    let old_amount2 = balance_out.amount();
+
+    // need the thing below to do this as a transaction.
+    let mut session = CLIENT.get().await.start_session(None).await?;
+    session.start_transaction(None).await?;
+
+    balance_in.sub_amount_unchecked(amount, Some(&mut session)).await?;
+    balance_out.add_amount_unchecked(to_give, Some(&mut session)).await?;
+
+    session.commit_transaction().await?;
     drop(balances); // please the linter
 
     Ok(to_give)

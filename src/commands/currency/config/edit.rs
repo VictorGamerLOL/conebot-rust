@@ -52,23 +52,23 @@ pub async fn run(
             // clone the Arc. It's just a pointer it shouldn't be too expensive, right? I think it doesn't
             // implement Copy because you need to explicitly say that you need to increment the reference
             // count.
-            possible_fut = Some(Currency::update_name(currency.clone(), value.clone()));
+            possible_fut = Some(Currency::update_name(currency.clone(), value.clone(), None));
         }
         //TODO: Generate nicer error messages for users.
-        "symbol" => currency__.update_symbol(value.clone()).await?,
-        "visible" => currency__.update_visible(value.parse()?).await?,
-        "base" => currency__.update_base(value.parse()?).await?,
-        "base_value" => currency__.update_base_value(value.parse().ok()).await?,
-        "pay" => currency__.update_pay(value.parse()?).await?,
-        "earn_by_chat" => currency__.update_earn_by_chat(value.parse()?).await?,
+        "symbol" => currency__.update_symbol(&value, None).await?,
+        "visible" => currency__.update_visible(value.parse()?, None).await?,
+        "base" => currency__.update_base(value.parse()?, None).await?,
+        "base_value" => currency__.update_base_value(value.parse().ok(), None).await?,
+        "pay" => currency__.update_pay(value.parse()?, None).await?,
+        "earn_by_chat" => currency__.update_earn_by_chat(value.parse()?, None).await?,
         "channels_is_whitelist" => {
-            currency__.update_channels_is_whitelist(value.parse()?).await?;
+            currency__.update_channels_is_whitelist(value.parse()?, None).await?;
         }
-        "roles_is_whitelist" => currency__.update_roles_is_whitelist(value.parse()?).await?,
-        "earn_min" => currency__.update_earn_min(value.parse()?).await?,
-        "earn_max" => currency__.update_earn_max(value.parse()?).await?,
+        "roles_is_whitelist" => currency__.update_roles_is_whitelist(value.parse()?, None).await?,
+        "earn_min" => currency__.update_earn_min(value.parse()?, None).await?,
+        "earn_max" => currency__.update_earn_max(value.parse()?, None).await?,
         "earn_timeout" => {
-            currency__.update_earn_timeout(Duration::seconds(value.parse::<i64>()?)).await?;
+            currency__.update_earn_timeout(Duration::seconds(value.parse::<i64>()?), None).await?;
         }
         "channels_whitelist" | "channels_blacklist" | "roles_blacklist" | "roles_whitelist" => {
             anyhow::bail!("List field is not editable with this command");

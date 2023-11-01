@@ -27,6 +27,7 @@ use chrono::Duration;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
+use mongodb::ClientSession;
 use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
 use serde_json::{ Map, Value };
@@ -35,7 +36,7 @@ use serenity::model::id::ChannelId;
 use serenity::model::mention::Mention;
 use serenity::model::prelude::RoleId;
 use thiserror::Error;
-use tokio::sync::{ Mutex, RwLock };
+use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
 use crate::db::id;
 use crate::db::models::ToKVs;
@@ -64,6 +65,11 @@ pub enum CurrencyError {
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 #[allow(clippy::struct_excessive_bools)] // If I don't put this here it will complain that im attempting to make a "state machine".
 /// A struct representing a currency entity in the database.
+///
+/// Each one of the methods can be used as a transaction by providing a `Some(&mut ClientSession)` instead of a `None` for the
+/// 2nd argument. If it is used as a transaction, ***!!! it is the caller's responsibility to use the `invalidate_cache()` method
+/// on the currency if the transaction fails, because otherwise you would have an object that is not updated in the database but
+/// is updated in the cache. !!!***
 pub struct Currency {
     /// The snowflake of the guild this currency belongs to.
     /// DbGuildId is a wrapper around a string for added safety.
@@ -199,11 +205,13 @@ impl Currency {
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn curr_name(&self) -> &str {
         &self.curr_name
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn symbol(&self) -> &str {
         &self.symbol
     }
@@ -250,21 +258,25 @@ impl Currency {
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn channels_whitelist(&self) -> &[DbChannelId] {
         &self.channels_whitelist
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn roles_whitelist(&self) -> &[DbRoleId] {
         &self.roles_whitelist
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn channels_blacklist(&self) -> &[DbChannelId] {
         &self.channels_blacklist
     }
 
     #[allow(clippy::must_use_candidate)]
+    #[inline]
     pub fn roles_blacklist(&self) -> &[DbRoleId] {
         &self.roles_blacklist
     }
@@ -298,7 +310,11 @@ impl Currency {
     /// # Panics
     ///
     /// It shouldn't, this is here to please the linter.
-    pub async fn update_name(self_: ArcTokioRwLockOption<Self>, new_name: String) -> Result<()> {
+    pub async fn update_name(
+        self_: ArcTokioRwLockOption<Self>,
+        new_name: String,
+        session: Option<&mut ClientSession> // passing pointer is better than passing value bc pointer is smaller
+    ) -> Result<()> {
         let mut self_ = self_.write().await;
         let mut cache = CACHE_CURRENCY.lock().await;
         // Get the cache so no other task tries to use this while it is being updated.
@@ -311,13 +327,13 @@ impl Currency {
 
         let filterdoc =
             doc! {
-            "GuildId": self__.guild_id.to_string(),
-            "CurrName": self__.curr_name.clone(),
+            "GuildId": self__.guild_id.as_str(),
+            "CurrName": &self__.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "CurrName": new_name.clone(),
+                "CurrName": &new_name,
             },
         };
 
@@ -327,20 +343,24 @@ impl Currency {
         // check if the new name already exists in the guild
         let filterdoc2 =
             doc! {
-            "GuildId": self__.guild_id.to_string(),
-            "CurrName": new_name.clone(),
+            "GuildId": self__.guild_id.as_str(),
+            "CurrName": &new_name,
         };
         if coll.find_one(filterdoc2, None).await?.is_some() {
             return Err(
                 anyhow!(
                     "Currency with name {} already exists in guild {}",
                     new_name,
-                    self__.guild_id.to_string()
+                    self__.guild_id.as_str()
                 )
             );
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
         cache.put(
@@ -357,24 +377,32 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_symbol(&mut self, new_symbol: String) -> Result<()> {
+    pub async fn update_symbol(
+        &mut self,
+        new_symbol: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "Symbol": new_symbol.clone(),
+                "Symbol": new_symbol,
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
-        self.symbol = new_symbol;
+        self.symbol = new_symbol.into();
 
         Ok(())
     }
@@ -384,10 +412,14 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_visible(&mut self, new_visible: bool) -> Result<()> {
+    pub async fn update_visible(
+        &mut self,
+        new_visible: bool,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
+            "GuildId": self.guild_id.as_str(),
             "CurrName": self.curr_name.clone(),
         };
         let updatedoc =
@@ -399,7 +431,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.visible = new_visible;
 
@@ -413,11 +449,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_base(&mut self, new_base: bool) -> Result<()> {
+    pub async fn update_base(
+        &mut self,
+        new_base: bool,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -433,7 +473,7 @@ impl Currency {
         if new_base {
             let filterdoc2 =
                 doc! {
-                "GuildId": self.guild_id.to_string(),
+                "GuildId": self.guild_id.as_str(),
                 "Base": true,
             };
             let updatedoc2 =
@@ -442,10 +482,21 @@ impl Currency {
                     "Base": false,
                 },
             };
-            coll.update_one(filterdoc2, updatedoc2, None).await?;
+            // if i don do this, it will consume the  ↓↓↓↓↓↓↓↓↓↓↓↓ option and i wont be able to use it later,
+            // even if it does end up with a          ↓↓↓↓↓↓↓↓↓↓↓↓ `&mut &mut ClientSession` as the `s`.
+            if let Some(s) = &mut session {
+                coll.update_one_with_session(filterdoc2, updatedoc2, None, s).await?;
+            } else {
+                coll.update_one(filterdoc2, updatedoc2, None).await?;
+            }
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        // which i needed to use here        ↓↓↓↓↓↓↓
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.base = new_base;
 
@@ -457,11 +508,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_base_value(&mut self, new_base_value: Option<f64>) -> Result<()> {
+    pub async fn update_base_value(
+        &mut self,
+        new_base_value: Option<f64>,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -472,7 +527,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.base_value = new_base_value;
 
@@ -484,11 +543,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_pay(&mut self, new_pay: bool) -> Result<()> {
+    pub async fn update_pay(
+        &mut self,
+        new_pay: bool,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -499,7 +562,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.pay = new_pay;
 
@@ -511,11 +578,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_earn_by_chat(&mut self, new_earn_by_chat: bool) -> Result<()> {
+    pub async fn update_earn_by_chat(
+        &mut self,
+        new_earn_by_chat: bool,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -526,7 +597,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.earn_by_chat = new_earn_by_chat;
 
@@ -540,12 +615,13 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn update_channels_is_whitelist(
         &mut self,
-        new_channels_is_whitelist: bool
+        new_channels_is_whitelist: bool,
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -556,7 +632,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.channels_is_whitelist = new_channels_is_whitelist;
 
@@ -568,11 +648,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_roles_is_whitelist(&mut self, new_roles_is_whitelist: bool) -> Result<()> {
+    pub async fn update_roles_is_whitelist(
+        &mut self,
+        new_roles_is_whitelist: bool,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -583,7 +667,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.roles_is_whitelist = new_roles_is_whitelist;
 
@@ -595,7 +683,11 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if channel is already whitelisted.
-    pub async fn add_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+    pub async fn add_whitelisted_channel(
+        &mut self,
+        channel_id: DbChannelId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
             "GuildId": self.guild_id.to_string(),
@@ -604,7 +696,7 @@ impl Currency {
         let updatedoc =
             doc! {
             "$push": {
-                "ChannelsWhitelist": channel_id.to_string(),
+                "ChannelsWhitelist": channel_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -616,15 +708,24 @@ impl Currency {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsWhitelist": {
-                "$in": [channel_id.to_string()],
+                "$in": [channel_id.as_str()],
             }
         };
-        let res = coll.find_one(filterdoc2, None).await?;
+        let mut res: Option<Self>;
+        if let Some(s) = &mut session {
+            res = coll.find_one_with_session(filterdoc2, None, s).await?;
+        } else {
+            res = coll.find_one(filterdoc2, None).await?;
+        }
         if res.is_some() {
             return Err(anyhow!("Channel already whitelisted"));
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.channels_whitelist.push(channel_id);
 
@@ -636,27 +737,35 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if channel is not whitelisted.
-    pub async fn remove_whitelisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+    pub async fn remove_whitelisted_channel(
+        &mut self,
+        channel_id: &DbChannelId,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "ChannelsWhitelist": {
-                "$in": [channel_id.to_string()],
+                "$in": [channel_id.as_str()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "ChannelsWhitelist": channel_id.to_string(),
+                "ChannelsWhitelist": channel_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
-        self.channels_whitelist.retain(|x| x != &channel_id);
+        self.channels_whitelist.retain(|x| x != channel_id);
 
         Ok(())
     }
@@ -666,16 +775,20 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if role is already whitelisted.
-    pub async fn add_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+    pub async fn add_whitelisted_role(
+        &mut self,
+        role_id: DbRoleId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "RolesWhitelist": role_id.to_string(),
+                "RolesWhitelist": role_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -684,18 +797,27 @@ impl Currency {
         // check if that role is present in the whitelist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "RolesWhitelist": {
-                "$in": [role_id.to_string()],
+                "$in": [role_id.as_str()],
             }
         };
-        let res = coll.find_one(filterdoc2, None).await?;
+        let mut res: Option<Self>;
+        if let Some(s) = &mut session {
+            res = coll.find_one_with_session(filterdoc2, None, s).await?;
+        } else {
+            res = coll.find_one(filterdoc2, None).await?;
+        }
         if res.is_some() {
             return Err(anyhow!("Role already whitelisted"));
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.roles_whitelist.push(role_id);
 
@@ -707,27 +829,35 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if role is not whitelisted.
-    pub async fn remove_whitelisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+    pub async fn remove_whitelisted_role(
+        &mut self,
+        role_id: &DbRoleId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "RolesWhitelist": {
-                "$in": [role_id.to_string()],
+                "$in": [role_id.as_str()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "RolesWhitelist": role_id.to_string(),
+                "RolesWhitelist": role_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
-        self.roles_whitelist.retain(|x| x != &role_id);
+        self.roles_whitelist.retain(|x| x != role_id);
 
         Ok(())
     }
@@ -737,16 +867,20 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if channel is already blacklisted.
-    pub async fn add_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+    pub async fn add_blacklisted_channel(
+        &mut self,
+        channel_id: DbChannelId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "ChannelsBlacklist": channel_id.to_string(),
+                "ChannelsBlacklist": channel_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -755,18 +889,27 @@ impl Currency {
         // check if that channel is present in the blacklist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "ChannelsBlacklist": {
-                "$in": [channel_id.to_string()],
+                "$in": [channel_id.as_str()],
             }
         };
-        let res = coll.find_one(filterdoc2, None).await?;
+        let mut res: Option<Self>;
+        if let Some(s) = &mut session {
+            res = coll.find_one_with_session(filterdoc2, None, s).await?;
+        } else {
+            res = coll.find_one(filterdoc2, None).await?;
+        }
         if res.is_some() {
             return Err(anyhow!("Channel already blacklisted"));
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.channels_blacklist.push(channel_id);
 
@@ -778,27 +921,35 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if channel is not blacklisted.
-    pub async fn remove_blacklisted_channel(&mut self, channel_id: DbChannelId) -> Result<()> {
+    pub async fn remove_blacklisted_channel(
+        &mut self,
+        channel_id: &DbChannelId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "ChannelsBlacklist": {
-                "$in": [channel_id.to_string()],
+                "$in": [channel_id.as_str()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "ChannelsBlacklist": channel_id.to_string(),
+                "ChannelsBlacklist": channel_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = &mut session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
-        self.channels_blacklist.retain(|x| x != &channel_id);
+        self.channels_blacklist.retain(|x| x != channel_id);
 
         Ok(())
     }
@@ -808,16 +959,20 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if role is already blacklisted.
-    pub async fn add_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+    pub async fn add_blacklisted_role(
+        &mut self,
+        role_id: DbRoleId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "RolesBlacklist": role_id.to_string(),
+                "RolesBlacklist": role_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -826,18 +981,27 @@ impl Currency {
         // check if that role is present in the blacklist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "RolesBlacklist": {
-                "$in": [role_id.to_string()],
+                "$in": [role_id.as_str()],
             }
         };
-        let res = coll.find_one(filterdoc2, None).await?;
+        let res: Option<Self>;
+        if let Some(s) = &mut session {
+            res = coll.find_one_with_session(filterdoc2, None, s).await?;
+        } else {
+            res = coll.find_one(filterdoc2, None).await?;
+        }
         if res.is_some() {
             return Err(anyhow!("Role already blacklisted"));
         }
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.roles_blacklist.push(role_id);
 
@@ -849,27 +1013,35 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors, or if role is not blacklisted.
-    pub async fn remove_blacklisted_role(&mut self, role_id: DbRoleId) -> Result<()> {
+    pub async fn remove_blacklisted_role(
+        &mut self,
+        role_id: &DbRoleId,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
             "RolesBlacklist": {
-                "$in": [role_id.to_string()],
+                "$in": [role_id.as_str()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "RolesBlacklist": role_id.to_string(),
+                "RolesBlacklist": role_id.as_str(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = &mut session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
-        self.roles_blacklist.retain(|x| x != &role_id);
+        self.roles_blacklist.retain(|x| x != role_id);
 
         Ok(())
     }
@@ -881,23 +1053,28 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn overwrite_whitelisted_channels(
         &mut self,
-        channels: Vec<DbChannelId>
+        channels: Vec<DbChannelId>,
+        mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "ChannelsWhitelist": channels.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
+                "ChannelsWhitelist": channels.iter().map(DbChannelId::as_str).collect::<Vec<&str>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.channels_whitelist = channels;
 
@@ -909,22 +1086,30 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn overwrite_whitelisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
+    pub async fn overwrite_whitelisted_roles(
+        &mut self,
+        roles: Vec<DbRoleId>,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "RolesWhitelist": roles.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
+                "RolesWhitelist": roles.iter().map(DbRoleId::as_str).collect::<Vec<&str>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.roles_whitelist = roles;
 
@@ -938,23 +1123,28 @@ impl Currency {
     /// If any mongodb operation errors.
     pub async fn overwrite_blacklisted_channels(
         &mut self,
-        channels: Vec<DbChannelId>
+        channels: Vec<DbChannelId>,
+        mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "ChannelsBlacklist": channels.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
+                "ChannelsBlacklist": channels.iter().map(DbChannelId::as_str).collect::<Vec<&str>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.channels_blacklist = channels;
 
@@ -966,22 +1156,30 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn overwrite_blacklisted_roles(&mut self, roles: Vec<DbRoleId>) -> Result<()> {
+    pub async fn overwrite_blacklisted_roles(
+        &mut self,
+        roles: Vec<DbRoleId>,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "RolesBlacklist": roles.iter().map(std::string::ToString::to_string).collect::<Vec<String>>(),
+                "RolesBlacklist": roles.iter().map(DbRoleId::as_str).collect::<Vec<&str>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.roles_blacklist = roles;
 
@@ -993,11 +1191,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_earn_min(&mut self, new_earn_min: f64) -> Result<()> {
+    pub async fn update_earn_min(
+        &mut self,
+        new_earn_min: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -1008,7 +1210,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.earn_min = new_earn_min;
 
@@ -1020,11 +1226,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_earn_max(&mut self, new_earn_max: f64) -> Result<()> {
+    pub async fn update_earn_max(
+        &mut self,
+        new_earn_max: f64,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -1035,7 +1245,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.earn_max = new_earn_max;
 
@@ -1047,11 +1261,15 @@ impl Currency {
     /// # Errors
     ///
     /// If any mongodb operation errors.
-    pub async fn update_earn_timeout(&mut self, new_earn_timeout: Duration) -> Result<()> {
+    pub async fn update_earn_timeout(
+        &mut self,
+        new_earn_timeout: Duration,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_str(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -1062,7 +1280,11 @@ impl Currency {
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = &mut session {
+            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
+        } else {
+            coll.update_one(filterdoc, updatedoc, None).await?;
+        }
 
         self.earn_timeout = new_earn_timeout;
 
@@ -1099,13 +1321,32 @@ impl Currency {
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
-            "GuildId": self__.guild_id.to_string(),
-            "CurrName": self__.curr_name.clone(),
+            "GuildId": self__.guild_id.as_str(),
+            "CurrName": &self__.curr_name,
         };
         coll.delete_one(filterdoc, None).await?;
 
         drop(self_); // please the linter
         drop(cache); // all hail the linter
+        Ok(())
+    }
+
+    /// Consumes an RwLockWriteGuard to a currency and invalidates it in the cache. Waits for
+    /// all other references to the currency to be dropped before invalidating.
+    ///
+    /// Use this in case a transaction fails and you want to invalidate the cache.
+    pub async fn invalidate_cache(mut self_: RwLockWriteGuard<'_, Option<Self>>) -> Result<()> {
+        let mut cache = CACHE_CURRENCY.lock().await;
+        let self__ = if let Some(c) = self_.take() {
+            c
+        } else {
+            return Err(anyhow!("Currency is already being used in a breaking operation."));
+        };
+
+        let popped = cache.pop(&(self__.guild_id.to_string(), self__.curr_name));
+
+        drop(self_);
+        drop(cache);
         Ok(())
     }
 }

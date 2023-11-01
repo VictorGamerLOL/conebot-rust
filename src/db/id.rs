@@ -23,12 +23,18 @@
 //! These structs contain the necessary methods to convert them to strings, u64s, serenity types and vice versa.
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use serenity::model::prelude::{ChannelId, GuildId, RoleId, UserId};
+use serde::{ Deserialize, Serialize };
+use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbGuildId(pub String);
+
+impl DbGuildId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<u64> for DbGuildId {
     fn from(id: u64) -> Self {
@@ -79,12 +85,6 @@ impl From<&str> for DbGuildId {
     }
 }
 
-impl AsRef<str> for DbGuildId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 impl Default for DbGuildId {
     fn default() -> Self {
         Self("0".into())
@@ -94,6 +94,12 @@ impl Default for DbGuildId {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbUserId(pub String);
+
+impl DbUserId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<u64> for DbUserId {
     fn from(id: u64) -> Self {
@@ -145,12 +151,6 @@ impl From<&str> for DbUserId {
     }
 }
 
-impl AsRef<str> for DbUserId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 impl Default for DbUserId {
     fn default() -> Self {
         Self("0".into())
@@ -160,6 +160,12 @@ impl Default for DbUserId {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbChannelId(pub String);
+
+impl DbChannelId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<u64> for DbChannelId {
     fn from(id: u64) -> Self {
@@ -211,12 +217,6 @@ impl From<&str> for DbChannelId {
     }
 }
 
-impl AsRef<str> for DbChannelId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 impl Default for DbChannelId {
     fn default() -> Self {
         Self("0".into())
@@ -226,6 +226,12 @@ impl Default for DbChannelId {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DbRoleId(pub String);
+
+impl DbRoleId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<u64> for DbRoleId {
     fn from(id: u64) -> Self {
@@ -274,12 +280,6 @@ impl From<String> for DbRoleId {
 impl From<&str> for DbRoleId {
     fn from(id: &str) -> Self {
         Self(id.to_string())
-    }
-}
-
-impl AsRef<str> for DbRoleId {
-    fn as_ref(&self) -> &str {
-        &self.0
     }
 }
 

@@ -1,16 +1,16 @@
-use crate::db::id::{DbChannelId, DbGuildId, DbRoleId, DbUserId};
-use crate::db::models::{Balance, Balances, Currency};
+use crate::db::id::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
+use crate::db::models::{ Balance, Balances, Currency };
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use rand::prelude::*;
 use serenity::client::Context;
 use serenity::model::channel::Message;
-use serenity::model::prelude::{Channel, GuildId, Member, RoleId, UserId};
+use serenity::model::prelude::{ Channel, GuildId, Member, RoleId, UserId };
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{ debug, error, info, warn };
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Timeout {
@@ -36,7 +36,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         return Ok(());
     };
 
-    let mut balances = Balances::try_from_user(guild_id.into(), user.into()).await?;
+    let mut balances = Balances::try_from_user(&guild_id.into(), &user.into()).await?;
     let mut balances = balances.lock().await;
     let mut balances_ = if let Some(b) = balances.as_mut() {
         b
@@ -95,20 +95,10 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 
         drop(currency);
 
-        balances_.ensure_has_currency(&currency_name).await?;
-        let mut balance = if let Some(b) = balances_
-            .balances_mut()
-            .iter_mut()
-            .find(|b| b.curr_name == currency_name)
-        {
-            b
-        } else {
-            warn!("Failed to get balance for currency {}", currency_name);
-            continue;
-        };
+        let mut balance = balances_.ensure_has_currency(&currency_name).await?;
         // get a number between earn_min and earn_max
         let amount = truncate_2dp(rand.gen_range(earn_min..=earn_max));
-        balance.add_amount(amount).await?;
+        balance.add_amount(amount, None).await?;
 
         timeouts.insert(timeout.clone());
         drop(timeouts);
@@ -117,10 +107,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             let std_duration = if let Ok(timeout_duration) = timeout_duration.to_std() {
                 timeout_duration
             } else {
-                error!(
-                    "Failed to convert chrono duration {:?} to std duration",
-                    timeout_duration
-                );
+                error!("Failed to convert chrono duration {:?} to std duration", timeout_duration);
                 return;
             };
             debug!("Sleeping for {:?}", std_duration);
@@ -139,7 +126,7 @@ fn check_can_earn(
     guild_id: GuildId,
     member: Member,
     channel: Channel,
-    currency: &Currency,
+    currency: &Currency
 ) -> bool {
     let mut can_earn = true;
     if currency.roles_is_whitelist() {
@@ -174,7 +161,7 @@ fn check_can_earn(
 fn check_contains_channel(
     guild_id: GuildId,
     current_channel: Channel,
-    channels: &[DbChannelId],
+    channels: &[DbChannelId]
 ) -> bool {
     for db_channel in channels {
         if current_channel.id().0.to_string() == db_channel.0 {

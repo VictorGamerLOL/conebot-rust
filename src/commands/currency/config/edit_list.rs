@@ -76,28 +76,28 @@ async fn add(currency: &mut Currency, field_name: &str, value: Mention) -> Resul
     match field_name {
         "roles_whitelist" => {
             if let Mention::Role(r) = value {
-                currency.add_whitelisted_role(r.into()).await?;
+                currency.add_whitelisted_role(r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "roles_blacklist" => {
             if let Mention::Role(r) = value {
-                currency.add_blacklisted_role(r.into()).await?;
+                currency.add_blacklisted_role(r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_whitelist" => {
             if let Mention::Channel(c) = value {
-                currency.add_whitelisted_channel(c.into()).await?;
+                currency.add_whitelisted_channel(c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_blacklist" => {
             if let Mention::Channel(c) = value {
-                currency.add_blacklisted_channel(c.into()).await?;
+                currency.add_blacklisted_channel(c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
@@ -111,28 +111,28 @@ async fn remove(currency: &mut Currency, field_name: &str, value: Mention) -> Re
     match field_name {
         "roles_whitelist" => {
             if let Mention::Role(r) = value {
-                currency.remove_whitelisted_role(r.into()).await?;
+                currency.remove_whitelisted_role(&r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "roles_blacklist" => {
             if let Mention::Role(r) = value {
-                currency.remove_blacklisted_role(r.into()).await?;
+                currency.remove_blacklisted_role(&r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_whitelist" => {
             if let Mention::Channel(c) = value {
-                currency.remove_whitelisted_channel(c.into()).await?;
+                currency.remove_whitelisted_channel(&c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_blacklist" => {
             if let Mention::Channel(c) = value {
-                currency.remove_blacklisted_channel(c.into()).await?;
+                currency.remove_blacklisted_channel(&c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
@@ -144,10 +144,10 @@ async fn remove(currency: &mut Currency, field_name: &str, value: Mention) -> Re
 
 async fn clear(currency: &mut Currency, field_name: &str) -> Result<()> {
     match field_name {
-        "roles_whitelist" => currency.overwrite_whitelisted_roles(vec![]).await?,
-        "roles_blacklist" => currency.overwrite_blacklisted_roles(vec![]).await?,
-        "channels_whitelist" => currency.overwrite_whitelisted_channels(vec![]).await?,
-        "channels_blacklist" => currency.overwrite_blacklisted_channels(vec![]).await?,
+        "roles_whitelist" => currency.overwrite_whitelisted_roles(vec![], None).await?,
+        "roles_blacklist" => currency.overwrite_blacklisted_roles(vec![], None).await?,
+        "channels_whitelist" => currency.overwrite_whitelisted_channels(vec![], None).await?,
+        "channels_blacklist" => currency.overwrite_blacklisted_channels(vec![], None).await?,
         _ => bail!("Invalid field name."),
     }
     Ok(())
