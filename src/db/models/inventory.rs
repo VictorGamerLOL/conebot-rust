@@ -42,7 +42,7 @@ impl Inventory {
         user_id: DbUserId
     ) -> Result<ArcTokioMutexOption<Self>> {
         let mut cache = CACHE_INVENTORY.lock().await;
-        let key = (guild_id.clone(), user_id.clone());
+        let key = (guild_id, user_id);
         if let Some(inventory) = cache.get(&key) {
             return Ok(inventory.clone());
         }
@@ -81,7 +81,7 @@ impl Inventory {
             return Ok(&mut self.inventory[i]);
         }
 
-        let entry = InventoryEntry::new(&self.guild_id, &self.user_id, item_name).await?;
+        let entry = InventoryEntry::new(self.guild_id, self.user_id, item_name).await?;
         self.inventory.push(entry);
         Ok(self.inventory.last_mut().unwrap())
     }
@@ -97,8 +97,8 @@ impl Inventory {
 
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "UserId": self.user_id.to_string(),
+            "GuildId": self.guild_id.as_i64(),
+            "UserId": self.user_id.as_i64(),
             "ItemName": &item_name,
         };
 
@@ -117,14 +117,14 @@ impl InventoryEntry {
     /// # Errors
     /// - Any mongodb error occurs.
     /// - The item entry already exists.
-    async fn new(guild_id: &DbGuildId, user_id: &DbUserId, item_name: String) -> Result<Self> {
+    async fn new(guild_id: DbGuildId, user_id: DbUserId, item_name: String) -> Result<Self> {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let mut coll: Collection<Self> = db.collection("inventories");
 
         let filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
             "ItemName": item_name.clone(),
         };
 
@@ -133,8 +133,8 @@ impl InventoryEntry {
         }
 
         let new_self = Self {
-            guild_id: guild_id.clone(),
-            user_id: user_id.clone(),
+            guild_id,
+            user_id,
             item_name,
             amount: 0,
         };
@@ -156,8 +156,8 @@ impl InventoryEntry {
 
         let filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
         };
 
         let mut res = coll.find(filterdoc, None).await?;
@@ -185,8 +185,8 @@ impl InventoryEntry {
 
         let mut filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
             "ItemName": item_name,
         };
         coll.find_one(filterdoc, None).await.map_err(|e| e.into())
@@ -210,8 +210,8 @@ impl InventoryEntry {
 
         let mut filterdoc =
             doc! {
-            "GuildId": guild_id.to_string(),
-            "UserId": user_id.to_string(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
             "ItemName": { "$regex": search_query, "$options": "i" },
         };
         let mut res = coll.find(filterdoc, None).await?;
@@ -256,9 +256,9 @@ impl InventoryEntry {
 
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "UserId": self.user_id.to_string(),
-            "ItemName": self.item_name.clone(),
+            "GuildId": self.guild_id.as_i64(),
+            "UserId": self.user_id.as_i64(),
+            "ItemName": &self.item_name,
         };
         let updatedoc =
             doc! {

@@ -60,7 +60,7 @@ impl Builder {
         let item_type = self.item_type.unwrap_or(ItemType::Trophy);
 
         let item = Item {
-            guild_id: self.guild_id.clone(),
+            guild_id: self.guild_id,
             item_name: self.item_name.clone(),
             description,
             sellable,
@@ -361,7 +361,7 @@ mod test {
         init_env().await;
         let guild_id = DbGuildId::default();
         let item_name = "test_item".to_string();
-        let item = Builder::new(guild_id.clone(), item_name.clone()).build().await.unwrap();
+        let item = Builder::new(guild_id, item_name.clone()).build().await.unwrap();
         let item_ = item.read().await;
         assert!(item_.is_some());
         let item__ = item_.as_ref().unwrap();
@@ -384,11 +384,11 @@ mod test {
         init_env().await;
         let guild_id = DbGuildId::default();
         let item_name = "test_item".to_string();
-        let mut item_builder = Builder::new(guild_id.clone(), item_name.clone());
+        let mut item_builder = Builder::new(guild_id, item_name.clone());
         item_builder.sellable(Some(true));
         assert!(item_builder.build().await.is_err());
 
-        let mut item_builder = Builder::new(guild_id.clone(), "existing_item".to_owned());
+        let mut item_builder = Builder::new(guild_id, "existing_item".to_owned());
         assert!(item_builder.build().await.is_err());
     }
 }

@@ -101,7 +101,7 @@ impl Builder {
         if curr.is_some() {
             return Err(anyhow::anyhow!("Currency already exists"));
         }
-        let guild_id = self.guild_id.clone();
+        let guild_id = self.guild_id;
         let curr_name = self.curr_name.clone();
         let symbol = self.symbol;
         let visible = self.visible.unwrap_or(true);
@@ -150,7 +150,7 @@ impl Builder {
         let arc_currency: ArcTokioRwLockOption<Currency> = Arc::new(
             tokio::sync::RwLock::new(Some(curr))
         );
-        cache.push((self.guild_id.to_string(), self.curr_name.clone()), arc_currency.clone());
+        cache.push((self.guild_id.as_i64(), self.curr_name.clone()), arc_currency.clone());
         drop(cache);
         Ok(arc_currency)
     }

@@ -36,7 +36,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         return Ok(());
     };
 
-    let mut balances = Balances::try_from_user(&guild_id.into(), &user.into()).await?;
+    let mut balances = Balances::try_from_user(guild_id.into(), user.into()).await?;
     let mut balances = balances.lock().await;
     let mut balances_ = if let Some(b) = balances.as_mut() {
         b
@@ -164,7 +164,7 @@ fn check_contains_channel(
     channels: &[DbChannelId]
 ) -> bool {
     for db_channel in channels {
-        if current_channel.id().0.to_string() == db_channel.0 {
+        if &DbChannelId::from(current_channel.id()) == db_channel {
             return true;
         } else {
             continue;
@@ -174,8 +174,9 @@ fn check_contains_channel(
 }
 
 fn check_contains_role(guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[DbRoleId]) -> bool {
-    for role in current_roles {
-        if roles.contains(&crate::db::id::DbRoleId(role.0.to_string())) {
+    let t = 0;
+    for role in current_roles.iter().copied() {
+        if roles.contains(&role.into()) {
             return true;
         } else {
             continue;

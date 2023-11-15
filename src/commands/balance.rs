@@ -39,7 +39,7 @@ pub async fn run<'a>(
     let guild_id: DbGuildId = command.guild_id
         .ok_or_else(|| anyhow!("Command not allowed in DMs."))?
         .into();
-    let opts = parse_options(options, guild_id.clone(), http.clone()).await?;
+    let opts = parse_options(options, guild_id, http.clone()).await?;
 
     let user = if let Some(u) = opts.user {
         u
@@ -49,7 +49,7 @@ pub async fn run<'a>(
         (user, member)
     };
 
-    let balances = Balances::try_from_user(&guild_id, &user.0.id.into()).await?;
+    let balances = Balances::try_from_user(guild_id, user.0.id.into()).await?;
 
     let embed = if let Some(c) = opts.currency {
         single_currency(c, &balances, guild_id.try_into()?, &user, command).await?
@@ -220,14 +220,14 @@ async fn parse_options<'a>(
     let mut currency: Option<String> = options.get_string_value("currency").transpose()?;
 
     let currency: Option<ArcTokioRwLockOption<Currency>> = if let Some(currency) = currency {
-        Currency::try_from_name(guild_id.clone(), currency).await?
+        Currency::try_from_name(guild_id, currency).await?
     } else {
         None
     };
 
     let user: Option<(User, Member)> = if let Some((u, m)) = user {
         let guild_id: GuildId = guild_id.try_into()?;
-        let member = guild_id.member(http.clone(), u.id).await?;
+        let member = guild_id.member(&http, u.id).await?;
         Some((u, member))
     } else {
         None

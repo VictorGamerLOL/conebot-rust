@@ -63,11 +63,11 @@ impl Balances {
     /// Returns an error if:
     /// - Any `MongoDB` error occurs.
     pub async fn try_from_user(
-        guild_id: &DbGuildId,
-        user_id: &DbUserId
+        guild_id: DbGuildId,
+        user_id: DbUserId
     ) -> Result<ArcTokioMutexOption<Self>> {
         let mut cache = CACHE_BALANCES.lock().await;
-        let balances = cache.get(&(guild_id.clone(), user_id.clone())).cloned();
+        let balances = cache.get(&(guild_id, user_id)).cloned();
         // if it some return if, else continue
         if let Some(balances) = balances {
             return Ok(balances);
@@ -77,8 +77,8 @@ impl Balances {
         let coll: Collection<Balance> = db.collection("balances");
         let filterdoc =
             doc! {
-            "GuildId": guild_id.as_str(),
-            "UserId": user_id.as_str(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
         };
         let res = coll.find(filterdoc, None).await?;
         let res = TryStreamExt::try_collect::<Vec<Balance>>(res).await?;
@@ -87,13 +87,13 @@ impl Balances {
         let balances = Arc::new(
             Mutex::new(
                 Some(Self {
-                    guild_id: guild_id.clone(),
-                    user_id: user_id.clone(),
+                    guild_id,
+                    user_id,
                     balances: res,
                 })
             )
         );
-        cache.put((guild_id.clone(), user_id.clone()), balances.clone());
+        cache.put((guild_id, user_id), balances.clone());
         drop(cache);
         Ok(balances)
     }
@@ -128,11 +128,7 @@ impl Balances {
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
     pub async fn create_balance(&mut self, curr_name: String) -> Result<&mut Balance> {
-        let bal = Balance::new(
-            self.guild_id.clone(),
-            self.user_id.clone(),
-            curr_name.clone()
-        ).await?;
+        let bal = Balance::new(self.guild_id, self.user_id, curr_name.clone()).await?;
         self.balances.push(bal);
 
         self.balances
@@ -214,8 +210,8 @@ impl Balance {
 
         let filterdoc =
             doc! {
-            "GuildId": guild_id.as_str(),
-            "UserId": user_id.as_str(),
+            "GuildId": guild_id.as_i64(),
+            "UserId": user_id.as_i64(),
             "CurrName": &curr_name,
         };
         let res = coll.find_one(filterdoc, None).await?;
@@ -239,7 +235,7 @@ impl Balance {
     /// - Any `MongoDB` error occurs.
     /// - The currency does not exist.
     pub async fn currency(&self) -> Result<Option<ArcTokioRwLockOption<Currency>>> {
-        Currency::try_from_name(self.guild_id.clone(), self.curr_name.clone()).await
+        Currency::try_from_name(self.guild_id, self.curr_name.clone()).await
     }
 
     #[allow(clippy::must_use_candidate)]
@@ -433,8 +429,8 @@ impl Balance {
 
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
-            "UserId": self.user_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
+            "UserId": self.user_id.as_i64(),
             "CurrName": self.curr_name.as_str(),
         };
         let updatedoc =
@@ -478,7 +474,7 @@ impl Balance {
     pub async fn is_valid(&self) -> Result<bool> {
         Ok(
             super::currency::Currency
-                ::try_from_name(self.guild_id.clone(), self.curr_name.clone()).await?
+                ::try_from_name(self.guild_id, self.curr_name.clone()).await?
                 .is_some()
         )
     }
@@ -524,7 +520,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         assert_eq!(balances_.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
@@ -537,7 +533,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         let mut balance = balances_.balances
@@ -589,7 +585,7 @@ mod test {
         crate::init_env().await;
         let user = crate::db::id::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(&guild, &user).await.unwrap();
+        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
         let mut balance = balances_.balances

@@ -140,7 +140,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": guild_id.as_str(),
+            "GuildID": guild_id.as_i64(),
             "ItemName": item_name,
         };
         let item = match collection.find_one(filter, None).await {
@@ -163,7 +163,7 @@ impl Item {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter = doc! {
-            "GuildID": guild_id.as_str(),
+            "GuildID": guild_id.as_i64(),
         };
         let mut cursor = collection.find(filter, None).await?;
         let mut items = Vec::new();
@@ -172,7 +172,7 @@ impl Item {
             let item = item?;
             let item_name = item.item_name.clone();
             let item_ptr = Arc::new(RwLock::new(Some(item)));
-            cache.put((guild_id.clone(), item_name), item_ptr.clone());
+            cache.put((guild_id, item_name), item_ptr.clone());
             items.push(item_ptr);
         }
         drop(cache);
@@ -219,7 +219,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self__.guild_id.as_str(),
+            "GuildID": self__.guild_id.as_i64(),
             "ItemName": &self__.item_name,
         };
         let update =
@@ -233,11 +233,8 @@ impl Item {
         self__.item_name = new_name;
 
         let mut cache = CACHE_ITEM.lock().await;
-        cache.pop(&(self__.guild_id.clone(), self__.item_name.clone()));
-        cache.put(
-            (self__.guild_id.clone(), self__.item_name.clone()),
-            Arc::new(RwLock::new(Some(self__)))
-        );
+        cache.pop(&(self__.guild_id, self__.item_name.clone()));
+        cache.put((self__.guild_id, self__.item_name.clone()), Arc::new(RwLock::new(Some(self__))));
 
         drop(self_);
         drop(cache);
@@ -253,7 +250,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -281,7 +278,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -308,7 +305,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -335,7 +332,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -362,7 +359,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -389,7 +386,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_str(),
+            "GuildID": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let mut update =
@@ -415,7 +412,7 @@ impl Item {
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
-                        update_set.insert("RoleId", role_id.as_str());
+                        update_set.insert("RoleId", role_id.as_i64());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
                         update_set.insert("DropTableName", drop_table_name);
@@ -428,7 +425,7 @@ impl Item {
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
-                        update_set.insert("RoleId", role_id.as_str());
+                        update_set.insert("RoleId", role_id.as_i64());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
                         update_set.insert("DropTableName", drop_table_name);
@@ -462,7 +459,7 @@ impl Item {
             "ItemName": self__.item_name.clone(),
         };
         collection.delete_one(filter, None).await?;
-        cache.pop(&(self__.guild_id.clone(), self__.item_name.clone()));
+        cache.pop(&(self__.guild_id, self__.item_name.clone()));
         drop(self_);
         drop(cache);
         Ok(())

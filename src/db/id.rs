@@ -26,265 +26,197 @@ use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
-pub struct DbGuildId(pub String);
+pub struct DbGuildId(i64);
 
 impl DbGuildId {
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_i64(self) -> i64 {
+        self.0
+    }
+
+    pub const fn as_u64(self) -> u64 {
+        u64::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
 
 impl From<u64> for DbGuildId {
     fn from(id: u64) -> Self {
-        Self(id.to_string())
+        Self(i64::from_ne_bytes(id.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbGuildId> for u64 {
-    type Error = anyhow::Error;
-    fn try_from(id: DbGuildId) -> Result<Self> {
-        Ok(id.0.parse()?)
+impl From<DbGuildId> for u64 {
+    fn from(id: DbGuildId) -> Self {
+        Self::from_ne_bytes(id.0.to_ne_bytes())
     }
 }
 
 impl From<GuildId> for DbGuildId {
     fn from(id: GuildId) -> Self {
-        Self(id.0.to_string())
+        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
 impl TryFrom<DbGuildId> for GuildId {
     type Error = anyhow::Error;
     fn try_from(id: DbGuildId) -> Result<Self> {
-        Ok(Self(id.0.parse()?))
+        Ok(Self(u64::from_ne_bytes(id.0.to_ne_bytes())))
     }
 }
 
 impl ToString for DbGuildId {
     fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-impl From<DbGuildId> for String {
-    fn from(id: DbGuildId) -> Self {
-        id.0
+        self.0.to_string()
     }
 }
 
-impl From<String> for DbGuildId {
-    fn from(id: String) -> Self {
-        Self(id)
-    }
-}
-
-impl From<&str> for DbGuildId {
-    fn from(id: &str) -> Self {
-        Self(id.to_string())
-    }
-}
-
-impl Default for DbGuildId {
-    fn default() -> Self {
-        Self("0".into())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
-pub struct DbUserId(pub String);
+pub struct DbUserId(i64);
 
 impl DbUserId {
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_i64(self) -> i64 {
+        self.0
+    }
+
+    pub const fn as_u64(self) -> u64 {
+        u64::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
 
 impl From<u64> for DbUserId {
     fn from(id: u64) -> Self {
-        Self(id.to_string())
+        Self(i64::from_ne_bytes(id.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbUserId> for u64 {
-    type Error = anyhow::Error;
-    fn try_from(id: DbUserId) -> Result<Self> {
-        Ok(id.0.parse()?)
+impl From<DbUserId> for u64 {
+    fn from(id: DbUserId) -> Self {
+        Self::from_ne_bytes(id.0.to_ne_bytes())
     }
 }
 
 impl From<UserId> for DbUserId {
     fn from(id: UserId) -> Self {
-        Self(id.0.to_string())
+        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbUserId> for UserId {
-    type Error = anyhow::Error;
-    fn try_from(id: DbUserId) -> Result<Self> {
-        Ok(Self(id.0.parse()?))
+impl From<DbUserId> for UserId {
+    fn from(id: DbUserId) -> Self {
+        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
 impl ToString for DbUserId {
     fn to_string(&self) -> String {
-        self.0.clone()
+        self.0.to_string()
     }
 }
 
-impl From<DbUserId> for String {
-    fn from(id: DbUserId) -> Self {
-        id.0
-    }
-}
-
-impl From<String> for DbUserId {
-    fn from(id: String) -> Self {
-        Self(id)
-    }
-}
-
-impl From<&str> for DbUserId {
-    fn from(id: &str) -> Self {
-        Self(id.to_string())
-    }
-}
-
-impl Default for DbUserId {
-    fn default() -> Self {
-        Self("0".into())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
-pub struct DbChannelId(pub String);
+pub struct DbChannelId(i64);
 
 impl DbChannelId {
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_i64(self) -> i64 {
+        self.0
+    }
+    pub const fn as_u64(self) -> u64 {
+        u64::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
 
 impl From<u64> for DbChannelId {
     fn from(id: u64) -> Self {
-        Self(id.to_string())
+        Self(i64::from_ne_bytes(id.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbChannelId> for u64 {
-    type Error = anyhow::Error;
-    fn try_from(id: DbChannelId) -> Result<Self> {
-        Ok(id.0.parse()?)
+impl From<DbChannelId> for u64 {
+    fn from(id: DbChannelId) -> Self {
+        Self::from_ne_bytes(id.0.to_ne_bytes())
     }
 }
 
-impl From<ChannelId> for DbChannelId {
-    fn from(id: ChannelId) -> Self {
-        Self(id.0.to_string())
-    }
-}
-
-impl TryFrom<DbChannelId> for ChannelId {
-    type Error = anyhow::Error;
-    fn try_from(id: DbChannelId) -> Result<Self> {
-        Ok(Self(id.0.parse()?))
-    }
-}
-
-impl ToString for DbChannelId {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl From<DbChannelId> for String {
+impl From<DbChannelId> for i64 {
     fn from(id: DbChannelId) -> Self {
         id.0
     }
 }
 
-impl From<String> for DbChannelId {
-    fn from(id: String) -> Self {
-        Self(id)
+impl From<ChannelId> for DbChannelId {
+    fn from(id: ChannelId) -> Self {
+        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
-impl From<&str> for DbChannelId {
-    fn from(id: &str) -> Self {
-        Self(id.to_string())
+impl From<DbChannelId> for ChannelId {
+    fn from(id: DbChannelId) -> Self {
+        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
-impl Default for DbChannelId {
-    fn default() -> Self {
-        Self("0".into())
+impl ToString for DbChannelId {
+    fn to_string(&self) -> String {
+        self.0.to_string()
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+impl TryFrom<String> for DbChannelId {
+    type Error = anyhow::Error;
+    fn try_from(id: String) -> Result<Self> {
+        Ok(Self(i64::from_ne_bytes(id.parse::<u64>()?.to_ne_bytes())))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
-pub struct DbRoleId(pub String);
+pub struct DbRoleId(i64);
 
 impl DbRoleId {
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_i64(self) -> i64 {
+        self.0
+    }
+    pub const fn as_u64(self) -> u64 {
+        u64::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
 
 impl From<u64> for DbRoleId {
     fn from(id: u64) -> Self {
-        Self(id.to_string())
+        Self(i64::from_ne_bytes(id.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbRoleId> for u64 {
-    type Error = anyhow::Error;
-    fn try_from(id: DbRoleId) -> Result<Self> {
-        Ok(id.0.parse()?)
+impl From<DbRoleId> for u64 {
+    fn from(id: DbRoleId) -> Self {
+        Self::from_ne_bytes(id.0.to_ne_bytes())
     }
 }
 
 impl From<RoleId> for DbRoleId {
     fn from(id: RoleId) -> Self {
-        Self(id.0.to_string())
+        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
-impl TryFrom<DbRoleId> for RoleId {
-    type Error = anyhow::Error;
-    fn try_from(id: DbRoleId) -> Result<Self> {
-        Ok(Self(id.0.parse()?))
+impl From<DbRoleId> for RoleId {
+    fn from(id: DbRoleId) -> Self {
+        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
 impl ToString for DbRoleId {
     fn to_string(&self) -> String {
-        self.0.clone()
+        self.0.to_string()
     }
 }
 
-impl From<DbRoleId> for String {
-    fn from(id: DbRoleId) -> Self {
-        id.0
-    }
-}
-
-impl From<String> for DbRoleId {
-    fn from(id: String) -> Self {
-        Self(id)
-    }
-}
-
-impl From<&str> for DbRoleId {
-    fn from(id: &str) -> Self {
-        Self(id.to_string())
-    }
-}
-
-impl Default for DbRoleId {
-    fn default() -> Self {
-        Self("0".into())
+impl TryFrom<String> for DbRoleId {
+    type Error = anyhow::Error;
+    fn try_from(id: String) -> Result<Self> {
+        Ok(Self(i64::from_ne_bytes(id.parse::<u64>()?.to_ne_bytes())))
     }
 }

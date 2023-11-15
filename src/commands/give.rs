@@ -70,8 +70,8 @@ pub async fn run(
     }
 
     let mut balances = Balances::try_from_user(
-        &command.guild_id.unwrap().into(),
-        &member.id.into()
+        command.guild_id.unwrap().into(),
+        member.id.into()
     ).await?;
     let mut balances = balances.lock().await;
 

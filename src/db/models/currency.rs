@@ -118,7 +118,7 @@ pub struct Currency {
 
 lazy_static! {
     // Need me that concurrency.
-    static ref CACHE_CURRENCY: TokioMutexCache<(String, String), ArcTokioRwLockOption<Currency>> =
+    static ref CACHE_CURRENCY: TokioMutexCache<(i64, String), ArcTokioRwLockOption<Currency>> =
         Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
@@ -139,11 +139,11 @@ impl Currency {
         guild_id: DbGuildId,
         curr_name: String
     ) -> Result<Option<ArcTokioRwLockOption<Self>>> {
-        let guild_id = guild_id.to_string();
+        let guild_id = guild_id.as_i64();
 
         // Try to get from cache first.
         let mut cache = CACHE_CURRENCY.lock().await;
-        if let Some(currency) = cache.get(&(guild_id.clone(), curr_name.clone())) {
+        if let Some(currency) = cache.get(&(guild_id, curr_name.clone())) {
             return Ok(Some(currency.clone()));
         }
         // If not in cache, try to get from database. Keep holding the lock on the cache
@@ -152,7 +152,7 @@ impl Currency {
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
-            "GuildId": guild_id.clone(),
+            "GuildId": guild_id,
             "CurrName": curr_name.clone(),
         };
         let res = coll.find_one(filterdoc, None).await?;
@@ -163,7 +163,7 @@ impl Currency {
             || Ok(None),
             |curr| {
                 let tmp = Arc::new(RwLock::new(Some(curr)));
-                cache.put((guild_id.clone(), curr_name.clone()), tmp.clone());
+                cache.put((guild_id, curr_name.clone()), tmp.clone());
                 Ok(Some(tmp))
             }
         );
@@ -176,14 +176,14 @@ impl Currency {
     /// # Errors
     /// - If any mongodb errors occur.
     pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioRwLockOption<Self>>> {
-        let guild_id = guild_id.to_string();
+        let guild_id = guild_id.as_i64();
 
         let mut cache = CACHE_CURRENCY.lock().await;
 
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc = doc! {
-            "GuildId": guild_id.clone(),
+            "GuildId": guild_id,
         };
         let mut res = coll.find(filterdoc, None).await?;
         drop(db); // Drop locks on mutexes as soon as possible.
@@ -193,15 +193,15 @@ impl Currency {
             let curr_name = curr.curr_name().to_owned();
             let tmp = Arc::new(RwLock::new(Some(curr)));
             currencies.push(tmp.clone());
-            cache.put((guild_id.clone(), curr_name), tmp.clone());
+            cache.put((guild_id, curr_name), tmp.clone());
         }
         drop(cache); // please the linter
         Ok(currencies)
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub const fn guild_id(&self) -> &DbGuildId {
-        &self.guild_id
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
     }
 
     #[allow(clippy::must_use_candidate)]
@@ -327,7 +327,7 @@ impl Currency {
 
         let filterdoc =
             doc! {
-            "GuildId": self__.guild_id.as_str(),
+            "GuildId": self__.guild_id.as_i64(),
             "CurrName": &self__.curr_name,
         };
         let updatedoc =
@@ -343,7 +343,7 @@ impl Currency {
         // check if the new name already exists in the guild
         let filterdoc2 =
             doc! {
-            "GuildId": self__.guild_id.as_str(),
+            "GuildId": self__.guild_id.as_i64(),
             "CurrName": &new_name,
         };
         if coll.find_one(filterdoc2, None).await?.is_some() {
@@ -351,7 +351,7 @@ impl Currency {
                 anyhow!(
                     "Currency with name {} already exists in guild {}",
                     new_name,
-                    self__.guild_id.as_str()
+                    self__.guild_id.as_i64()
                 )
             );
         }
@@ -362,9 +362,9 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
+        cache.pop(&(self__.guild_id.as_i64(), self__.curr_name.clone()));
         cache.put(
-            (self__.guild_id.to_string(), new_name),
+            (self__.guild_id.as_i64(), new_name),
             Arc::new(RwLock::new(Some(self__.clone())))
         );
         drop(self_); // please the linter
@@ -384,7 +384,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -419,7 +419,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": self.curr_name.clone(),
         };
         let updatedoc =
@@ -456,7 +456,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -473,7 +473,7 @@ impl Currency {
         if new_base {
             let filterdoc2 =
                 doc! {
-                "GuildId": self.guild_id.as_str(),
+                "GuildId": self.guild_id.as_i64(),
                 "Base": true,
             };
             let updatedoc2 =
@@ -515,7 +515,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -550,7 +550,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -585,7 +585,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -620,7 +620,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -655,7 +655,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -696,7 +696,7 @@ impl Currency {
         let updatedoc =
             doc! {
             "$push": {
-                "ChannelsWhitelist": channel_id.as_str(),
+                "ChannelsWhitelist": channel_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -708,7 +708,7 @@ impl Currency {
             "GuildId": self.guild_id.to_string(),
             "CurrName": self.curr_name.clone(),
             "ChannelsWhitelist": {
-                "$in": [channel_id.as_str()],
+                "$in": [channel_id.as_i64()],
             }
         };
         let mut res: Option<Self>;
@@ -744,16 +744,16 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "ChannelsWhitelist": {
-                "$in": [channel_id.as_str()],
+                "$in": [channel_id.as_i64()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "ChannelsWhitelist": channel_id.as_str(),
+                "ChannelsWhitelist": channel_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -782,13 +782,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "RolesWhitelist": role_id.as_str(),
+                "RolesWhitelist": role_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -797,10 +797,10 @@ impl Currency {
         // check if that role is present in the whitelist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "RolesWhitelist": {
-                "$in": [role_id.as_str()],
+                "$in": [role_id.as_i64()],
             }
         };
         let mut res: Option<Self>;
@@ -836,16 +836,16 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "RolesWhitelist": {
-                "$in": [role_id.as_str()],
+                "$in": [role_id.as_i64()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "RolesWhitelist": role_id.as_str(),
+                "RolesWhitelist": role_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -874,13 +874,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "ChannelsBlacklist": channel_id.as_str(),
+                "ChannelsBlacklist": channel_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -889,10 +889,10 @@ impl Currency {
         // check if that channel is present in the blacklist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "ChannelsBlacklist": {
-                "$in": [channel_id.as_str()],
+                "$in": [channel_id.as_i64()],
             }
         };
         let mut res: Option<Self>;
@@ -928,16 +928,16 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "ChannelsBlacklist": {
-                "$in": [channel_id.as_str()],
+                "$in": [channel_id.as_i64()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "ChannelsBlacklist": channel_id.as_str(),
+                "ChannelsBlacklist": channel_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -966,13 +966,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$push": {
-                "RolesBlacklist": role_id.as_str(),
+                "RolesBlacklist": role_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -981,10 +981,10 @@ impl Currency {
         // check if that role is present in the blacklist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "RolesBlacklist": {
-                "$in": [role_id.as_str()],
+                "$in": [role_id.as_i64()],
             }
         };
         let res: Option<Self>;
@@ -1020,16 +1020,16 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
             "RolesBlacklist": {
-                "$in": [role_id.as_str()],
+                "$in": [role_id.as_i64()],
             }
         };
         let updatedoc =
             doc! {
             "$pull": {
-                "RolesBlacklist": role_id.as_str(),
+                "RolesBlacklist": role_id.as_i64(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -1058,13 +1058,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "ChannelsWhitelist": channels.iter().map(DbChannelId::as_str).collect::<Vec<&str>>(),
+                "ChannelsWhitelist": channels.iter().copied().map(DbChannelId::as_i64).collect::<Vec<i64>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -1093,13 +1093,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "RolesWhitelist": roles.iter().map(DbRoleId::as_str).collect::<Vec<&str>>(),
+                "RolesWhitelist": roles.iter().copied().map(DbRoleId::as_i64).collect::<Vec<i64>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -1128,13 +1128,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "ChannelsBlacklist": channels.iter().map(DbChannelId::as_str).collect::<Vec<&str>>(),
+                "ChannelsBlacklist": channels.iter().copied().map(DbChannelId::as_i64).collect::<Vec<i64>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -1163,13 +1163,13 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
             "$set": {
-                "RolesBlacklist": roles.iter().map(DbRoleId::as_str).collect::<Vec<&str>>(),
+                "RolesBlacklist": roles.iter().copied().map(DbRoleId::as_i64).collect::<Vec<i64>>(),
             },
         };
         let mut db = super::super::CLIENT.get().await.database("conebot");
@@ -1198,7 +1198,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -1233,7 +1233,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -1268,7 +1268,7 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.as_str(),
+            "GuildId": self.guild_id.as_i64(),
             "CurrName": &self.curr_name,
         };
         let updatedoc =
@@ -1312,7 +1312,7 @@ impl Currency {
         };
 
         // Remove the currency from the cache.
-        let popped = cache.pop(&(self__.guild_id.to_string(), self__.curr_name.clone()));
+        let popped = cache.pop(&(self__.guild_id.as_i64(), self__.curr_name.clone()));
         // Keep the cache past this point so that another task
         // will not try to get the currency from the db while we're deleting it.
 
@@ -1321,7 +1321,7 @@ impl Currency {
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
-            "GuildId": self__.guild_id.as_str(),
+            "GuildId": self__.guild_id.as_i64(),
             "CurrName": &self__.curr_name,
         };
         coll.delete_one(filterdoc, None).await?;
@@ -1343,7 +1343,7 @@ impl Currency {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
         };
 
-        let popped = cache.pop(&(self__.guild_id.to_string(), self__.curr_name));
+        let popped = cache.pop(&(self__.guild_id.as_i64(), self__.curr_name));
 
         drop(self_);
         drop(cache);
@@ -1381,8 +1381,8 @@ impl ToKVs for Currency {
                                             .to_string()
                                             .replace('"', "");
                                         // Then to a DbChannelId then to a ChannelId.
-                                        let db_id: DbChannelId = val.into();
-                                        let id: ChannelId = db_id.try_into()?;
+                                        let db_id: DbChannelId = val.try_into()?;
+                                        let id: ChannelId = db_id.into();
                                         // Then a stringified mention with leading comma and a space.
                                         Ok(format!("{}, ", Mention::from(id)))
                                     })
@@ -1410,8 +1410,8 @@ impl ToKVs for Currency {
                                             )?
                                             .to_string()
                                             .replace('"', "");
-                                        let db_id: DbRoleId = val.into();
-                                        let id: RoleId = db_id.try_into()?;
+                                        let db_id: DbRoleId = val.try_into()?;
+                                        let id: RoleId = db_id.into();
                                         Ok(format!("{}, ", Mention::from(id)))
                                     })
                                     .collect::<Result<Vec<_>>>()?;
@@ -1452,7 +1452,7 @@ mod test {
             .unwrap();
         let currency = currency.read().await;
         let currency_ = currency.as_ref().unwrap();
-        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
+        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id));
         assert_eq!(currency_.curr_name, curr_name);
         drop(currency);
     }
@@ -1496,7 +1496,7 @@ mod test {
             .unwrap();
         let currency = currency.read().await;
         let currency_ = currency.as_ref().unwrap();
-        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id.to_string()));
+        assert_eq!(currency_.guild_id, DbGuildId::from(guild_id));
         assert_eq!(currency_.curr_name, curr_name);
         drop(currency)
     }

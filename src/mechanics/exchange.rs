@@ -59,8 +59,8 @@ pub async fn exchange(
     }
 
     let mut balances = Balances::try_from_user(
-        &member.guild_id.into(),
-        &member.user.id.into()
+        member.guild_id.into(),
+        member.user.id.into()
     ).await?;
 
     let mut balances = balances.lock().await;
