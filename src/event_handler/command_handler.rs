@@ -1,10 +1,13 @@
-use anyhow::{anyhow, Result};
+use anyhow::{ anyhow, Result };
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 use serenity::model::{
     prelude::{
-        application_command::{CommandDataOption, CommandDataOptionValue},
+        application_command::{ CommandDataOption, CommandDataOptionValue },
         command::CommandOptionType,
-        Channel, PartialChannel, PartialMember, Role,
+        Channel,
+        PartialChannel,
+        PartialMember,
+        Role,
     },
     user::User,
 };
@@ -68,7 +71,10 @@ impl CommandOptions {
     /// - If the option does not exist.
     /// - If the option is optional and there is no value.
     pub fn get_value_by_name(&self, name: &str) -> Option<CommandDataOptionValue> {
-        self.args.iter().find(|arg| arg.name == name)?.value.clone()
+        self.args
+            .iter()
+            .find(|arg| arg.name == name)?
+            .value.clone()
     }
 
     /// Given the name of the parameter, returns the value of the argument
@@ -179,8 +185,9 @@ impl CommandOptions {
             return None;
         }
         let first_option = self.args.first()?.clone();
-        if first_option.kind != CommandOptionType::SubCommand
-            && first_option.kind != CommandOptionType::SubCommandGroup
+        if
+            first_option.kind != CommandOptionType::SubCommand &&
+            first_option.kind != CommandOptionType::SubCommandGroup
         {
             return None;
         }

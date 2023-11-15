@@ -146,8 +146,12 @@ async fn clear(currency: &mut Currency, field_name: &str) -> Result<()> {
     match field_name {
         "roles_whitelist" => currency.overwrite_whitelisted_roles(vec![], None).await?,
         "roles_blacklist" => currency.overwrite_blacklisted_roles(vec![], None).await?,
-        "channels_whitelist" => currency.overwrite_whitelisted_channels(vec![], None).await?,
-        "channels_blacklist" => currency.overwrite_blacklisted_channels(vec![], None).await?,
+        "channels_whitelist" => {
+            currency.overwrite_whitelisted_channels(vec![], None).await?;
+        }
+        "channels_blacklist" => {
+            currency.overwrite_blacklisted_channels(vec![], None).await?;
+        }
         _ => bail!("Invalid field name."),
     }
     Ok(())

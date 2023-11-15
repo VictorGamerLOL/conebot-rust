@@ -13,58 +13,94 @@ use mongodb::bson::doc;
 use mongodb::ClientSession;
 use serde::{ Deserialize, Serialize };
 use thiserror::Error;
-use tokio::sync::{ Mutex, RwLock };
+use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 use tracing::instrument;
 
+/// Represents an item a user can hold in their inventory. May or may not
+/// be worth something or be used in return for something.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct Item {
+    /// The guild id of the guild this item belongs to.
     guild_id: DbGuildId,
+    /// The name of the item, must be unique per guild.
     item_name: String,
+    /// The description of the item.
     description: String,
+    /// Whether the item can be sold for the currency it corresponds to.
     sellable: bool,
+    /// Whether the item can be traded between users.
     tradeable: bool,
-    currency_value: String,
+    /// The currency the item corresponds to.
+    currency: String,
+    /// The value of the item in the currency it corresponds to.
     value: f64,
     #[serde(flatten)]
+    /// The type of the item along with its needed details.
     item_type: ItemType,
 }
 
+/// The type of the item along with its needed details.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(tag = "ItemType")]
 pub enum ItemType {
     #[default]
+    /// A trophy item, cannot be used as it does nothing. It just sits in your inventory.
     Trophy,
-    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] Consumable {
+    /// A consumable item, can be used and will be removed from your inventory after use.
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
+    Consumable {
+        /// The message to send when the item is used.
         message: String,
+        /// The action to take when the item is used, can be none. It contains the details of the
+        /// action.
         #[serde(flatten)]
         action_type: ItemActionType,
     },
-    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] InstantConsumable {
+    /// Like consumable but it gets instantly used and removed from your inventory the moment you
+    /// get it.
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
+    InstantConsumable {
+        /// The message to send when the item is used.
         message: String,
+        /// The action to take when the item is used, can be none. It contains the details of the
+        /// action.
         #[serde(flatten)]
         action_type: ItemActionType,
     },
 }
 
+/// The action to take when the item is used, can be none. It contains the details of the action.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[non_exhaustive]
 #[serde(tag = "ActionType")]
 pub enum ItemActionType {
+    /// Do nothing besides sending the message.
     #[default]
     None,
-    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] Role {
+    /// Give the user a role.
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
+    Role {
+        /// The id of the role to give the user as a string.
         role_id: DbRoleId,
     },
-    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))] Lootbox {
+    /// Opens itself as a lootbox and gives the user randomized items.
+    #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
+    Lootbox {
+        /// The name of the drop table to use when opening the lootbox.
         drop_table_name: String,
     },
 }
 
+/// An error that can occur when trying to get an item from the database.
 #[derive(Debug, Error)]
 pub enum ItemError {
+    /// The item has not been found in the database.
     #[error("The item has not been found in the database.")]
     ItemNotFound,
-    #[error(transparent)] Other(#[from] anyhow::Error),
+    /// Something else went wrong. Deal with it.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 lazy_static! {
@@ -73,29 +109,38 @@ lazy_static! {
 }
 
 impl Item {
+    /// Attempts to get an item from the database by its name.
+    ///
+    /// It first checks the cache, if the item is not in the cache it will then check the database.
+    ///
+    /// # Errors
+    /// - [`ItemError::ItemNotFound`] if the item has not been found in the database.
+    /// - [`ItemError::Other`] if something else went wrong. Probably a database error.
     pub async fn try_from_name(
         guild_id: DbGuildId,
         item_name: String
-    ) -> anyhow::Result<ArcTokioRwLockOption<Self>, ItemError> {
-        let key = (guild_id.clone(), item_name.clone());
+    ) -> Result<ArcTokioRwLockOption<Self>, ItemError> {
+        let key = (guild_id, item_name);
         if let Some(item) = CACHE_ITEM.lock().await.get(&key) {
             return Ok(item.clone());
         }
-        let item = Self::try_from_name_uncached(guild_id, item_name).await?;
+        let item = Self::try_from_name_uncached(&key.0, &key.1).await?;
         CACHE_ITEM.lock().await.put(key, item.clone());
+        // were cloning a pointer above, not all of the data so it's fine.
         Ok(item)
     }
 
+    /// Internal function to just get the item from the database without checking the cache.
     async fn try_from_name_uncached(
-        guild_id: DbGuildId,
-        item_name: String
+        guild_id: &DbGuildId,
+        item_name: &str
     ) -> Result<ArcTokioRwLockOption<Self>, ItemError> {
         // i am using mongodb by the way
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": guild_id.to_string(),
+            "GuildID": guild_id.as_str(),
             "ItemName": item_name,
         };
         let item = match collection.find_one(filter, None).await {
@@ -110,6 +155,7 @@ impl Item {
         Ok(Arc::new(RwLock::new(Some(item))))
     }
 
+    /// Gets all items from the database for a guild.
     pub async fn try_from_guild(
         guild_id: DbGuildId
     ) -> anyhow::Result<Vec<ArcTokioRwLockOption<Self>>> {
@@ -117,7 +163,7 @@ impl Item {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter = doc! {
-            "GuildID": guild_id.to_string(),
+            "GuildID": guild_id.as_str(),
         };
         let mut cursor = collection.find(filter, None).await?;
         let mut items = Vec::new();
@@ -150,7 +196,7 @@ impl Item {
     }
 
     pub fn currency_value(&self) -> &str {
-        &self.currency_value
+        &self.currency
     }
 
     pub const fn value(&self) -> f64 {
@@ -303,7 +349,7 @@ impl Item {
         } else {
             collection.update_one(filter, update, None).await?;
         }
-        self.currency_value = new_currency_value;
+        self.currency = new_currency_value;
         Ok(())
     }
 
@@ -390,7 +436,11 @@ impl Item {
                 }
             }
         }
-        collection.update_one(filter, update, None).await?;
+        if let Some(s) = session {
+            collection.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_one(filter, update, None).await?;
+        }
         self.item_type = new_item_type;
         Ok(())
     }
@@ -414,6 +464,16 @@ impl Item {
         collection.delete_one(filter, None).await?;
         cache.pop(&(self__.guild_id.clone(), self__.item_name.clone()));
         drop(self_);
+        drop(cache);
+        Ok(())
+    }
+
+    pub async fn invalidate_cache(mut self_: RwLockWriteGuard<'_, Option<Self>>) -> Result<()> {
+        let mut cache = CACHE_ITEM.lock().await;
+        let item = self_
+            .take()
+            .ok_or_else(|| anyhow!("Item is already being used in breaking operation."))?;
+        cache.pop(&(item.guild_id, item.item_name));
         drop(cache);
         Ok(())
     }

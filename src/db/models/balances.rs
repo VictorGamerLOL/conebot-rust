@@ -17,11 +17,11 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::bson::doc;
-use mongodb::{ Collection, ClientSession };
+use mongodb::{ ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard, MutexGuard };
+use tokio::sync::{ Mutex, MutexGuard, RwLock, RwLockWriteGuard };
 
 use super::Currency;
 

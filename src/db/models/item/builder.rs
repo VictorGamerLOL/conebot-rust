@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use super::*;
 use crate::db::{ id::DbGuildId, ArcTokioRwLockOption };
 use anyhow::{ anyhow, bail, Result };
@@ -63,7 +65,7 @@ impl Builder {
             description,
             sellable,
             tradeable,
-            currency_value,
+            currency: currency_value,
             value,
             item_type,
         };
@@ -112,6 +114,237 @@ impl Builder {
     pub fn item_type(&mut self, item_type: Option<ItemType>) -> &mut Self {
         self.item_type = item_type;
         self
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ItemTypeBuilder {
+    type_: Option<ItemTypeTypeBuilder>,
+    message: Option<String>,
+    action_type: Option<ActionTypeItemTypeBuilder>,
+    role: Option<DbRoleId>,
+    drop_table_name: Option<String>,
+}
+
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum ItemTypeTypeBuilder {
+    #[default]
+    Trophy,
+    Consumable,
+    InstantConsumable,
+}
+
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum ActionTypeItemTypeBuilder {
+    #[default]
+    None,
+    Role,
+    Lootbox,
+}
+
+impl ItemTypeBuilder {
+    const TROPHY: ItemType = ItemType::Trophy; // To quickly make a trophy item rather than going through the builder.
+
+    pub const fn new() -> Self {
+        Self {
+            type_: None,
+            message: None,
+            action_type: None,
+            role: None,
+            drop_table_name: None,
+        }
+    }
+
+    pub fn build(mut self) -> Result<ItemType> {
+        let action_type = self.infer_action_type()?;
+        let type_ = self.type_.unwrap_or_else(|| {
+            if
+                self.message.is_some() ||
+                self.action_type.is_some() ||
+                self.role.is_some() ||
+                self.drop_table_name.is_some()
+            {
+                ItemTypeTypeBuilder::Consumable
+            } else {
+                ItemTypeTypeBuilder::Trophy
+            }
+        });
+        if type_ == ItemTypeTypeBuilder::Trophy {
+            return Ok(Self::TROPHY);
+        }
+
+        let message = self.message.unwrap_or_default();
+        let action_type: ItemActionType = match action_type {
+            ActionTypeItemTypeBuilder::None => ItemActionType::None,
+            ActionTypeItemTypeBuilder::Role => {
+                let role = self.role.ok_or_else(||
+                    anyhow!("Role must be present if action type is Role.")
+                )?;
+                ItemActionType::Role { role_id: role }
+            }
+            ActionTypeItemTypeBuilder::Lootbox => {
+                let drop_table_name = self.drop_table_name.ok_or_else(|| {
+                    anyhow!("Drop table name must be present if action type is Lootbox.")
+                })?;
+                ItemActionType::Lootbox { drop_table_name }
+            }
+        };
+
+        match type_ {
+            ItemTypeTypeBuilder::Trophy => Ok(ItemType::Trophy),
+            ItemTypeTypeBuilder::Consumable =>
+                Ok(ItemType::Consumable {
+                    message,
+                    action_type,
+                }),
+            ItemTypeTypeBuilder::InstantConsumable =>
+                Ok(ItemType::InstantConsumable {
+                    message,
+                    action_type,
+                }),
+        }
+    }
+
+    pub fn infer_action_type(&self) -> Result<ActionTypeItemTypeBuilder> {
+        if let Some(action_type) = self.action_type {
+            return Ok(action_type);
+        }
+        if self.role.is_none() && self.drop_table_name.is_none() {
+            Ok(ActionTypeItemTypeBuilder::None)
+        } else if self.role.is_some() && self.drop_table_name.is_none() {
+            Ok(ActionTypeItemTypeBuilder::Role)
+        } else if self.role.is_none() && self.drop_table_name.is_some() {
+            Ok(ActionTypeItemTypeBuilder::Lootbox)
+        } else {
+            Err(
+                anyhow!(
+                    "Role and drop_table_name cannot be both present when action type is not specified."
+                )
+            )
+        }
+    }
+
+    pub fn message(&mut self, message: Option<String>) -> &mut Self {
+        self.message = message;
+        self
+    }
+
+    pub fn action_type(&mut self, action_type: Option<ActionTypeItemTypeBuilder>) -> &mut Self {
+        self.action_type = action_type;
+        self
+    }
+
+    pub fn role(&mut self, role: Option<DbRoleId>) -> &mut Self {
+        self.role = role;
+        self
+    }
+
+    pub fn drop_table_name(&mut self, drop_table_name: Option<String>) -> &mut Self {
+        self.drop_table_name = drop_table_name;
+        self
+    }
+}
+
+impl ToString for ItemTypeTypeBuilder {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Trophy => "Trophy".to_owned(),
+            Self::Consumable => "Consumable".to_owned(),
+            Self::InstantConsumable => "InstantConsumable".to_owned(),
+        }
+    }
+}
+
+impl FromStr for ItemTypeTypeBuilder {
+    type Err = anyhow::Error;
+
+    /// The from_str implementation on this is
+    /// ***CASE SENSITIVE***. It assumes that the str passed
+    /// is already lowercase. The only other case this works is
+    /// if the first letter is capitalized.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "trophy" | "Trophy" => Ok(Self::Trophy),
+            "consumable" | "Consumable" => Ok(Self::Consumable),
+            "instantconsumable" | "InstantConsumable" | "Instantconsumable" => {
+                Ok(Self::InstantConsumable)
+            }
+            _ => Err(anyhow!("Invalid item type: {}", s)),
+        }
+    }
+}
+
+impl ItemTypeTypeBuilder {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Trophy => "Trophy",
+            Self::Consumable => "Consumable",
+            Self::InstantConsumable => "InstantConsumable",
+        }
+    }
+
+    pub fn from_string(mut s: String) -> Result<Self> {
+        s.make_ascii_lowercase();
+        match s.as_str() {
+            "trophy" => Ok(Self::Trophy),
+            "consumable" => Ok(Self::Consumable),
+            "instantconsumable" | "instant consumable" | "instant-consumable" => {
+                Ok(Self::InstantConsumable)
+            }
+            _ => Err(anyhow!("Invalid item type")),
+        }
+    }
+}
+
+impl ToString for ActionTypeItemTypeBuilder {
+    fn to_string(&self) -> String {
+        match self {
+            Self::None => "None".to_owned(),
+            Self::Role => "Role".to_owned(),
+            Self::Lootbox => "Lootbox".to_owned(),
+        }
+    }
+}
+
+impl FromStr for ActionTypeItemTypeBuilder {
+    type Err = anyhow::Error;
+
+    /// The from_str implementation on this is
+    /// ***CASE SENSITIVE***. It assumes that the str passed
+    /// is already lowercase. The only other case this works is
+    /// if the first letter is capitalized.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "none" | "None" => Ok(Self::None),
+            "role" | "Role" => Ok(Self::Role),
+            "lootbox" | "Lootbox" => Ok(Self::Lootbox),
+            _ => Err(anyhow!("Invalid action type: {}", s)),
+        }
+    }
+}
+
+impl ActionTypeItemTypeBuilder {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Role => "Role",
+            Self::Lootbox => "Lootbox",
+        }
+    }
+
+    pub fn from_string(mut s: String) -> Result<Self> {
+        s.make_ascii_lowercase();
+        match s.as_str() {
+            "none" => Ok(Self::None),
+            "role" => Ok(Self::Role),
+            "lootbox" => Ok(Self::Lootbox),
+            _ => Err(anyhow!("Invalid action type")),
+        }
     }
 }
 

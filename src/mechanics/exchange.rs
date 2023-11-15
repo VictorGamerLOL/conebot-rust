@@ -5,8 +5,8 @@ use mongodb::Client;
 use serenity::model::prelude::Member;
 use tokio::sync::RwLock;
 
-use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::truncate_2dp };
 use crate::db::CLIENT;
+use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::truncate_2dp };
 
 /// Exchanges one currency for another.
 /// Returns the amount of the output currency that was given.

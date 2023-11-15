@@ -58,13 +58,17 @@ pub async fn run(
         "symbol" => currency__.update_symbol(&value, None).await?,
         "visible" => currency__.update_visible(value.parse()?, None).await?,
         "base" => currency__.update_base(value.parse()?, None).await?,
-        "base_value" => currency__.update_base_value(value.parse().ok(), None).await?,
+        "base_value" => {
+            currency__.update_base_value(value.parse().ok(), None).await?;
+        }
         "pay" => currency__.update_pay(value.parse()?, None).await?,
         "earn_by_chat" => currency__.update_earn_by_chat(value.parse()?, None).await?,
         "channels_is_whitelist" => {
             currency__.update_channels_is_whitelist(value.parse()?, None).await?;
         }
-        "roles_is_whitelist" => currency__.update_roles_is_whitelist(value.parse()?, None).await?,
+        "roles_is_whitelist" => {
+            currency__.update_roles_is_whitelist(value.parse()?, None).await?;
+        }
         "earn_min" => currency__.update_earn_min(value.parse()?, None).await?,
         "earn_max" => currency__.update_earn_max(value.parse()?, None).await?,
         "earn_timeout" => {
