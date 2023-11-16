@@ -54,17 +54,17 @@ pub async fn init() {
         }
     };
     let mut columns = vec![
-        "currencies".to_string(),
-        "items".to_string(),
-        "dropTables".to_string(),
-        "storeEntries".to_string(),
-        "balances".to_string(),
-        "inventories".to_string(),
-        "roleRewards".to_string(),
-        "multipliers".to_string(),
-        "globalCurrencies".to_string(),
-        "globalParticipatingGuilds".to_string(),
-        "globalBalances".to_string()
+        "currencies".to_owned(),
+        "items".to_owned(),
+        "dropTables".to_owned(),
+        "storeEntries".to_owned(),
+        "balances".to_owned(),
+        "inventories".to_owned(),
+        "roleRewards".to_owned(),
+        "multipliers".to_owned(),
+        "globalCurrencies".to_owned(),
+        "globalParticipatingGuilds".to_owned(),
+        "globalBalances".to_owned()
     ];
     collections.into_iter().for_each(|coll| columns.retain(|x| x != &coll));
 

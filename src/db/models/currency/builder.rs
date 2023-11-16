@@ -95,8 +95,7 @@ impl Builder {
         // check if currency already exists
         let db = super::super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Currency> = db.collection("currencies");
-        let filter =
-            doc! { "GuildId": self.guild_id.to_string(), "CurrName": self.curr_name.clone() };
+        let filter = doc! { "GuildId": self.guild_id.as_i64(), "CurrName": &self.curr_name };
         let curr = coll.find_one(filter, None).await?;
         if curr.is_some() {
             return Err(anyhow::anyhow!("Currency already exists"));
@@ -140,7 +139,7 @@ impl Builder {
         };
         // if base is set to true, check if there is another currency where base is true and set it to false
         if curr.base {
-            let filter = doc! { "GuildId": curr.guild_id.to_string(), "Base": true };
+            let filter = doc! { "GuildId": curr.guild_id.as_i64(), "Base": true };
             let update = doc! { "$set": {"Base": false} };
             coll.update_one(filter, update, None).await?;
         }
@@ -150,7 +149,7 @@ impl Builder {
         let arc_currency: ArcTokioRwLockOption<Currency> = Arc::new(
             tokio::sync::RwLock::new(Some(curr))
         );
-        cache.push((self.guild_id.as_i64(), self.curr_name.clone()), arc_currency.clone());
+        cache.push((self.guild_id, self.curr_name.clone()), arc_currency.clone());
         drop(cache);
         Ok(arc_currency)
     }
@@ -354,10 +353,10 @@ impl Builder {
 #[tokio::test]
 async fn test_currency_builder() {
     crate::init_env().await;
-    let mut curr = Builder::new(DbGuildId::from(12), "TTest".to_owned(), "t".to_owned());
-    curr.guild_id(Some(DbGuildId::from(123)))
-        .curr_name(Some("test".to_string()))
-        .symbol(Some("T".to_string()))
+    let mut curr = Builder::new(DbGuildId::from(12u64), "TTest".to_owned(), "t".to_owned());
+    curr.guild_id(Some(DbGuildId::from(123u64)))
+        .curr_name(Some("test".to_owned()))
+        .symbol(Some("T".to_owned()))
         .visible(Some(true))
         .base(Some(false))
         .base_value(Some(1.0))
@@ -377,30 +376,32 @@ async fn test_currency_builder() {
         .earn_max(Some(10.0))
         .earn_timeout(Some(Duration::seconds(60)));
     let curr = curr.build().await.unwrap();
-    let curr = curr.read().await;
-    let curr2 = curr.clone();
-    drop(curr);
-    let curr = curr2.unwrap();
+    let curr2 = curr.read().await;
+    let curr3 = curr2.as_ref().unwrap();
 
-    assert_eq!(curr.guild_id, DbGuildId::from(123));
-    assert_eq!(curr.curr_name, "test");
-    assert_eq!(curr.symbol, "T");
-    assert!(curr.visible);
-    assert!(!curr.base);
-    assert_eq!(curr.base_value, Some(1.0));
-    assert!(curr.pay);
-    assert!(curr.earn_by_chat);
-    assert!(curr.channels_is_whitelist);
-    assert!(curr.roles_is_whitelist);
-    assert_eq!(curr.channels_whitelist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
-    assert_eq!(curr.roles_whitelist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
-    assert_eq!(curr.channels_blacklist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
-    assert_eq!(curr.roles_blacklist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
+    assert_eq!(curr3.guild_id, DbGuildId::from(123u64));
+    assert_eq!(curr3.curr_name, "test");
+    assert_eq!(curr3.symbol, "T");
+    assert!(curr3.visible);
+    assert!(!curr3.base);
+    assert_eq!(curr3.base_value, Some(1.0));
+    assert!(curr3.pay);
+    assert!(curr3.earn_by_chat);
+    assert!(curr3.channels_is_whitelist);
+    assert!(curr3.roles_is_whitelist);
+    assert_eq!(curr3.channels_whitelist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
+    assert_eq!(curr3.roles_whitelist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
+    assert_eq!(curr3.channels_blacklist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
+    assert_eq!(curr3.roles_blacklist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
 
     let error_margin_f64 = f64::EPSILON;
-    let res1 = curr.earn_min - 1.0;
-    let res2 = curr.earn_max - 10.0;
+    let res1 = curr3.earn_min - 1.0;
+    let res2 = curr3.earn_max - 10.0;
     assert!(res1 < error_margin_f64);
     assert!(res2 < error_margin_f64);
-    assert_eq!(curr.earn_timeout, Duration::seconds(60));
+    assert_eq!(curr3.earn_timeout, Duration::seconds(60));
+
+    drop(curr2);
+
+    Currency::delete_currency(curr).await.unwrap();
 }

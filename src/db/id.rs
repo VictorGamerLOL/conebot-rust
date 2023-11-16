@@ -11,16 +11,16 @@
 //! - 64-bit signed integer
 //! - 128-bit decimal floating point
 //!
-//! Since Rust does not have support for decimal128, the only option is to use strings.
-//! This is because if I were to give the BSON serializer a u64, it would try to
-//! convert it to a signed 64-bit integer, which would possibly result in an overflow. So
-//! it is better to instead take a hit on the amount of space used in the database rather
-//! than risk an overflow.
+//! Since Rust does not have support for decimal128, the only option is to use i64.
+//! However, i64 is not large enough to store a snowflake from Serenity, which is a u64.
+//! Therefore the snowflakes have their bytes interpreted as an i64 and stored in the
+//! structs as that. The bytes are then interpreted as a u64 when needed. Since the functions
+//! that do this are const, this is safe and very performant as it does not require any
+//! allocation or conversion. The functions claim that this is no-op so it should have
+//! little to no impact.
 //!
-//! I understand why serenity stores snowflakes as u64 to save on RAM, but it is mildly annoying
-//! to work with.
-//!
-//! These structs contain the necessary methods to convert them to strings, u64s, serenity types and vice versa.
+//! The fact that MongoDB uses BigEndian and the average x86_64 CPU uses LittleEndian
+//! is trivial because the bson serializer and deserializer will handle that for us.
 
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };
@@ -28,9 +28,11 @@ use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
+/// A wrapper around a guild ID as it should be stored in the database.
 pub struct DbGuildId(i64);
 
 impl DbGuildId {
+    /// Returns the ID as an i64.
     pub const fn as_i64(self) -> i64 {
         self.0
     }
@@ -46,9 +48,21 @@ impl From<u64> for DbGuildId {
     }
 }
 
+impl From<i64> for DbGuildId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
 impl From<DbGuildId> for u64 {
     fn from(id: DbGuildId) -> Self {
         Self::from_ne_bytes(id.0.to_ne_bytes())
+    }
+}
+
+impl From<DbGuildId> for i64 {
+    fn from(id: DbGuildId) -> Self {
+        id.0
     }
 }
 
@@ -58,10 +72,9 @@ impl From<GuildId> for DbGuildId {
     }
 }
 
-impl TryFrom<DbGuildId> for GuildId {
-    type Error = anyhow::Error;
-    fn try_from(id: DbGuildId) -> Result<Self> {
-        Ok(Self(u64::from_ne_bytes(id.0.to_ne_bytes())))
+impl From<DbGuildId> for GuildId {
+    fn from(id: DbGuildId) -> Self {
+        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 

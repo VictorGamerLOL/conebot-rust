@@ -455,8 +455,8 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildId": self__.guild_id.to_string(),
-            "ItemName": self__.item_name.clone(),
+            "GuildId": self__.guild_id.as_i64(),
+            "ItemName": &self__.item_name,
         };
         collection.delete_one(filter, None).await?;
         cache.pop(&(self__.guild_id, self__.item_name.clone()));
@@ -488,7 +488,7 @@ mod test {
                 },
                 message: "A".to_string(),
             },
-            ..Default::default()
+            ..Default::default() // Magical syntax for saying "make the rest of the fields whatever the default is."
         };
         println!("{}", serde_json::to_string_pretty(&item).unwrap());
     }

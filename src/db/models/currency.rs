@@ -118,7 +118,7 @@ pub struct Currency {
 
 lazy_static! {
     // Need me that concurrency.
-    static ref CACHE_CURRENCY: TokioMutexCache<(i64, String), ArcTokioRwLockOption<Currency>> =
+    static ref CACHE_CURRENCY: TokioMutexCache<(DbGuildId, String), ArcTokioRwLockOption<Currency>> =
         Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
@@ -139,8 +139,6 @@ impl Currency {
         guild_id: DbGuildId,
         curr_name: String
     ) -> Result<Option<ArcTokioRwLockOption<Self>>> {
-        let guild_id = guild_id.as_i64();
-
         // Try to get from cache first.
         let mut cache = CACHE_CURRENCY.lock().await;
         if let Some(currency) = cache.get(&(guild_id, curr_name.clone())) {
@@ -152,7 +150,7 @@ impl Currency {
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
-            "GuildId": guild_id,
+            "GuildId": guild_id.as_i64(),
             "CurrName": curr_name.clone(),
         };
         let res = coll.find_one(filterdoc, None).await?;
@@ -176,14 +174,12 @@ impl Currency {
     /// # Errors
     /// - If any mongodb errors occur.
     pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioRwLockOption<Self>>> {
-        let guild_id = guild_id.as_i64();
-
         let mut cache = CACHE_CURRENCY.lock().await;
 
         let mut db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc = doc! {
-            "GuildId": guild_id,
+            "GuildId": guild_id.as_i64(),
         };
         let mut res = coll.find(filterdoc, None).await?;
         drop(db); // Drop locks on mutexes as soon as possible.
@@ -362,11 +358,8 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        cache.pop(&(self__.guild_id.as_i64(), self__.curr_name.clone()));
-        cache.put(
-            (self__.guild_id.as_i64(), new_name),
-            Arc::new(RwLock::new(Some(self__.clone())))
-        );
+        cache.pop(&(self__.guild_id, self__.curr_name.clone()));
+        cache.put((self__.guild_id, new_name), Arc::new(RwLock::new(Some(self__.clone()))));
         drop(self_); // please the linter
         drop(cache); // all hail the linter
         Ok(())
@@ -690,8 +683,8 @@ impl Currency {
     ) -> Result<()> {
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_i64(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -705,8 +698,8 @@ impl Currency {
         // check if that channel is present in the whitelist
         let filterdoc2 =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_i64(),
+            "CurrName": &self.curr_name,
             "ChannelsWhitelist": {
                 "$in": [channel_id.as_i64()],
             }
@@ -1312,7 +1305,7 @@ impl Currency {
         };
 
         // Remove the currency from the cache.
-        let popped = cache.pop(&(self__.guild_id.as_i64(), self__.curr_name.clone()));
+        let popped = cache.pop(&(self__.guild_id, self__.curr_name.clone()));
         // Keep the cache past this point so that another task
         // will not try to get the currency from the db while we're deleting it.
 
@@ -1343,7 +1336,7 @@ impl Currency {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
         };
 
-        let popped = cache.pop(&(self__.guild_id.as_i64(), self__.curr_name));
+        let popped = cache.pop(&(self__.guild_id, self__.curr_name));
 
         drop(self_);
         drop(cache);
@@ -1378,7 +1371,7 @@ impl ToKVs for Currency {
                                                 // ***12 indentation levels***
                                                 anyhow!("Could not convert to json string.")
                                             )?
-                                            .to_string()
+                                            .to_owned()
                                             .replace('"', "");
                                         // Then to a DbChannelId then to a ChannelId.
                                         let db_id: DbChannelId = val.try_into()?;
@@ -1408,7 +1401,7 @@ impl ToKVs for Currency {
                                             .ok_or_else(||
                                                 anyhow!("Could not convert to json string.")
                                             )?
-                                            .to_string()
+                                            .to_owned()
                                             .replace('"', "");
                                         let db_id: DbRoleId = val.try_into()?;
                                         let id: RoleId = db_id.into();
@@ -1447,7 +1440,7 @@ mod test {
         crate::init_env().await;
         let guild_id: u64 = 123_456_789; // Test currency present in the database.
         let curr_name = "test";
-        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
+        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_owned()).await
             .unwrap()
             .unwrap();
         let currency = currency.read().await;
@@ -1491,7 +1484,7 @@ mod test {
 
     async fn sleepy_fetch_currency(guild_id: u64, curr_name: &str, millis: u64, i: usize) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
-        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_string()).await
+        let currency = Currency::try_from_name(guild_id.into(), curr_name.to_owned()).await
             .unwrap()
             .unwrap();
         let currency = currency.read().await;
@@ -1505,14 +1498,14 @@ mod test {
     async fn try_create_delete() {
         crate::init_env().await;
         let mut curr = builder::Builder::new(
-            DbGuildId::from(12),
-            "testNo".to_string(),
-            "Tt".to_string()
+            DbGuildId::from(12u64),
+            "testNo".to_owned(),
+            "Tt".to_owned()
         );
 
-        curr.guild_id(DbGuildId::from(123))
-            .curr_name("test2".to_string())
-            .symbol("T".to_string())
+        curr.guild_id(DbGuildId::from(123u64))
+            .curr_name("test2".to_owned())
+            .symbol("T".to_owned())
             .base(false)
             .base_value(Some(1.0))
             .pay(Some(true))

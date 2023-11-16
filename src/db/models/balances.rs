@@ -103,8 +103,8 @@ impl Balances {
         let coll: Collection<Balance> = db.collection("balances");
         let filterdoc =
             doc! {
-            "GuildId": currency.guild_id().to_string(),
-            "CurrName": currency.curr_name().to_owned(),
+            "GuildId": currency.guild_id().as_i64(),
+            "CurrName": &currency.curr_name(),
         };
         coll.delete_many(filterdoc, None).await?;
         Ok(())
@@ -493,9 +493,9 @@ impl Balance {
 
         let filterdoc =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "UserId": self.user_id.to_string(),
-            "CurrName": self.curr_name.clone(),
+            "GuildId": self.guild_id.as_i64(),
+            "UserId": self.user_id.as_i64(),
+            "CurrName": &self.curr_name,
         };
 
         let res = match coll.delete_one(filterdoc, None).await {

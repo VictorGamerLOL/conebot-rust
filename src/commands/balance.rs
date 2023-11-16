@@ -52,9 +52,9 @@ pub async fn run<'a>(
     let balances = Balances::try_from_user(guild_id, user.0.id.into()).await?;
 
     let embed = if let Some(c) = opts.currency {
-        single_currency(c, &balances, guild_id.try_into()?, &user, command).await?
+        single_currency(c, &balances, guild_id.into(), &user, command).await?
     } else {
-        multi_currency(balances, guild_id.try_into()?, &user, command).await?
+        multi_currency(balances, guild_id.into(), &user, command).await?
     };
 
     command.edit_original_interaction_response(http, |m|
@@ -177,8 +177,8 @@ async fn multi_currency_embed(
         if !currency_.visible() {
             continue;
         }
-        let symbol = currency_.symbol().to_owned();
-        let title = format!("{}{n}", symbol.clone());
+        let symbol = currency_.symbol();
+        let title = format!("{}{n}", symbol);
         let description = format!("{symbol}{a}");
         field_data.push((title, description, true));
         drop(currency);
@@ -226,7 +226,7 @@ async fn parse_options<'a>(
     };
 
     let user: Option<(User, Member)> = if let Some((u, m)) = user {
-        let guild_id: GuildId = guild_id.try_into()?;
+        let guild_id: GuildId = guild_id.into();
         let member = guild_id.member(&http, u.id).await?;
         Some((u, member))
     } else {

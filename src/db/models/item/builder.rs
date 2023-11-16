@@ -43,8 +43,8 @@ impl Builder {
 
         let filter =
             doc! {
-            "GuildId": self.guild_id.to_string(),
-            "ItemName": self.item_name.clone()
+            "GuildId": self.guild_id.as_i64(),
+            "ItemName": &self.item_name
         };
         let item = coll.find_one(filter, None).await?;
         if item.is_some() {
@@ -360,7 +360,7 @@ mod test {
     async fn test_builder_and_delete() {
         init_env().await;
         let guild_id = DbGuildId::default();
-        let item_name = "test_item".to_string();
+        let item_name = "test_item".to_owned();
         let item = Builder::new(guild_id, item_name.clone()).build().await.unwrap();
         let item_ = item.read().await;
         assert!(item_.is_some());
@@ -383,7 +383,7 @@ mod test {
     async fn test_builder_safety() {
         init_env().await;
         let guild_id = DbGuildId::default();
-        let item_name = "test_item".to_string();
+        let item_name = "test_item".to_owned();
         let mut item_builder = Builder::new(guild_id, item_name.clone());
         item_builder.sellable(Some(true));
         assert!(item_builder.build().await.is_err());
