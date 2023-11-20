@@ -44,7 +44,7 @@ impl Inventory {
         let mut cache = CACHE_INVENTORY.lock().await;
         let key = (guild_id, user_id);
         if let Some(inventory) = cache.get(&key) {
-            return Ok(inventory.clone());
+            return Ok(inventory.to_owned());
         }
         let inv_entries = InventoryEntry::from_user(&guild_id, &user_id).await?;
         let inventory = Arc::new(
@@ -56,7 +56,7 @@ impl Inventory {
                 })
             )
         );
-        cache.put(key, inventory.clone());
+        cache.put(key, inventory.to_owned());
         drop(cache);
         Ok(inventory)
     }
@@ -125,7 +125,7 @@ impl InventoryEntry {
             doc! {
             "GuildId": guild_id.as_i64(),
             "UserId": user_id.as_i64(),
-            "ItemName": item_name.clone(),
+            "ItemName": &item_name,
         };
 
         if coll.find_one(filterdoc, None).await?.is_some() {

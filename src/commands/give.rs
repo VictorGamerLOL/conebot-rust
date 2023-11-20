@@ -56,14 +56,16 @@ pub async fn run(
 
     amount = truncate_2dp(amount);
 
-    if Currency::try_from_name(command.guild_id.unwrap().into(), currency.clone()).await?.is_none() {
+    if
+        Currency::try_from_name(command.guild_id.unwrap().into(), currency.clone()).await?.is_none()
+    {
         return Err(anyhow!("Currency {} does not exist.", currency));
     }
 
     if
         command.guild_id
             .ok_or_else(|| anyhow!("Cannot use commands in DMs."))?
-            .member(http.clone(), member.id).await
+            .member(&http, member.id).await
             .is_err()
     {
         return Err(anyhow!("Member {} does not exist.", member.id));

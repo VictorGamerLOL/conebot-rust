@@ -4,8 +4,9 @@ use anyhow::{ anyhow, bail, Result };
 use mongodb::Client;
 use serenity::model::prelude::Member;
 use tokio::sync::RwLock;
+use tracing::error;
 
-use crate::db::CLIENT;
+use crate::db::{ CLIENT, ArcTokioRwLockOption };
 use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::truncate_2dp };
 
 /// Exchanges one currency for another.
@@ -31,8 +32,11 @@ pub async fn exchange(
     input: &Currency,
     output: &Currency,
     amount: f64,
-    member: Member
+    member: &Member
 ) -> Result<f64> {
+    if input.curr_name() == output.curr_name() {
+        bail!("You cannot exchange {} for itself.", input.curr_name());
+    }
     let input_base_value = if let Some(f) = input.base_value() {
         f
     } else if !input.base() {
@@ -112,19 +116,45 @@ pub async fn exchange(
     // need the thing below to do this as a transaction.
     let mut session = CLIENT.get().await.start_session(None).await?;
     session.start_transaction(None).await?;
+    if
+        let Err(e) = transaction_function(
+            &mut session,
+            balance_in,
+            amount,
+            balance_out,
+            to_give
+        ).await
+    {
+        error!("Error when exchanging: {}", e);
+        Balances::invalidate_cache(balances).await?; // it is important to invalidate before
+        // aborting the transaction because if aborting fails, we got cache that is incorrect and that is even worse
+        // than an unaborted transaction.
+        session.abort_transaction().await?;
+        bail!("Error when exchanging: {}", e);
+    } else {
+        session.commit_transaction().await?;
+    }
 
-    balance_in.sub_amount_unchecked(amount, Some(&mut session)).await?;
-    balance_out.add_amount_unchecked(to_give, Some(&mut session)).await?;
-
-    session.commit_transaction().await?;
     drop(balances); // please the linter
 
     Ok(to_give)
 }
 
+async fn transaction_function(
+    mut session: &mut mongodb::ClientSession,
+    balance_in: &mut Balance,
+    amount: f64,
+    balance_out: &mut Balance,
+    to_give: f64
+) -> Result<()> {
+    balance_in.sub_amount_unchecked(amount, Some(&mut session)).await?;
+    balance_out.add_amount_unchecked(to_give, Some(&mut session)).await?;
+    Ok(())
+}
+
 async fn get_base_currency(
-    currencies: Vec<Arc<RwLock<Option<Currency>>>>
-) -> Result<Arc<RwLock<Option<Currency>>>> {
+    currencies: Vec<ArcTokioRwLockOption<Currency>>
+) -> Result<ArcTokioRwLockOption<Currency>> {
     let mut base_currency = None;
 
     for currency in currencies {

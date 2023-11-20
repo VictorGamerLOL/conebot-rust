@@ -39,22 +39,26 @@ pub async fn run<'a>(
     let guild_id: DbGuildId = command.guild_id
         .ok_or_else(|| anyhow!("Command not allowed in DMs."))?
         .into();
-    let opts = parse_options(options, guild_id, http.clone()).await?;
+    let opts = parse_options(options, guild_id, &http).await?;
 
-    let user = if let Some(u) = opts.user {
-        u
+    let possible_user = opts.user.as_ref();
+
+    let (tmp_user, member) = if let Some(u) = possible_user {
+        (&u.0, &u.1)
     } else {
-        let user = command.user.clone();
-        let member = command.member.clone().ok_or_else(|| anyhow!("DMs not allowed"))?;
+        let user = &command.user;
+        let member = command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?;
         (user, member)
     };
+
+    let user = (tmp_user, member);
 
     let balances = Balances::try_from_user(guild_id, user.0.id.into()).await?;
 
     let embed = if let Some(c) = opts.currency {
-        single_currency(c, &balances, guild_id.into(), &user, command).await?
+        single_currency(c, &balances, guild_id.into(), user, command).await?
     } else {
-        multi_currency(balances, guild_id.into(), &user, command).await?
+        multi_currency(balances, guild_id.into(), user, command).await?
     };
 
     command.edit_original_interaction_response(http, |m|
@@ -66,7 +70,7 @@ pub async fn run<'a>(
 async fn multi_currency<'a>(
     balances: std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
     guild_id: GuildId,
-    user: &'a (User, Member),
+    user: (&User, &Member),
     command: &'a ApplicationCommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
     let mut balances = balances.lock().await;
@@ -78,8 +82,8 @@ async fn multi_currency<'a>(
     let embed = multi_currency_embed(
         balances_.balances(),
         guild_id,
-        &user.1.clone(),
-        &command.member.clone().ok_or_else(|| anyhow!("DMs not allowed"))?
+        user.1,
+        command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
     ).await?;
     drop(balances);
     Ok(embed)
@@ -89,7 +93,7 @@ async fn single_currency<'a>(
     c: std::sync::Arc<tokio::sync::RwLock<Option<Currency>>>,
     balances: &'a std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
     guild_id: GuildId,
-    user: &'a (User, Member),
+    user: (&User, &Member),
     command: &ApplicationCommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
     let mut currency = c.read().await;
@@ -115,8 +119,8 @@ async fn single_currency<'a>(
         balance,
         currency_,
         guild_id,
-        &user.1,
-        &command.member.clone().ok_or_else(|| anyhow!("DMs not allowed"))?
+        user.1,
+        command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
     );
     drop(balances);
     drop(currency);

@@ -142,7 +142,7 @@ impl Currency {
         // Try to get from cache first.
         let mut cache = CACHE_CURRENCY.lock().await;
         if let Some(currency) = cache.get(&(guild_id, curr_name.clone())) {
-            return Ok(Some(currency.clone()));
+            return Ok(Some(currency.to_owned()));
         }
         // If not in cache, try to get from database. Keep holding the lock on the cache
         // so that another thread doesn't try to get the same currency from the database.
@@ -151,7 +151,7 @@ impl Currency {
         let filterdoc =
             doc! {
             "GuildId": guild_id.as_i64(),
-            "CurrName": curr_name.clone(),
+            "CurrName": &curr_name,
         };
         let res = coll.find_one(filterdoc, None).await?;
         drop(db); // Drop locks on mutexes as soon as possible.
@@ -161,7 +161,7 @@ impl Currency {
             || Ok(None),
             |curr| {
                 let tmp = Arc::new(RwLock::new(Some(curr)));
-                cache.put((guild_id, curr_name.clone()), tmp.clone());
+                cache.put((guild_id, curr_name), tmp.clone());
                 Ok(Some(tmp))
             }
         );
@@ -189,7 +189,7 @@ impl Currency {
             let curr_name = curr.curr_name().to_owned();
             let tmp = Arc::new(RwLock::new(Some(curr)));
             currencies.push(tmp.clone());
-            cache.put((guild_id, curr_name), tmp.clone());
+            cache.put((guild_id, curr_name), tmp);
         }
         drop(cache); // please the linter
         Ok(currencies)
@@ -359,7 +359,7 @@ impl Currency {
         }
 
         cache.pop(&(self__.guild_id, self__.curr_name.clone()));
-        cache.put((self__.guild_id, new_name), Arc::new(RwLock::new(Some(self__.clone()))));
+        cache.put((self__.guild_id, new_name), Arc::new(RwLock::new(Some(self__))));
         drop(self_); // please the linter
         drop(cache); // all hail the linter
         Ok(())
@@ -413,7 +413,7 @@ impl Currency {
         let filterdoc =
             doc! {
             "GuildId": self.guild_id.as_i64(),
-            "CurrName": self.curr_name.clone(),
+            "CurrName": &self.curr_name,
         };
         let updatedoc =
             doc! {
@@ -1488,6 +1488,7 @@ mod test {
             .unwrap()
             .unwrap();
         let currency = currency.read().await;
+        println!("Thread {} got currency.", i);
         let currency_ = currency.as_ref().unwrap();
         assert_eq!(currency_.guild_id, DbGuildId::from(guild_id));
         assert_eq!(currency_.curr_name, curr_name);

@@ -34,8 +34,7 @@ pub async fn run(
         .ok_or_else(|| anyhow!("No amount was found"))?;
     let member = command.member
         .as_ref()
-        .ok_or_else(|| anyhow!("Command can't be performed in DMs"))?
-        .clone();
+        .ok_or_else(|| anyhow!("Command can't be performed in DMs"))?;
 
     let amount = amount.cast_to_f64();
 
