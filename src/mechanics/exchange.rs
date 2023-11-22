@@ -6,7 +6,7 @@ use serenity::model::prelude::Member;
 use tokio::sync::RwLock;
 use tracing::error;
 
-use crate::db::{ CLIENT, ArcTokioRwLockOption };
+use crate::db::{ ArcTokioRwLockOption, CLIENT };
 use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::truncate_2dp };
 
 /// Exchanges one currency for another.

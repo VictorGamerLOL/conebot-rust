@@ -1,6 +1,3 @@
-pub mod config;
-pub mod create;
-pub mod delete;
 pub mod exchange;
 
 use anyhow::{ anyhow, Result };
@@ -23,9 +20,6 @@ pub async fn run(
         .get_subcommand_args_and_name()
         .ok_or_else(|| anyhow!("No subcommand found"))?;
     match cmd_name.as_str() {
-        "create" => create::run(options, command, &http).await?,
-        "delete" => delete::run(options, command, &http).await?,
-        "config" => config::run(options, command, &http).await?,
         "exchange" => exchange::run(options, command, &http).await?,
         _ => {
             return Err(anyhow!("Unknown subcommand: {}", cmd_name));
@@ -41,9 +35,6 @@ pub fn application_command() -> CreateApplicationCommand {
         .name("currency")
         .description("Commands related to managing currencies.")
         .dm_permission(false)
-        .add_option(create::option())
-        .add_option(delete::option())
-        .add_option(config::option())
         .add_option(exchange::option());
     command
 }

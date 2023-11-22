@@ -70,6 +70,16 @@ pub enum ItemType {
     },
 }
 
+impl ToString for ItemType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Trophy => "Trophy".to_owned(),
+            Self::Consumable { .. } => "Consumable".to_owned(),
+            Self::InstantConsumable { .. } => "InstantConsumable".to_owned(),
+        }
+    }
+}
+
 /// The action to take when the item is used, can be none. It contains the details of the action.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[non_exhaustive]
@@ -140,7 +150,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": guild_id.as_i64(),
+            "GuildId": guild_id.as_i64(),
             "ItemName": item_name,
         };
         let item = match collection.find_one(filter, None).await {
@@ -163,7 +173,7 @@ impl Item {
         let mut db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter = doc! {
-            "GuildID": guild_id.as_i64(),
+            "GuildId": guild_id.as_i64(),
         };
         let mut cursor = collection.find(filter, None).await?;
         let mut items = Vec::new();
@@ -219,7 +229,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self__.guild_id.as_i64(),
+            "GuildId": self__.guild_id.as_i64(),
             "ItemName": &self__.item_name,
         };
         let update =
@@ -250,7 +260,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -278,7 +288,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -305,7 +315,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -332,7 +342,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -359,7 +369,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let update =
@@ -386,7 +396,7 @@ impl Item {
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
-            "GuildID": self.guild_id.as_i64(),
+            "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
         let mut update =

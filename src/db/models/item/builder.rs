@@ -12,7 +12,6 @@ pub struct Builder {
     tradeable: Option<bool>,
     currency_value: Option<String>,
     value: Option<f64>,
-    message: Option<String>,
     item_type: Option<ItemType>,
 }
 
@@ -26,7 +25,6 @@ impl Builder {
             tradeable: None,
             currency_value: None,
             value: None,
-            message: None,
             item_type: None,
         }
     }
@@ -55,8 +53,7 @@ impl Builder {
         let sellable = self.sellable.unwrap_or(false);
         let tradeable = self.tradeable.unwrap_or(false);
         let currency_value = self.currency_value.unwrap_or_default();
-        let value = self.value.unwrap_or(0.0);
-        let message = self.message.unwrap_or_default();
+        let value = self.value.unwrap_or_default();
         let item_type = self.item_type.unwrap_or(ItemType::Trophy);
 
         let item = Item {
@@ -106,11 +103,6 @@ impl Builder {
         self
     }
 
-    pub fn message(&mut self, message: Option<String>) -> &mut Self {
-        self.message = message;
-        self
-    }
-
     pub fn item_type(&mut self, item_type: Option<ItemType>) -> &mut Self {
         self.item_type = item_type;
         self
@@ -119,6 +111,11 @@ impl Builder {
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// There is a lot of inferring that can be done when
+/// determining the item type in order to save the user
+/// from having to specify a lot of fields. If we really
+/// need more information, then we can just return an
+/// error and have the user specify more fields.
 pub struct ItemTypeBuilder {
     type_: Option<ItemTypeTypeBuilder>,
     message: Option<String>,
@@ -127,9 +124,13 @@ pub struct ItemTypeBuilder {
     drop_table_name: Option<String>,
 }
 
-#[repr(u8)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+/// This exists because the builder needs to be able to
+/// infer the type of the item, and the type of the item
+/// needs to be able to be set by the builder. It can either
+/// be set directly or inferred based on the presence of other
+/// fields.
 pub enum ItemTypeTypeBuilder {
     #[default]
     Trophy,
@@ -137,9 +138,13 @@ pub enum ItemTypeTypeBuilder {
     InstantConsumable,
 }
 
-#[repr(u8)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+/// If the type of the item is not Trophy, then the action type
+/// must be specified or be able to be inferred from the presence
+/// of other fields. If neither `role` nor `drop_table_name` are
+/// present, then the action type is `None`. If both are present,
+/// then it is an error.
 pub enum ActionTypeItemTypeBuilder {
     #[default]
     None,
@@ -148,7 +153,8 @@ pub enum ActionTypeItemTypeBuilder {
 }
 
 impl ItemTypeBuilder {
-    const TROPHY: ItemType = ItemType::Trophy; // To quickly make a trophy item rather than going through the builder.
+    /// To quickly make a trophy item rather than going through the builder.
+    const TROPHY: ItemType = ItemType::Trophy;
 
     pub const fn new() -> Self {
         Self {
@@ -227,6 +233,11 @@ impl ItemTypeBuilder {
                 )
             )
         }
+    }
+
+    pub fn type_(&mut self, type_: Option<ItemTypeTypeBuilder>) -> &mut Self {
+        self.type_ = type_;
+        self
     }
 
     pub fn message(&mut self, message: Option<String>) -> &mut Self {

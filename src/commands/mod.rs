@@ -1,7 +1,7 @@
 pub mod balance;
+pub mod config;
 pub mod currency;
 pub mod give;
-pub mod item;
 pub mod ping;
 pub mod take;
 pub mod test1;

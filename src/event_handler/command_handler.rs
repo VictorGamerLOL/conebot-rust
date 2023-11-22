@@ -24,19 +24,19 @@ pub enum IntOrNumber {
 impl IntOrNumber {
     /// Takes whatever option is in the enum
     /// and returns it as a f64.
-    pub const fn cast_to_f64(&self) -> f64 {
+    pub const fn cast_to_f64(self) -> f64 {
         match self {
-            Self::Int(i) => *i as f64, // Should not cause a lot of loss here.
-            Self::Number(n) => *n,
+            Self::Int(i) => i as f64, // Should not cause a lot of loss here.
+            Self::Number(n) => n,
         }
     }
 
     /// Takes whatever option is in the enum
     /// and returns it as an i64.
-    pub const fn cast_to_i64(&self) -> i64 {
+    pub const fn cast_to_i64(self) -> i64 {
         match self {
-            Self::Int(i) => *i,
-            Self::Number(n) => *n as i64, // Ok now THIS causes loss, but I doubt this function will be used. Here just in case.
+            Self::Int(i) => i,
+            Self::Number(n) => n as i64, // Ok now THIS causes loss, but I doubt this function will be used. Here just in case.
         }
     }
 }

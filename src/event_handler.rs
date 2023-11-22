@@ -34,6 +34,7 @@ impl Handler {
             "balance" => commands::balance::run(options, command, ctx).await?,
             "give" => commands::give::run(options, command, ctx).await?,
             "take" => commands::take::run(options, command, ctx).await?,
+            "config" => commands::config::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }
@@ -69,7 +70,8 @@ impl EventHandler for Handler {
                         commands::currency::application_command(),
                         commands::balance::application_command(),
                         commands::give::application_command(),
-                        commands::take::application_command()
+                        commands::take::application_command(),
+                        commands::config::application_command()
                     ]
                 )
             }).await
