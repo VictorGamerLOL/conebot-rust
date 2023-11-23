@@ -10,7 +10,7 @@ use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
 use tokio::sync::Mutex;
 
-use crate::db::{ id::{ DbGuildId, DbUserId }, ArcTokioMutexOption, TokioMutexCache };
+use crate::db::{ uniques::{ DbGuildId, DbUserId }, ArcTokioMutexOption, TokioMutexCache };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inventory {

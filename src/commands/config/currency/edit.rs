@@ -28,7 +28,7 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Value not found."))??;
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command may not be performed in DMs"))?;
 
-    let field_name = field_name.to_lowercase().trim().replace(' ', "_");
+    let field_name = field_name.to_lowercase().trim().replace([' ', '-'], "_");
 
     let currency = Currency::try_from_name(
         guild_id.into(),

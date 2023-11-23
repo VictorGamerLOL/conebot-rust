@@ -1,4 +1,4 @@
-use crate::db::id::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
+use crate::db::uniques::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 use crate::db::models::{ Balance, Balances, Currency };
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
@@ -64,7 +64,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         let timeout = Timeout {
             user,
             guild: guild_id,
-            currency: currency_name.clone(),
+            currency: currency_name.clone().into_string(),
         };
 
         let mut timeouts = TIMEOUTS.lock().await;
@@ -95,7 +95,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 
         drop(currency);
 
-        let mut balance = balances_.ensure_has_currency(&currency_name).await?;
+        let mut balance = balances_.ensure_has_currency(currency_name.as_ref()).await?;
         // get a number between earn_min and earn_max
         let amount = truncate_2dp(rand.gen_range(earn_min..=earn_max));
         balance.add_amount(amount, None).await?;

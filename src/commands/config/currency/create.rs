@@ -10,7 +10,7 @@ use serenity::{
     },
 };
 
-use crate::db::{ id::DbGuildId, models::currency::builder::Builder };
+use crate::db::{ uniques::DbGuildId, models::currency::builder::Builder };
 use crate::event_handler::command_handler::CommandOptions;
 
 /// Runs the create currency subcommand.

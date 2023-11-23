@@ -21,7 +21,7 @@ use serenity::{
 };
 
 use crate::{
-    db::{ id::DbGuildId, models::{ Balance, Balances, Currency }, ArcTokioRwLockOption },
+    db::{ uniques::DbGuildId, models::{ Balance, Balances, Currency }, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 
@@ -113,7 +113,7 @@ async fn single_currency<'a>(
     let balance = if let Some(b) = balance {
         b
     } else {
-        balances_.create_balance(currency_.curr_name().to_owned()).await?
+        balances_.create_balance(currency_.curr_name().to_owned().into_string()).await?
     };
     let embed = single_currency_embed(
         balance,
@@ -142,7 +142,7 @@ fn single_currency_embed<'a>(
             "{}'s balance for {}{}",
             target.display_name(),
             currency.symbol(),
-            currency.curr_name()
+            currency.curr_name().as_str()
         )
     );
     embed.description(format!("{}{}", currency.symbol(), balance.amount()));

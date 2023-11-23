@@ -33,7 +33,7 @@ async fn test_new_client() {
     let client = Client::with_uri_str(&uri).await.unwrap();
 }
 
-pub mod id;
+pub mod uniques;
 
 /// Simply prepare the database for use.
 /// Environment variables must be set for this to work and

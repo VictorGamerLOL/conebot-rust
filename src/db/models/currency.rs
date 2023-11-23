@@ -38,12 +38,12 @@ use serenity::model::prelude::RoleId;
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
-use crate::db::id;
+use crate::db::uniques::{ self, CurrencyName, CurrencyNameRef };
 use crate::db::models::ToKVs;
 use crate::db::{
-    id::DbChannelId,
-    id::DbGuildId,
-    id::DbRoleId,
+    uniques::DbChannelId,
+    uniques::DbGuildId,
+    uniques::DbRoleId,
     ArcTokioRwLockOption,
     TokioMutexCache,
 };
@@ -189,7 +189,7 @@ impl Currency {
             let curr_name = curr.curr_name().to_owned();
             let tmp = Arc::new(RwLock::new(Some(curr)));
             currencies.push(tmp.clone());
-            cache.put((guild_id, curr_name), tmp);
+            cache.put((guild_id, curr_name.into_string()), tmp);
         }
         drop(cache); // please the linter
         Ok(currencies)
@@ -202,8 +202,8 @@ impl Currency {
 
     #[allow(clippy::must_use_candidate)]
     #[inline]
-    pub fn curr_name(&self) -> &str {
-        &self.curr_name
+    pub fn curr_name(&self) -> CurrencyNameRef<'_> {
+        CurrencyNameRef::from_str_and_guild_id_unchecked(self.guild_id, &self.curr_name)
     }
 
     #[allow(clippy::must_use_candidate)]

@@ -14,7 +14,7 @@ use serenity::{
 };
 
 use crate::{
-    db::{ id::DbGuildId, models::{ Balances, Currency } },
+    db::{ uniques::DbGuildId, models::{ Balances, Currency } },
     event_handler::command_handler::CommandOptions,
     util::currency::truncate_2dp,
 };

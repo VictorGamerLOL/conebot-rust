@@ -22,7 +22,7 @@ pub use store_entry::StoreEntry;
 
 use once_cell::sync::OnceCell;
 
-use super::id::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
+use super::uniques::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 
 // pub struct BotGuild {
 //     guild_id: DbGuildId,

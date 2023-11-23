@@ -63,10 +63,10 @@ pub async fn run(
                 "You gave {} {}{} and got {} {}{}.",
                 amount,
                 input.symbol(),
-                input.curr_name(),
+                input.curr_name().as_str(),
                 given,
                 output.symbol(),
-                output.curr_name()
+                output.curr_name().as_str()
             )
         )
     }).await?;

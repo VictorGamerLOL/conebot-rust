@@ -15,7 +15,7 @@ use serenity::{
 use tokio::sync::MutexGuard;
 
 use crate::{
-    db::{ id::DbGuildId, models::Currency, ArcTokioRwLockOption },
+    db::{ uniques::DbGuildId, models::Currency, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 

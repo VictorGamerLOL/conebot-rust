@@ -10,7 +10,7 @@
 //! be doing things like changing the user that has that amount of currency or changing the currency.
 //!
 
-use crate::db::id::{ DbGuildId, DbUserId };
+use crate::db::uniques::{ DbGuildId, DbUserId, CurrencyNameRef };
 use crate::db::{ ArcTokioMutexOption, ArcTokioRwLockOption, TokioMutexCache };
 use anyhow::{ anyhow, Result };
 use futures::TryStreamExt;
@@ -104,7 +104,7 @@ impl Balances {
         let filterdoc =
             doc! {
             "GuildId": currency.guild_id().as_i64(),
-            "CurrName": &currency.curr_name(),
+            "CurrName": &currency.curr_name().as_str(),
         };
         coll.delete_many(filterdoc, None).await?;
         Ok(())
@@ -147,11 +147,14 @@ impl Balances {
     ///
     /// # Errors
     /// - Any `MongoDB` error occurs.
-    pub async fn ensure_has_currency(&mut self, curr_name: &str) -> Result<&mut Balance> {
+    pub async fn ensure_has_currency(
+        &mut self,
+        curr_name: CurrencyNameRef<'_>
+    ) -> Result<&mut Balance> {
         if let Some(i) = self.balances.iter().position(|b| b.curr_name == curr_name) {
             return Ok(&mut self.balances[i]);
         }
-        self.create_balance(curr_name.to_owned()).await
+        self.create_balance(curr_name.to_owned().into_string()).await
     }
 
     /// Delete the balance for the specified currency for the user in the guild.
@@ -518,8 +521,8 @@ mod test {
     #[tokio::test]
     async fn test_try_from_user() {
         crate::init_env().await;
-        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
-        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
+        let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
@@ -531,8 +534,8 @@ mod test {
     #[allow(clippy::float_cmp)]
     async fn test_checked_amount_operations() {
         crate::init_env().await;
-        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
-        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
+        let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();
@@ -583,8 +586,8 @@ mod test {
     #[tokio::test]
     async fn test_unchecked_amount_operations() {
         crate::init_env().await;
-        let user = crate::db::id::DbUserId::from(TEST_USER_ID);
-        let guild = crate::db::id::DbGuildId::from(TEST_GUILD_ID);
+        let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
+        let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
         let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
         let mut balances_ = balances.as_mut().unwrap();

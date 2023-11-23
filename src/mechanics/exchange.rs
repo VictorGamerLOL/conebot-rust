@@ -35,19 +35,19 @@ pub async fn exchange(
     member: &Member
 ) -> Result<f64> {
     if input.curr_name() == output.curr_name() {
-        bail!("You cannot exchange {} for itself.", input.curr_name());
+        bail!("You cannot exchange {} for itself.", input.curr_name().as_str());
     }
     let input_base_value = if let Some(f) = input.base_value() {
         f
     } else if !input.base() {
-        bail!("{} cannot be exchanged.", input.curr_name());
+        bail!("{} cannot be exchanged.", input.curr_name().as_str());
     } else {
         1.0 // if it is a base currency, then it's base value is 1, because it is worth itself
     };
     let output_base_value = if let Some(f) = output.base_value() {
         f
     } else if !output.base() {
-        bail!("{} cannot be exchanged.", output.curr_name());
+        bail!("{} cannot be exchanged.", output.curr_name().as_str());
     } else {
         1.0 // same here
     };
@@ -90,14 +90,14 @@ pub async fn exchange(
     }
 
     let balance_in = balance_in.ok_or_else(||
-        anyhow!("No balance found for {}.", input.curr_name())
+        anyhow!("No balance found for {}.", input.curr_name().as_str())
     )?;
     let balance_out = balance_out.ok_or_else(||
-        anyhow!("No balance found for {}.", output.curr_name())
+        anyhow!("No balance found for {}.", output.curr_name().as_str())
     )?;
 
     if balance_in.amount() < amount {
-        bail!("You don't have enough {}.", input.curr_name());
+        bail!("You don't have enough {}.", input.curr_name().as_str());
     }
 
     let to_give = truncate_2dp((input_base_value * amount) / output_base_value);

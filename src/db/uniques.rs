@@ -22,6 +22,8 @@
 //! The fact that MongoDB uses BigEndian and the average x86_64 CPU uses LittleEndian
 //! is trivial because the bson serializer and deserializer will handle that for us.
 
+use std::{ str::FromStr, borrow::Borrow };
+
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
@@ -231,5 +233,119 @@ impl TryFrom<String> for DbRoleId {
     type Error = anyhow::Error;
     fn try_from(id: String) -> Result<Self> {
         Ok(Self(i64::from_ne_bytes(id.parse::<u64>()?.to_ne_bytes())))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct CurrencyName(#[serde(skip)] DbGuildId, String);
+
+impl CurrencyName {
+    pub const fn db_guild_id(&self) -> DbGuildId {
+        self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.1
+    }
+
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn validate(&self) -> Result<bool> {
+        todo!()
+    }
+
+    pub fn into_string(self) -> String {
+        self.1
+    }
+
+    pub fn as_ref(&self) -> CurrencyNameRef<'_> {
+        CurrencyNameRef(self.0, &self.1)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct CurrencyNameRef<'a>(#[serde(skip)] DbGuildId, &'a str);
+
+impl<'a> CurrencyNameRef<'a> {
+    pub const fn db_guild_id(&self) -> DbGuildId {
+        self.0
+    }
+
+    pub const fn as_str(&self) -> &str {
+        self.1
+    }
+
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn validate(&self) -> Result<bool> {
+        todo!()
+    }
+
+    pub const fn from_str_and_guild_id_unchecked(guild_id: DbGuildId, name: &'a str) -> Self {
+        Self(guild_id, name)
+    }
+
+    pub fn to_owned(&self) -> CurrencyName {
+        CurrencyName(self.0, self.1.to_owned())
+    }
+}
+impl PartialEq<&str> for CurrencyNameRef<'_> {
+    fn eq(&self, other: &&str) -> bool {
+        self.1 == *other
+    }
+}
+
+impl PartialEq<CurrencyNameRef<'_>> for &str {
+    fn eq(&self, other: &CurrencyNameRef<'_>) -> bool {
+        *self == other.1
+    }
+}
+
+impl PartialEq<String> for CurrencyNameRef<'_> {
+    fn eq(&self, other: &String) -> bool {
+        self.1 == other
+    }
+}
+
+impl PartialEq<CurrencyNameRef<'_>> for String {
+    fn eq(&self, other: &CurrencyNameRef<'_>) -> bool {
+        self == other.1
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct DropTableName(#[serde(skip)] DbGuildId, String);
+
+impl DropTableName {
+    pub const fn db_guild_id(&self) -> DbGuildId {
+        self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.1
+    }
+
+    #[allow(clippy::missing_const_for_fn)]
+    pub async fn validate(&self) -> Result<bool> {
+        // TODO: make this function once the
+        // database with the drop tables is implemented.
+        Ok(true)
+    }
+
+    pub async fn from_string_and_guild_id(guild_id: DbGuildId, name: String) -> Result<Self> {
+        let tmp = Self(guild_id, name);
+        if tmp.validate().await? {
+            Ok(tmp)
+        } else {
+            anyhow::bail!("Invalid drop table name.")
+        }
+    }
+
+    pub const fn from_string_and_guild_id_unchecked(guild_id: DbGuildId, name: String) -> Self {
+        Self(guild_id, name)
+    }
+}
+
+impl ToString for DropTableName {
+    fn to_string(&self) -> String {
+        self.1.clone()
     }
 }

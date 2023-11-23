@@ -4,7 +4,7 @@ pub mod builder;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
-use crate::db::{ id::{ DbGuildId, DbRoleId }, ArcTokioRwLockOption, TokioMutexCache };
+use crate::db::{ uniques::{ DbGuildId, DbRoleId }, ArcTokioRwLockOption, TokioMutexCache };
 use anyhow::{ anyhow, bail, Result };
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -15,6 +15,8 @@ use serde::{ Deserialize, Serialize };
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 use tracing::instrument;
+
+use self::builder::{ ItemTypeTypeBuilder, ActionTypeItemTypeBuilder };
 
 /// Represents an item a user can hold in their inventory. May or may not
 /// be worth something or be used in return for something.
@@ -111,6 +113,150 @@ pub enum ItemError {
     /// Something else went wrong. Deal with it.
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+/// This exists strictly for the updating of the item types via [ItemType]'s
+/// `update_auto` function. It is used to make the update more intuitive on
+/// the user's end.
+pub enum ItemTypeUpdateType {
+    Type(ItemTypeTypeBuilder),
+    Message(String),
+    ActionType(ActionTypeItemTypeBuilder),
+    RoleId(DbRoleId),
+    DropTableName(String),
+}
+
+// This giant block is needed in order to make the update more intuitive on
+// the user's end. The main function responsible for this is update_auto. Which
+// takes an ItemTypeUpdateType and updates the item accordingly by trying to
+// figure out what the user wants to do and returning an error if it can't.
+impl ItemType {
+    pub fn update_auto(&self, update_type: ItemTypeUpdateType) -> Result<Self> {
+        match update_type {
+            ItemTypeUpdateType::Type(type_) => Ok(self.update_from_type(type_)),
+            ItemTypeUpdateType::Message(message) => Ok(self.update_from_message(message)),
+            ItemTypeUpdateType::ActionType(action_type) => {
+                self.update_from_action_type(action_type)
+            }
+            ItemTypeUpdateType::RoleId(role_id) => Ok(self.update_from_role_id(role_id)),
+            ItemTypeUpdateType::DropTableName(drop_table_name) => {
+                Ok(self.update_from_drop_table_name(drop_table_name))
+            }
+        }
+    }
+
+    fn update_from_type(&self, type_: ItemTypeTypeBuilder) -> Self {
+        match type_ {
+            ItemTypeTypeBuilder::Trophy => Self::Trophy,
+            ItemTypeTypeBuilder::Consumable => {
+                Self::Consumable {
+                    message: if let Self::Consumable { message, .. } = self {
+                        message.clone()
+                    } else if let Self::InstantConsumable { message, .. } = self {
+                        message.clone()
+                    } else {
+                        "".to_owned()
+                    },
+                    action_type: if let Self::Consumable { action_type, .. } = self {
+                        action_type.clone()
+                    } else if let Self::InstantConsumable { action_type, .. } = self {
+                        action_type.clone()
+                    } else {
+                        ItemActionType::None
+                    },
+                }
+            }
+            ItemTypeTypeBuilder::InstantConsumable => {
+                Self::InstantConsumable {
+                    message: "".to_owned(),
+                    action_type: ItemActionType::None,
+                }
+            }
+        }
+    }
+
+    fn update_from_message(&self, message: String) -> Self {
+        match self {
+            Self::Consumable { action_type, .. } =>
+                Self::Consumable {
+                    message,
+                    action_type: action_type.clone(),
+                },
+            Self::InstantConsumable { action_type, .. } =>
+                Self::InstantConsumable {
+                    message,
+                    action_type: action_type.clone(),
+                },
+            _ => Self::Consumable { message, action_type: ItemActionType::None },
+        }
+    }
+
+    fn update_from_action_type(&self, action_type: ActionTypeItemTypeBuilder) -> Result<Self> {
+        if action_type == ActionTypeItemTypeBuilder::Lootbox {
+            bail!(
+                "Cannot change to lootbox like this. Use the update_drop_table_name field instead."
+            );
+        } else if action_type == ActionTypeItemTypeBuilder::Role {
+            bail!("Cannot change to role like this. Use the role_id field instead.");
+        }
+        match self {
+            Self::Consumable { message, .. } =>
+                Ok(Self::Consumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::None,
+                }),
+            Self::InstantConsumable { message, .. } =>
+                Ok(Self::InstantConsumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::None,
+                }),
+            _ =>
+                Ok(Self::Consumable {
+                    message: "".to_owned(),
+                    action_type: ItemActionType::None,
+                }),
+        }
+    }
+
+    fn update_from_role_id(&self, role_id: DbRoleId) -> Self {
+        match self {
+            Self::Consumable { message, .. } =>
+                Self::Consumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::Role { role_id },
+                },
+            Self::InstantConsumable { message, .. } =>
+                Self::InstantConsumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::Role { role_id },
+                },
+            _ =>
+                Self::Consumable {
+                    message: "".to_owned(),
+                    action_type: ItemActionType::Role { role_id },
+                },
+        }
+    }
+
+    fn update_from_drop_table_name(&self, drop_table_name: String) -> Self {
+        match self {
+            Self::Consumable { message, .. } =>
+                Self::Consumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::Lootbox { drop_table_name },
+                },
+            Self::InstantConsumable { message, .. } =>
+                Self::InstantConsumable {
+                    message: message.clone(),
+                    action_type: ItemActionType::Lootbox { drop_table_name },
+                },
+            _ =>
+                Self::Consumable {
+                    message: "".to_owned(),
+                    action_type: ItemActionType::Lootbox { drop_table_name },
+                },
+        }
+    }
 }
 
 lazy_static! {

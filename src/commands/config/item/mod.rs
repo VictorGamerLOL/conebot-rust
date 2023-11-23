@@ -7,6 +7,7 @@ use serenity::{
 
 pub mod create;
 pub mod delete;
+pub mod edit;
 
 pub async fn run(
     options: crate::event_handler::command_handler::CommandOptions,

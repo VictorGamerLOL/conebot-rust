@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use super::*;
-use crate::db::{ id::DbGuildId, ArcTokioRwLockOption };
+use crate::db::{ uniques::DbGuildId, ArcTokioRwLockOption };
 use anyhow::{ anyhow, bail, Result };
 
 pub struct Builder {

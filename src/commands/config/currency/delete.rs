@@ -1,4 +1,4 @@
-use crate::db::id::DbGuildId;
+use crate::db::uniques::DbGuildId;
 use crate::db::models::Currency;
 use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, Result };
