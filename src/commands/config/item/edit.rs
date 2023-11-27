@@ -4,7 +4,7 @@ use serenity::{
     model::prelude::Mention,
 };
 
-use crate::db::models::{ Item, item::ItemTypeUpdateType };
+use crate::db::{ models::{ Item, item::ItemTypeUpdateType }, uniques::DropTableName };
 
 pub async fn run(
     options: crate::event_handler::command_handler::CommandOptions,
@@ -89,7 +89,13 @@ pub async fn run(
             ).await?,
         "drop_table" | "drop_table_name" =>
             item__.update_item_type(
-                item__.item_type().update_auto(ItemTypeUpdateType::DropTableName(value))?,
+                item__
+                    .item_type()
+                    .update_auto(
+                        ItemTypeUpdateType::DropTableName(
+                            DropTableName::from_string_and_guild_id(guild_id.into(), value).await?
+                        )
+                    )?,
                 None
             ).await?,
         _ => anyhow::bail!("Field {} does not exist.", field_name),

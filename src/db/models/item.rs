@@ -4,7 +4,11 @@ pub mod builder;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
-use crate::db::{ uniques::{ DbGuildId, DbRoleId }, ArcTokioRwLockOption, TokioMutexCache };
+use crate::db::{
+    uniques::{ DbGuildId, DbRoleId, DropTableName, DropTableNameRef },
+    ArcTokioRwLockOption,
+    TokioMutexCache,
+};
 use anyhow::{ anyhow, bail, Result };
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -123,7 +127,7 @@ pub enum ItemTypeUpdateType {
     Message(String),
     ActionType(ActionTypeItemTypeBuilder),
     RoleId(DbRoleId),
-    DropTableName(String),
+    DropTableName(DropTableName),
 }
 
 // This giant block is needed in order to make the update more intuitive on
@@ -238,22 +242,28 @@ impl ItemType {
         }
     }
 
-    fn update_from_drop_table_name(&self, drop_table_name: String) -> Self {
+    fn update_from_drop_table_name(&self, drop_table_name: DropTableName) -> Self {
         match self {
             Self::Consumable { message, .. } =>
                 Self::Consumable {
                     message: message.clone(),
-                    action_type: ItemActionType::Lootbox { drop_table_name },
+                    action_type: ItemActionType::Lootbox {
+                        drop_table_name: drop_table_name.into_string(),
+                    },
                 },
             Self::InstantConsumable { message, .. } =>
                 Self::InstantConsumable {
                     message: message.clone(),
-                    action_type: ItemActionType::Lootbox { drop_table_name },
+                    action_type: ItemActionType::Lootbox {
+                        drop_table_name: drop_table_name.into_string(),
+                    },
                 },
             _ =>
                 Self::Consumable {
                     message: "".to_owned(),
-                    action_type: ItemActionType::Lootbox { drop_table_name },
+                    action_type: ItemActionType::Lootbox {
+                        drop_table_name: drop_table_name.into_string(),
+                    },
                 },
         }
     }
@@ -361,6 +371,58 @@ impl Item {
 
     pub const fn item_type(&self) -> &ItemType {
         &self.item_type
+    }
+
+    pub const fn message(&self) -> Option<&String> {
+        match self.item_type {
+            ItemType::Consumable { ref message, .. } => Some(message),
+            ItemType::InstantConsumable { ref message, .. } => Some(message),
+            _ => None,
+        }
+    }
+
+    pub const fn action_type(&self) -> Option<&ItemActionType> {
+        match self.item_type {
+            ItemType::Consumable { ref action_type, .. } => Some(action_type),
+            ItemType::InstantConsumable { ref action_type, .. } => Some(action_type),
+            _ => None,
+        }
+    }
+
+    pub fn drop_table_name(&self) -> Option<DropTableNameRef<'_>> {
+        match self.item_type {
+            ItemType::Consumable {
+                action_type: ItemActionType::Lootbox { ref drop_table_name },
+                ..
+            } =>
+                Some(
+                    DropTableNameRef::from_str_and_guild_id_unchecked(
+                        self.guild_id,
+                        drop_table_name
+                    )
+                ),
+            ItemType::InstantConsumable {
+                action_type: ItemActionType::Lootbox { ref drop_table_name },
+                ..
+            } =>
+                Some(
+                    DropTableNameRef::from_str_and_guild_id_unchecked(
+                        self.guild_id,
+                        drop_table_name
+                    )
+                ),
+            _ => None,
+        }
+    }
+
+    pub const fn role_id(&self) -> Option<DbRoleId> {
+        match self.item_type {
+            ItemType::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
+                Some(role_id),
+            ItemType::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. } =>
+                Some(role_id),
+            _ => None,
+        }
     }
 
     pub async fn update_name(self_: ArcTokioRwLockOption<Self>, new_name: String) -> Result<()> {

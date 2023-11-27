@@ -1364,17 +1364,14 @@ impl ToKVs for Currency {
                                     .ok_or_else(|| anyhow!("Could not convert to json array."))?
                                     .iter()
                                     .map(|v| {
-                                        // this is where we take the `v` Value and convert it to a String.
-                                        let val = v
-                                            .as_str()
+                                        // this is where we take the `v` Value and convert it to an i64, then a DbChannelId.
+                                        let db_id: DbChannelId = v
+                                            .as_i64()
                                             .ok_or_else(||
-                                                // ***12 indentation levels***
-                                                anyhow!("Could not convert to json string.")
+                                                anyhow!("Could not convert to json i64.")
                                             )?
-                                            .to_owned()
-                                            .replace('"', "");
-                                        // Then to a DbChannelId then to a ChannelId.
-                                        let db_id: DbChannelId = val.try_into()?;
+                                            .into();
+                                        // Then a regular ChannelId.
                                         let id: ChannelId = db_id.into();
                                         // Then a stringified mention with leading comma and a space.
                                         Ok(format!("{}, ", Mention::from(id)))
@@ -1396,14 +1393,12 @@ impl ToKVs for Currency {
                                     .ok_or_else(|| anyhow!("Could not convert to json array."))?
                                     .iter()
                                     .map(|v| {
-                                        let val = v
-                                            .as_str()
+                                        let db_id: DbRoleId = v
+                                            .as_i64()
                                             .ok_or_else(||
-                                                anyhow!("Could not convert to json string.")
+                                                anyhow!("Could not convert to json i64.")
                                             )?
-                                            .to_owned()
-                                            .replace('"', "");
-                                        let db_id: DbRoleId = val.try_into()?;
+                                            .into();
                                         let id: RoleId = db_id.into();
                                         Ok(format!("{}, ", Mention::from(id)))
                                     })
@@ -1513,14 +1508,14 @@ mod test {
             .earn_by_chat(Some(true))
             .channels_is_whitelist(Some(true))
             .roles_is_whitelist(Some(true))
-            .channels_whitelist(vec![DbChannelId::from(123)])
-            .channels_whitelist_add(DbChannelId::from(456))
-            .channels_blacklist(Some(vec![DbChannelId::from(789)]))
-            .channels_blacklist_add(DbChannelId::from(101_112))
-            .roles_whitelist(Some(vec![DbRoleId::from(123)]))
-            .roles_whitelist_add(DbRoleId::from(456))
-            .roles_blacklist(Some(vec![DbRoleId::from(789)]))
-            .roles_blacklist_add(DbRoleId::from(101_112))
+            .channels_whitelist(vec![DbChannelId::from(123_i64)])
+            .channels_whitelist_add(DbChannelId::from(456_i64))
+            .channels_blacklist(Some(vec![DbChannelId::from(789_i64)]))
+            .channels_blacklist_add(DbChannelId::from(101_112_i64))
+            .roles_whitelist(Some(vec![DbRoleId::from(123_i64)]))
+            .roles_whitelist_add(DbRoleId::from(456_i64))
+            .roles_blacklist(Some(vec![DbRoleId::from(789_i64)]))
+            .roles_blacklist_add(DbRoleId::from(101_112_i64))
             .earn_min(Some(10.0))
             .earn_max(Some(100.0))
             .earn_timeout(Duration::seconds(60));

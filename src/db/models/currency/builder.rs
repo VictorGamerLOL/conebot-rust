@@ -364,14 +364,14 @@ async fn test_currency_builder() {
         .earn_by_chat(Some(true))
         .channels_is_whitelist(Some(true))
         .roles_is_whitelist(Some(true))
-        .channels_whitelist(Some(vec![DbChannelId::from(123)]))
-        .channels_whitelist_add(DbChannelId::from(456))
-        .roles_whitelist(Some(vec![DbRoleId::from(123)]))
-        .roles_whitelist_add(DbRoleId::from(456))
-        .channels_blacklist(Some(vec![DbChannelId::from(123)]))
-        .channels_blacklist_add(DbChannelId::from(456))
-        .roles_blacklist(Some(vec![DbRoleId::from(123)]))
-        .roles_blacklist_add(DbRoleId::from(456))
+        .channels_whitelist(Some(vec![DbChannelId::from(123_i64)]))
+        .channels_whitelist_add(DbChannelId::from(456_i64))
+        .roles_whitelist(Some(vec![DbRoleId::from(123_i64)]))
+        .roles_whitelist_add(DbRoleId::from(456_i64))
+        .channels_blacklist(Some(vec![DbChannelId::from(123_i64)]))
+        .channels_blacklist_add(DbChannelId::from(456_i64))
+        .roles_blacklist(Some(vec![DbRoleId::from(123_i64)]))
+        .roles_blacklist_add(DbRoleId::from(456_i64))
         .earn_min(Some(1.0))
         .earn_max(Some(10.0))
         .earn_timeout(Some(Duration::seconds(60)));
@@ -389,10 +389,16 @@ async fn test_currency_builder() {
     assert!(curr3.earn_by_chat);
     assert!(curr3.channels_is_whitelist);
     assert!(curr3.roles_is_whitelist);
-    assert_eq!(curr3.channels_whitelist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
-    assert_eq!(curr3.roles_whitelist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
-    assert_eq!(curr3.channels_blacklist, vec![DbChannelId::from(123), DbChannelId::from(456)]);
-    assert_eq!(curr3.roles_blacklist, vec![DbRoleId::from(123), DbRoleId::from(456)]);
+    assert_eq!(
+        curr3.channels_whitelist,
+        vec![DbChannelId::from(123_i64), DbChannelId::from(456_i64)]
+    );
+    assert_eq!(curr3.roles_whitelist, vec![DbRoleId::from(123_i64), DbRoleId::from(456_i64)]);
+    assert_eq!(
+        curr3.channels_blacklist,
+        vec![DbChannelId::from(123_i64), DbChannelId::from(456_i64)]
+    );
+    assert_eq!(curr3.roles_blacklist, vec![DbRoleId::from(123_i64), DbRoleId::from(456_i64)]);
 
     let error_margin_f64 = f64::EPSILON;
     let res1 = curr3.earn_min - 1.0;

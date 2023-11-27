@@ -6,7 +6,7 @@
 //!
 //! IDs are represented in strings because of BSON document limitations. A BSON document only supports the following number types:
 //!
-//! - 64-bit decimal floating point
+//! - 64-bit binary floating point
 //! - 32-bit signed integer
 //! - 64-bit signed integer
 //! - 128-bit decimal floating point
@@ -27,6 +27,8 @@ use std::{ str::FromStr, borrow::Borrow };
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
+
+use crate::db::models::Currency;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -53,6 +55,42 @@ impl From<u64> for DbGuildId {
 impl From<i64> for DbGuildId {
     fn from(id: i64) -> Self {
         Self(id)
+    }
+}
+
+impl From<i32> for DbGuildId {
+    fn from(id: i32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u32> for DbGuildId {
+    fn from(id: u32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i16> for DbGuildId {
+    fn from(id: i16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u16> for DbGuildId {
+    fn from(id: u16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i8> for DbGuildId {
+    fn from(id: i8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u8> for DbGuildId {
+    fn from(id: u8) -> Self {
+        Self(i64::from(id))
     }
 }
 
@@ -112,6 +150,48 @@ impl From<DbUserId> for u64 {
     }
 }
 
+impl From<i64> for DbUserId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<i32> for DbUserId {
+    fn from(id: i32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u32> for DbUserId {
+    fn from(id: u32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i16> for DbUserId {
+    fn from(id: i16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u16> for DbUserId {
+    fn from(id: u16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i8> for DbUserId {
+    fn from(id: i8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u8> for DbUserId {
+    fn from(id: u8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
 impl From<UserId> for DbUserId {
     fn from(id: UserId) -> Self {
         Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
@@ -158,6 +238,48 @@ impl From<DbChannelId> for u64 {
 impl From<DbChannelId> for i64 {
     fn from(id: DbChannelId) -> Self {
         id.0
+    }
+}
+
+impl From<i64> for DbChannelId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<i32> for DbChannelId {
+    fn from(id: i32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u32> for DbChannelId {
+    fn from(id: u32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i16> for DbChannelId {
+    fn from(id: i16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u16> for DbChannelId {
+    fn from(id: u16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i8> for DbChannelId {
+    fn from(id: i8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u8> for DbChannelId {
+    fn from(id: u8) -> Self {
+        Self(i64::from(id))
     }
 }
 
@@ -211,6 +333,54 @@ impl From<DbRoleId> for u64 {
     }
 }
 
+impl From<i64> for DbRoleId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<i32> for DbRoleId {
+    fn from(id: i32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u32> for DbRoleId {
+    fn from(id: u32) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i16> for DbRoleId {
+    fn from(id: i16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u16> for DbRoleId {
+    fn from(id: u16) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<i8> for DbRoleId {
+    fn from(id: i8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<u8> for DbRoleId {
+    fn from(id: u8) -> Self {
+        Self(i64::from(id))
+    }
+}
+
+impl From<DbRoleId> for i64 {
+    fn from(id: DbRoleId) -> Self {
+        id.0
+    }
+}
+
 impl From<RoleId> for DbRoleId {
     fn from(id: RoleId) -> Self {
         Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
@@ -249,8 +419,17 @@ impl CurrencyName {
     }
 
     #[allow(clippy::missing_const_for_fn)]
-    pub fn validate(&self) -> Result<bool> {
-        todo!()
+    pub async fn validate(&self) -> Result<bool> {
+        Ok(Currency::try_from_name(self.0, self.1.clone()).await?.is_some())
+    }
+
+    pub async fn from_string_and_guild_id(guild_id: DbGuildId, name: String) -> Result<Self> {
+        let tmp = Self(guild_id, name);
+        if tmp.validate().await? {
+            Ok(tmp)
+        } else {
+            anyhow::bail!("Currency does not exist.")
+        }
     }
 
     pub fn into_string(self) -> String {
@@ -272,11 +451,6 @@ impl<'a> CurrencyNameRef<'a> {
 
     pub const fn as_str(&self) -> &str {
         self.1
-    }
-
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn validate(&self) -> Result<bool> {
-        todo!()
     }
 
     pub const fn from_str_and_guild_id_unchecked(guild_id: DbGuildId, name: &'a str) -> Self {
@@ -342,10 +516,38 @@ impl DropTableName {
     pub const fn from_string_and_guild_id_unchecked(guild_id: DbGuildId, name: String) -> Self {
         Self(guild_id, name)
     }
+
+    pub fn as_ref(&self) -> DropTableNameRef<'_> {
+        DropTableNameRef(self.0, &self.1)
+    }
+
+    pub fn into_string(self) -> String {
+        self.1
+    }
 }
 
-impl ToString for DropTableName {
-    fn to_string(&self) -> String {
-        self.1.clone()
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct DropTableNameRef<'a>(#[serde(skip)] DbGuildId, &'a str);
+
+impl<'a> DropTableNameRef<'a> {
+    pub const fn db_guild_id(&self) -> DbGuildId {
+        self.0
+    }
+
+    pub const fn as_str(&self) -> &str {
+        self.1
+    }
+
+    #[allow(clippy::missing_const_for_fn)]
+    pub async fn validate(&self) -> Result<bool> {
+        Ok(true)
+    }
+
+    pub const fn from_str_and_guild_id_unchecked(guild_id: DbGuildId, name: &'a str) -> Self {
+        Self(guild_id, name)
+    }
+
+    pub fn to_owned(&self) -> DropTableName {
+        DropTableName(self.0, self.1.to_owned())
     }
 }
