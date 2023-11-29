@@ -1,11 +1,11 @@
-use crate::db::uniques::DbGuildId;
 use crate::db::models::Currency;
+use crate::db::uniques::DbGuildId;
 use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, Result };
 use serenity::{
-    http::{ Http, CacheHttp },
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
+    http::{ CacheHttp, Http },
 };
 
 pub async fn run(

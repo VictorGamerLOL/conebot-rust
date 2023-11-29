@@ -1,10 +1,10 @@
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     model::prelude::Mention,
-    all::{ CommandInteraction, CommandOptionType },
 };
 
-use crate::db::{ models::{ Item, item::ItemTypeUpdateType }, uniques::DropTableName };
+use crate::db::{ models::{ item::ItemTypeUpdateType, Item }, uniques::DropTableName };
 
 pub async fn run(
     options: crate::event_handler::command_handler::CommandOptions,
@@ -32,9 +32,7 @@ pub async fn run(
 
     let mut item__ = item_
         .as_mut()
-        .ok_or_else(|| {
-            anyhow::anyhow!("Item {} is being used in breaking operation", item_name)
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("Item {} is being used in breaking operation", item_name))?;
 
     let mut possible_fut = None;
 
@@ -47,19 +45,21 @@ pub async fn run(
         "tradeable" | "trade" => item__.update_tradeable(value.parse()?, None).await?,
         "currency" | "currency_value" => item__.update_currency_value(value, None).await?,
         "value" => item__.update_value(value.parse()?, None).await?,
-        "type" =>
+        "type" => {
             item__.update_item_type(
                 item__
                     .item_type()
                     .update_auto(ItemTypeUpdateType::Type(value.to_ascii_lowercase().parse()?))?,
                 None
-            ).await?,
-        "message" =>
+            ).await?;
+        }
+        "message" => {
             item__.update_item_type(
                 item__.item_type().update_auto(ItemTypeUpdateType::Message(value))?,
                 None
-            ).await?,
-        "action_type" | "action" =>
+            ).await?;
+        }
+        "action_type" | "action" => {
             item__.update_item_type(
                 item__
                     .item_type()
@@ -67,8 +67,9 @@ pub async fn run(
                         ItemTypeUpdateType::ActionType(value.to_ascii_lowercase().parse()?)
                     )?,
                 None
-            ).await?,
-        "role" | "roleid" =>
+            ).await?;
+        }
+        "role" | "roleid" => {
             item__.update_item_type(
                 item__.item_type().update_auto(
                     ItemTypeUpdateType::RoleId({
@@ -86,8 +87,9 @@ pub async fn run(
                     })
                 )?,
                 None
-            ).await?,
-        "drop_table" | "drop_table_name" =>
+            ).await?;
+        }
+        "drop_table" | "drop_table_name" => {
             item__.update_item_type(
                 item__
                     .item_type()
@@ -97,7 +99,8 @@ pub async fn run(
                         )
                     )?,
                 None
-            ).await?,
+            ).await?;
+        }
         _ => anyhow::bail!("Field {} does not exist.", field_name),
     }
 

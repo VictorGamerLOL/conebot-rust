@@ -1,5 +1,5 @@
-use crate::db::uniques::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 use crate::db::models::{ Balance, Balances, Currency };
+use crate::db::uniques::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
 use lazy_static::lazy_static;

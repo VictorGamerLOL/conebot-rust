@@ -20,7 +20,7 @@ use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 use tracing::instrument;
 
-use self::builder::{ ItemTypeTypeBuilder, ActionTypeItemTypeBuilder };
+use self::builder::{ ActionTypeItemTypeBuilder, ItemTypeTypeBuilder };
 
 /// Represents an item a user can hold in their inventory. May or may not
 /// be worth something or be used in return for something.
@@ -152,7 +152,7 @@ impl ItemType {
     fn update_from_type(&self, type_: ItemTypeTypeBuilder) -> Self {
         match type_ {
             ItemTypeTypeBuilder::Trophy => Self::Trophy,
-            ItemTypeTypeBuilder::Consumable => {
+            ItemTypeTypeBuilder::Consumable =>
                 Self::Consumable {
                     message: if let Self::Consumable { message, .. } = self {
                         message.clone()
@@ -168,14 +168,12 @@ impl ItemType {
                     } else {
                         ItemActionType::None
                     },
-                }
-            }
-            ItemTypeTypeBuilder::InstantConsumable => {
+                },
+            ItemTypeTypeBuilder::InstantConsumable =>
                 Self::InstantConsumable {
                     message: "".to_owned(),
                     action_type: ItemActionType::None,
-                }
-            }
+                },
         }
     }
 
@@ -191,7 +189,11 @@ impl ItemType {
                     message,
                     action_type: action_type.clone(),
                 },
-            _ => Self::Consumable { message, action_type: ItemActionType::None },
+            _ =>
+                Self::Consumable {
+                    message,
+                    action_type: ItemActionType::None,
+                },
         }
     }
 

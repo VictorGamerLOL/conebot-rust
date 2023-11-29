@@ -1,11 +1,10 @@
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
+    builder::{ CreateCommandOption, EditInteractionResponse },
     http::CacheHttp,
     http::Http,
-    model::prelude::{},
-    all::{ CommandInteraction, CommandOptionType },
-    builder::{ EditInteractionResponse, CreateCommandOption },
 };
 
 use crate::{ db::models::Currency, event_handler::command_handler::CommandOptions };

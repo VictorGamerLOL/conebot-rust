@@ -1,15 +1,15 @@
 use anyhow::{ anyhow, bail, Result };
 use core::str::FromStr;
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
+    builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
     model::prelude::{ ChannelId, GuildId, Mention, RoleId },
-    all::{ CommandInteraction, CommandOptionType },
-    builder::{ EditInteractionResponse, CreateCommandOption },
 };
 use tokio::sync::MutexGuard;
 
 use crate::{
-    db::{ uniques::DbGuildId, models::Currency, ArcTokioRwLockOption },
+    db::{ models::Currency, uniques::DbGuildId, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 

@@ -10,7 +10,7 @@
 //! be doing things like changing the user that has that amount of currency or changing the currency.
 //!
 
-use crate::db::uniques::{ DbGuildId, DbUserId, CurrencyNameRef };
+use crate::db::uniques::{ CurrencyNameRef, DbGuildId, DbUserId };
 use crate::db::{ ArcTokioMutexOption, ArcTokioRwLockOption, TokioMutexCache };
 use anyhow::{ anyhow, Result };
 use futures::TryStreamExt;

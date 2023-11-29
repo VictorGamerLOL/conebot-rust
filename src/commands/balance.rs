@@ -1,20 +1,20 @@
 use anyhow::{ anyhow, Result };
 use futures::future::try_join_all;
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType, UserId },
     builder::{
         CreateCommand,
+        CreateCommandOption,
         CreateEmbed,
         CreateEmbedAuthor,
-        CreateCommandOption,
         EditInteractionResponse,
     },
     http::{ CacheHttp, Http },
     model::{ prelude::{ GuildId, Member, PartialMember }, user::User, Colour },
-    all::{ CommandInteraction, CommandOptionType, UserId },
 };
 
 use crate::{
-    db::{ uniques::DbGuildId, models::{ Balance, Balances, Currency }, ArcTokioRwLockOption },
+    db::{ models::{ Balance, Balances, Currency }, uniques::DbGuildId, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
 };
 

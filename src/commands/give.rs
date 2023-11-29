@@ -1,9 +1,9 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType, User, UserId },
+    builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
     model::Permissions,
-    all::{ CommandInteraction, User, UserId, CommandOptionType },
-    builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
 };
 
 use crate::{
@@ -47,7 +47,9 @@ pub async fn run(
 
     amount = truncate_2dp(amount);
 
-    if Currency::try_from_name(command.guild_id.unwrap().into(), currency.clone()).await?.is_none() {
+    if
+        Currency::try_from_name(command.guild_id.unwrap().into(), currency.clone()).await?.is_none()
+    {
         return Err(anyhow!("Currency {} does not exist.", currency));
     }
 

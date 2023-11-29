@@ -1,9 +1,9 @@
 use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    all::{ CommandOptionType, CommandInteraction },
 };
 
 use crate::db::models::Item;

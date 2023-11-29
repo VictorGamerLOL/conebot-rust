@@ -1,11 +1,11 @@
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
-use serenity::all::{ CommandOptionType, CommandInteraction };
+use serenity::all::{ CommandInteraction, CommandOptionType };
 use serenity::builder::EditInteractionResponse;
 use serenity::http::CacheHttp;
-use serenity::{ builder::CreateCommandOption, http::Http, model::{} };
+use serenity::{ builder::CreateCommandOption, http::Http };
 
-use crate::db::{ uniques::DbGuildId, models::currency::builder::Builder };
+use crate::db::{ models::currency::builder::Builder, uniques::DbGuildId };
 use crate::event_handler::command_handler::CommandOptions;
 
 /// Runs the create currency subcommand.

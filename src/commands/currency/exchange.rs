@@ -1,8 +1,8 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    all::{ CommandOptionType, CommandInteraction },
 };
 use tokio::join;
 

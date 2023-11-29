@@ -2,7 +2,7 @@ pub mod currency;
 pub mod item;
 
 use anyhow::{ anyhow, Result };
-use serenity::{ http::{ CacheHttp, Http }, all::CommandInteraction, builder::CreateCommand };
+use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
 
 use crate::event_handler::command_handler::CommandOptions;
 

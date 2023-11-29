@@ -22,7 +22,7 @@
 //! The fact that MongoDB uses BigEndian and the average x86_64 CPU uses LittleEndian
 //! is trivial because the bson serializer and deserializer will handle that for us.
 
-use std::{ str::FromStr, borrow::Borrow };
+use std::{ borrow::Borrow, str::FromStr };
 
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };

@@ -1,15 +1,15 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
-    model::{ prelude::{ Channel, PartialChannel, PartialMember, Role }, user::User },
     all::{
-        CommandOptionType,
+        ChannelId,
         CommandDataOption,
         CommandDataOptionValue,
-        UserId,
+        CommandOptionType,
         RoleId,
-        ChannelId,
+        UserId,
     },
-    http::{ Http, CacheHttp },
+    http::{ CacheHttp, Http },
+    model::{ prelude::{ Channel, PartialChannel, PartialMember, Role }, user::User },
 };
 
 /// If a command expects a number but an integer is given, do not worry

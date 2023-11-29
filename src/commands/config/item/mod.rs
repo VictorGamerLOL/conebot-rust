@@ -1,8 +1,8 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::CreateCommandOption,
     http::{ CacheHttp, Http },
-    all::{ CommandOptionType, CommandInteraction },
 };
 
 pub mod create;

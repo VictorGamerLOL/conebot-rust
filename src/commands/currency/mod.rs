@@ -1,7 +1,7 @@
 pub mod exchange;
 
 use anyhow::{ anyhow, Result };
-use serenity::{ builder::CreateCommand, http::{ CacheHttp, Http }, all::CommandInteraction };
+use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
 
 use crate::event_handler::command_handler::CommandOptions;
 

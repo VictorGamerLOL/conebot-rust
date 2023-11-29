@@ -1,8 +1,8 @@
 use anyhow::Result;
 use serenity::{
-    builder::{ CreateCommand, EditInteractionResponse },
-    http::{ Http, CacheHttp },
     all::CommandInteraction,
+    builder::{ CreateCommand, EditInteractionResponse },
+    http::{ CacheHttp, Http },
 };
 
 use crate::event_handler::command_handler::CommandOptions;

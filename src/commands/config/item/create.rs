@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
     model::prelude::UserId,
     prelude::Context,
-    all::{ CommandInteraction, CommandOptionType },
 };
 
 use crate::{

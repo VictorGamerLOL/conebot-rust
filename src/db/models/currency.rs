@@ -38,8 +38,8 @@ use serenity::model::prelude::RoleId;
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
-use crate::db::uniques::{ self, CurrencyName, CurrencyNameRef };
 use crate::db::models::ToKVs;
+use crate::db::uniques::{ self, CurrencyName, CurrencyNameRef };
 use crate::db::{
     uniques::DbChannelId,
     uniques::DbGuildId,

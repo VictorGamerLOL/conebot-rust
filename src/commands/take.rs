@@ -1,13 +1,13 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType, UserId },
+    builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
     model::{ prelude::GuildId, user::User, Permissions },
-    all::{ UserId, CommandInteraction, CommandOptionType },
-    builder::{ CreateCommand, EditInteractionResponse, CreateCommandOption },
 };
 
 use crate::{
-    db::{ uniques::DbGuildId, models::{ Balances, Currency } },
+    db::{ models::{ Balances, Currency }, uniques::DbGuildId },
     event_handler::command_handler::CommandOptions,
     util::currency::truncate_2dp,
 };

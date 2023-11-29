@@ -5,9 +5,9 @@ use crate::{
 };
 use anyhow::{ anyhow, Result };
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, CreateEmbed, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    all::{ CommandInteraction, CommandOptionType },
 };
 use tokio::sync::MutexGuard;
 
