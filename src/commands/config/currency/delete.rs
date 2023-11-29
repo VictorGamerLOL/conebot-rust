@@ -2,18 +2,16 @@ use crate::db::uniques::DbGuildId;
 use crate::db::models::Currency;
 use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, Result };
-use serenity::builder::CreateApplicationCommandOption;
-use serenity::http::Http;
-use serenity::model::prelude::application_command::{
-    ApplicationCommandInteraction,
-    CommandDataOption,
+use serenity::{
+    http::{ Http, CacheHttp },
+    all::{ CommandInteraction, CommandOptionType },
+    builder::{ CreateCommandOption, EditInteractionResponse },
 };
-use serenity::model::prelude::command::CommandOptionType;
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + Send + Sync + CacheHttp
 ) -> Result<()> {
     let currency_name = options
         .get_string_value("name")
@@ -24,23 +22,31 @@ pub async fn run(
         currency_name
     ).await?.ok_or_else(|| anyhow!("Currency not found"))?;
     Currency::delete_currency(currency).await?;
-    command.edit_original_interaction_response(http, |response|
-        response.content("Currency deleted.")
-    ).await?;
+    command.edit_response(http, EditInteractionResponse::new().content("Currency deleted.")).await?;
     Ok(())
 }
 
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("delete")
-        .description("Delete a currency.")
-        .kind(CommandOptionType::SubCommand)
-        .create_sub_option(|o| {
-            o.name("name")
-                .description("The name of the currency to delete.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "delete",
+        "Delete a currency."
+    ).add_sub_option(
+        CreateCommandOption::new(
+            CommandOptionType::String,
+            "name",
+            "The name of the currency to delete."
+        ).required(true)
+    )
+    // option
+    //     .name("delete")
+    //     .description("Delete a currency.")
+    //     .kind(CommandOptionType::SubCommand)
+    //     .create_sub_option(|o| {
+    //         o.name("name")
+    //             .description("The name of the currency to delete.")
+    //             .kind(CommandOptionType::String)
+    //             .required(true)
+    //     });
+    // option
 }

@@ -2,15 +2,11 @@ use std::time::Duration;
 
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
-    builder::CreateApplicationCommandOption,
-    collector::CollectReply,
+    builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    model::prelude::{
-        application_command::ApplicationCommandInteraction,
-        command::CommandOptionType,
-        UserId,
-    },
+    model::prelude::UserId,
     prelude::Context,
+    all::{ CommandInteraction, CommandOptionType },
 };
 
 use crate::{
@@ -23,7 +19,7 @@ use crate::{
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
     let command_author = command.user.id;
@@ -66,7 +62,7 @@ pub async fn run(
         let action_type = ActionTypeItemTypeBuilder::from_string(s)?;
         item_type_builder.action_type(Some(action_type));
     }
-    item_type_builder.role(role.map(|r| r.id.into())).drop_table_name(drop_table);
+    item_type_builder.role(role.map(|r| r.into())).drop_table_name(drop_table);
 
     let item_type = item_type_builder.build()?;
 
@@ -76,9 +72,7 @@ pub async fn run(
 
     item_builder.build().await?;
 
-    command.edit_original_interaction_response(&http, |response| {
-        response.content(format!("Item `{}` of type `{}` created.", name, item_type_string))
-    }).await?;
+    command.edit_response(http, EditInteractionResponse::new().content("Item created.")).await?;
 
     Ok(())
 }
@@ -96,100 +90,89 @@ const ACTION_TYPE_OPTION_NAME: &str = "action_type";
 const ROLE_OPTION_NAME: &str = "role";
 const DROP_TABLE_OPTION_NAME: &str = "drop_table";
 
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("create")
-        .kind(CommandOptionType::SubCommand)
-        .description("Create a new item.")
-        .create_sub_option(|option| {
-            option
-                .name(NAME_OPTION_NAME)
-                .description("The name of the item, cannot be blank.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(DESCRIPTION_OPTION_NAME)
-                .description("The description of the item.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(SELLABLE_OPTION_NAME)
-                .description("Whether the item can be sold for the currency it corresponds to.")
-                .kind(CommandOptionType::Boolean)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(TRADEABLE_OPTION_NAME)
-                .description("Whether the item can be traded between users.")
-                .kind(CommandOptionType::Boolean)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(CURRENCY_OPTION_NAME)
-                .description("The currency the item corresponds to.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(VALUE_OPTION_NAME)
-                .description("The value of the item in terms of the currency it corresponds to.")
-                .kind(CommandOptionType::Number)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(TYPE_OPTION_NAME)
-                .description("How the item behaves.")
-                .kind(CommandOptionType::String)
-                .required(false)
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::SubCommand, "create", "Create a new item.")
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                NAME_OPTION_NAME,
+                "The name of the item, cannot be blank."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                DESCRIPTION_OPTION_NAME,
+                "The description of the item."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                SELLABLE_OPTION_NAME,
+                "Whether the item can be sold for the currency it corresponds to."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                TRADEABLE_OPTION_NAME,
+                "Whether the item can be traded between users."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                CURRENCY_OPTION_NAME,
+                "The currency the item corresponds to."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                VALUE_OPTION_NAME,
+                "The value of the item in terms of the currency it corresponds to."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                TYPE_OPTION_NAME,
+                "How the item behaves."
+            )
                 .add_string_choice("Trophy", "Trophy")
                 .add_string_choice("Consumable", "Consumable")
                 .add_string_choice("InstantConsumable", "InstantConsumable")
-        })
-        .create_sub_option(|option| {
-            option
-                .name(MESSAGE_OPTION_NAME)
-                .description("The message to send when the item is used. Ignored when trophy.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(ACTION_TYPE_OPTION_NAME)
-                .description(
-                    "The type of action to perform when the item is used. Ignored when trophy."
-                )
-                .kind(CommandOptionType::String)
-                .required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                MESSAGE_OPTION_NAME,
+                "The message to send when the item is used. Ignored when trophy."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                ACTION_TYPE_OPTION_NAME,
+                "The type of action to perform when the item is used. Ignored when trophy."
+            )
                 .add_string_choice("None", "None")
                 .add_string_choice("Role", "Role")
                 .add_string_choice("Lootbox", "Lootbox")
-        })
-        .create_sub_option(|option| {
-            option
-                .name(ROLE_OPTION_NAME)
-                .description(
-                    "The role to give when the item is used. Ignored when trophy or action_type is None or Lootbox."
-                )
-                .kind(CommandOptionType::Role)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(DROP_TABLE_OPTION_NAME)
-                .description(
-                    "The drop table to use when the item is used. Ignored when trophy or action_type is None or Role."
-                )
-                .kind(CommandOptionType::String)
-                .required(false)
-        });
-    option
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Role,
+                ROLE_OPTION_NAME,
+                "The role to give when the item is used. Ignored when trophy or action_type is None or Lootbox."
+            )
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                DROP_TABLE_OPTION_NAME,
+                "The drop table to use when the item is used. Ignored when trophy or action_type is None or Role."
+            )
+        )
 }

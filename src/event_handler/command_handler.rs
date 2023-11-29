@@ -1,15 +1,15 @@
 use anyhow::{ anyhow, Result };
-use serenity::model::prelude::application_command::ApplicationCommandInteraction;
-use serenity::model::{
-    prelude::{
-        application_command::{ CommandDataOption, CommandDataOptionValue },
-        command::CommandOptionType,
-        Channel,
-        PartialChannel,
-        PartialMember,
-        Role,
+use serenity::{
+    model::{ prelude::{ Channel, PartialChannel, PartialMember, Role }, user::User },
+    all::{
+        CommandOptionType,
+        CommandDataOption,
+        CommandDataOptionValue,
+        UserId,
+        RoleId,
+        ChannelId,
     },
-    user::User,
+    http::{ Http, CacheHttp },
 };
 
 /// If a command expects a number but an integer is given, do not worry
@@ -55,11 +55,9 @@ pub struct Opt {
     name: String,
     /// The kind of option which should match the one defined by the command.
     kind: CommandOptionType,
-    /// If the option happens to be a subcommand or a subcommand group, this will contain the options of said
-    /// subcommand or subcommand group.
-    options: Vec<CommandDataOption>,
     /// If the option is not a subcommand or subcommand group this will contain the resolved value of the option.
-    value: Option<CommandDataOptionValue>,
+    /// Otherwise it contains the options of the subcommand or subcommand group.
+    value: CommandDataOptionValue,
 }
 
 impl CommandOptions {
@@ -71,10 +69,12 @@ impl CommandOptions {
     /// - If the option does not exist.
     /// - If the option is optional and there is no value.
     pub fn get_value_by_name(&self, name: &str) -> Option<CommandDataOptionValue> {
-        self.args
-            .iter()
-            .find(|arg| arg.name == name)?
-            .value.clone()
+        Some(
+            self.args
+                .iter()
+                .find(|arg| arg.name == name)?
+                .value.clone()
+        )
     }
 
     /// Given the name of the parameter, returns the value of the argument
@@ -134,10 +134,10 @@ impl CommandOptions {
     /// - If the option specified is not a user with `Some(Err)`.
     /// - If the option does not exist with `None`.
     /// - If the option is optional and there is no value with `None`.
-    pub fn get_user_value(&self, name: &str) -> Option<Result<(User, Option<PartialMember>)>> {
+    pub fn get_user_value(&self, name: &str) -> Option<Result<UserId>> {
         let t = self.get_value_by_name(name)?;
-        if let CommandDataOptionValue::User(u, m) = t {
-            Some(Ok((u, m)))
+        if let CommandDataOptionValue::User(u) = t {
+            Some(Ok(u))
         } else {
             Some(Err(anyhow!("Option {} is not a user.", name)))
         }
@@ -150,7 +150,7 @@ impl CommandOptions {
     /// - If the option specified is not a role with `Some(Err)`.
     /// - If the option does not exist with `None`.
     /// - If the option is optional and there is no value with `None`.
-    pub fn get_role_value(&self, name: &str) -> Option<Result<Role>> {
+    pub fn get_role_value(&self, name: &str) -> Option<Result<RoleId>> {
         let t = self.get_value_by_name(name)?;
         if let CommandDataOptionValue::Role(r) = t {
             Some(Ok(r))
@@ -166,7 +166,7 @@ impl CommandOptions {
     /// - If the option specified is not a channel with `Some(Err)`.
     /// - If the option does not exist with `None`.
     /// - If the option is optional and there is no value with `None`.
-    pub fn get_channel_value(&self, name: &str) -> Option<Result<PartialChannel>> {
+    pub fn get_channel_value(&self, name: &str) -> Option<Result<ChannelId>> {
         let t = self.get_value_by_name(name)?;
         if let CommandDataOptionValue::Channel(c) = t {
             Some(Ok(c))
@@ -191,7 +191,36 @@ impl CommandOptions {
         {
             return None;
         }
-        Some((first_option.name, first_option.options.into()))
+        Some((
+            first_option.name,
+            match first_option.value {
+                CommandDataOptionValue::SubCommandGroup(group) =>
+                    Self {
+                        args: group
+                            .into_iter()
+                            .map(|arg| Opt {
+                                kind: arg.kind(),
+                                name: arg.name,
+                                value: arg.value,
+                            })
+                            .collect(),
+                    },
+                CommandDataOptionValue::SubCommand(subcommand) =>
+                    Self {
+                        args: subcommand
+                            .into_iter()
+                            .map(|arg| Opt {
+                                kind: arg.kind(),
+                                name: arg.name,
+                                value: arg.value,
+                            })
+                            .collect(),
+                    },
+                _ => {
+                    return None;
+                }
+            },
+        ))
     }
 }
 
@@ -200,10 +229,9 @@ impl From<Vec<CommandDataOption>> for CommandOptions {
         let cmd_args = args
             .into_iter()
             .map(|arg| Opt {
+                kind: arg.kind(),
                 name: arg.name,
-                kind: arg.kind,
-                options: arg.options,
-                value: arg.resolved,
+                value: arg.value,
             })
             .collect::<Vec<_>>();
         Self { args: cmd_args }

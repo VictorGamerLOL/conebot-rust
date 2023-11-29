@@ -1,14 +1,14 @@
 use serenity::{
-    builder::CreateApplicationCommandOption,
-    model::application::command::CommandOptionType,
+    builder::{ CreateCommandOption, EditInteractionResponse },
     model::prelude::Mention,
+    all::{ CommandInteraction, CommandOptionType },
 };
 
 use crate::db::{ models::{ Item, item::ItemTypeUpdateType }, uniques::DropTableName };
 
 pub async fn run(
     options: crate::event_handler::command_handler::CommandOptions,
-    command: &serenity::model::application::interaction::application_command::ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<serenity::http::Http> + serenity::http::CacheHttp + Clone + Send + Sync
 ) -> anyhow::Result<()> {
     let guild_id = command.guild_id.ok_or_else(||
@@ -105,10 +105,10 @@ pub async fn run(
     if let Some(fut) = possible_fut {
         fut.await?;
     }
-
-    command.edit_original_interaction_response(&http, |m| {
-        m.content(format!("Edited item {}.", item_name))
-    }).await?;
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().content(format!("Edited item {}.", item_name))
+    ).await?;
     Ok(())
 }
 
@@ -116,32 +116,27 @@ pub const NAME_OPTION_NAME: &str = "name";
 pub const FIELD_OPTION_NAME: &str = "field";
 pub const VALUE_OPTION_NAME: &str = "value";
 
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("edit")
-        .description("Edit an item.")
-        .kind(CommandOptionType::SubCommand)
-        .create_sub_option(|option| {
-            option
-                .name(NAME_OPTION_NAME)
-                .description("The name of the item to edit.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(FIELD_OPTION_NAME)
-                .description("The field of the item to edit.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        })
-        .create_sub_option(|option| {
-            option
-                .name(VALUE_OPTION_NAME)
-                .description("The value to set the field to.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::SubCommand, "edit", "Edit an item.")
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                NAME_OPTION_NAME,
+                "The name of the item to edit."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                FIELD_OPTION_NAME,
+                "The field of the item to edit."
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                VALUE_OPTION_NAME,
+                "The value to set the field to."
+            ).required(false)
+        )
 }

@@ -1,23 +1,16 @@
 use anyhow::{ anyhow, Result };
 use futures::future::try_join_all;
 use serenity::{
-    builder::{ CreateApplicationCommand, CreateEmbed, CreateEmbedAuthor },
-    http::{ CacheHttp, Http },
-    model::{
-        prelude::{
-            application_command::{
-                ApplicationCommandInteraction,
-                CommandDataOption,
-                CommandDataOptionValue,
-            },
-            command::CommandOptionType,
-            GuildId,
-            Member,
-            PartialMember,
-        },
-        user::User,
+    builder::{
+        CreateCommand,
+        CreateEmbed,
+        CreateEmbedAuthor,
+        CreateCommandOption,
+        EditInteractionResponse,
     },
-    utils::Colour,
+    http::{ CacheHttp, Http },
+    model::{ prelude::{ GuildId, Member, PartialMember }, user::User, Colour },
+    all::{ CommandInteraction, CommandOptionType, UserId },
 };
 
 use crate::{
@@ -33,7 +26,7 @@ use crate::{
 #[allow(clippy::unused_async)]
 pub async fn run<'a>(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl CacheHttp + AsRef<Http> + Clone
 ) -> Result<()> {
     let guild_id: DbGuildId = command.guild_id
@@ -44,10 +37,13 @@ pub async fn run<'a>(
     let possible_user = opts.user.as_ref();
 
     let (tmp_user, member) = if let Some(u) = possible_user {
-        (&u.0, &u.1)
+        (&u.0, u.1.as_ref())
     } else {
         let user = &command.user;
-        let member = command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?;
+        let member = command.member
+            .as_ref()
+            .ok_or_else(|| anyhow!("DMs not allowed"))?
+            .as_ref();
         (user, member)
     };
 
@@ -61,8 +57,9 @@ pub async fn run<'a>(
         multi_currency(balances, guild_id.into(), user, command).await?
     };
 
-    command.edit_original_interaction_response(http, |m|
-        m.add_embed(embed).content("\u{200b}")
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().add_embed(embed).content("\u{200b}")
     ).await?;
     Ok(())
 }
@@ -71,7 +68,7 @@ async fn multi_currency<'a>(
     balances: std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
     guild_id: GuildId,
     user: (&User, &Member),
-    command: &'a ApplicationCommandInteraction
+    command: &'a CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
     let mut balances = balances.lock().await;
     let mut balances_ = balances
@@ -94,7 +91,7 @@ async fn single_currency<'a>(
     balances: &'a std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
     guild_id: GuildId,
     user: (&User, &Member),
-    command: &ApplicationCommandInteraction
+    command: &CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
     let mut currency = c.read().await;
     let currency_ = currency
@@ -134,22 +131,20 @@ fn single_currency_embed<'a>(
     target: &'a Member,
     executor: &'a Member
 ) -> CreateEmbed {
-    let mut embed = CreateEmbed::default();
-    let mut author = CreateEmbedAuthor::default();
-    author.name(executor.display_name()).icon_url(executor.face());
-    embed.title(
-        format!(
-            "{}'s balance for {}{}",
-            target.display_name(),
-            currency.symbol(),
-            currency.curr_name().as_str()
+    let mut author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
+    CreateEmbed::default()
+        .title(
+            format!(
+                "{}'s balance for {}{}",
+                target.display_name(),
+                currency.symbol(),
+                currency.curr_name().as_str()
+            )
         )
-    );
-    embed.description(format!("{}{}", currency.symbol(), balance.amount()));
-    embed.colour(Colour::DARK_GREEN);
-    embed.image(target.face());
-    embed.timestamp(chrono::Utc::now());
-    embed
+        .description(format!("{}{}", currency.symbol(), balance.amount()))
+        .colour(Colour::DARK_GREEN)
+        .image(target.face())
+        .timestamp(chrono::Utc::now())
 }
 
 #[allow(clippy::unused_async)]
@@ -188,18 +183,19 @@ async fn multi_currency_embed(
         drop(currency);
     }
     let mut embed = CreateEmbed::default();
-    let mut author = CreateEmbedAuthor::default();
-    author.name(executor.display_name()).icon_url(executor.face());
-    embed.title(format!("{}'s balances", target.display_name()));
-    embed.description(format!("{}'s balances for all currencies", target.display_name()));
-    embed.colour(Colour::DARK_GREEN);
-    embed.image(target.face());
-    embed.fields(field_data);
-    Ok(embed)
+    let mut author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
+    Ok(
+        CreateEmbed::default()
+            .title(format!("{}'s balances", target.display_name()))
+            .description(format!("{}'s balances for all currencies", target.display_name()))
+            .colour(Colour::DARK_GREEN)
+            .image(target.face())
+            .fields(field_data)
+    )
 }
 
 struct Options {
-    user: Option<(User, Member)>,
+    user: Option<(User, Box<Member>)>,
     currency: Option<ArcTokioRwLockOption<Currency>>,
 }
 
@@ -212,15 +208,7 @@ async fn parse_options<'a>(
     // return if the result is Err, then map the Option<(User, Option<PartialMember>)> to Option<Result<(User, PartialMember)>>
     // then also change that to Result<Option<(User, PartialMember)>>, then return if the result is Err to finally get
     // Option<(User, PartialMember)>. Easy enough.
-    let mut user: Option<(User, PartialMember)> = options
-        .get_user_value("user")
-        .transpose()?
-        .map(
-            |(u, m)| -> Result<(User, PartialMember)> {
-                Ok((u, m.ok_or_else(|| anyhow!("DMs not allowed"))?))
-            }
-        )
-        .transpose()?;
+    let mut user: Option<UserId> = options.get_user_value("user").transpose()?;
     let mut currency: Option<String> = options.get_string_value("currency").transpose()?;
 
     let currency: Option<ArcTokioRwLockOption<Currency>> = if let Some(currency) = currency {
@@ -229,34 +217,32 @@ async fn parse_options<'a>(
         None
     };
 
-    let user: Option<(User, Member)> = if let Some((u, m)) = user {
+    let user: Option<(User, Box<Member>)> = if let Some(u) = user {
         let guild_id: GuildId = guild_id.into();
-        let member = guild_id.member(&http, u.id).await?;
-        Some((u, member))
+        let member = guild_id.member(&http, u).await?;
+        Some((u.to_user(http).await?, Box::new(member)))
     } else {
         None
     };
     Ok(Options { user, currency })
 }
 
-#[must_use]
-pub fn application_command() -> CreateApplicationCommand {
-    let mut command = CreateApplicationCommand::default();
-    command
-        .name("balance")
-        .description("Check your balance or someone else's for one currency or one of them.")
+pub fn application_command() -> CreateCommand {
+    CreateCommand::new("balance")
+        .description("Check your balance or someone else's for one currency or all of them.")
         .dm_permission(false)
-        .create_option(|o| {
-            o.name("user")
-                .description("The user to check the balance of.")
-                .kind(CommandOptionType::User)
-                .required(false)
-        })
-        .create_option(|o| {
-            o.name("currency")
-                .description("The currency to check the balance of.")
-                .kind(CommandOptionType::String)
-                .required(false)
-        });
-    command
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::User,
+                "user",
+                "The user to check the balance of."
+            ).required(false)
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "currency",
+                "The currency to check the balance of."
+            ).required(false)
+        )
 }

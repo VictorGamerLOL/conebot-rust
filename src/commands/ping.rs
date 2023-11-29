@@ -1,11 +1,8 @@
 use anyhow::Result;
 use serenity::{
-    builder::CreateApplicationCommand,
-    http::Http,
-    model::prelude::interaction::application_command::{
-        ApplicationCommandInteraction,
-        CommandDataOption,
-    },
+    builder::{ CreateCommand, EditInteractionResponse },
+    http::{ Http, CacheHttp },
+    all::CommandInteraction,
 };
 
 use crate::event_handler::command_handler::CommandOptions;
@@ -14,18 +11,16 @@ use crate::event_handler::command_handler::CommandOptions;
 /// Serenity stuff.
 pub async fn run(
     _options: CommandOptions,
-    command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + Send + Sync + CacheHttp
 ) -> Result<()> {
-    let future = command.edit_original_interaction_response(&http, |msg|
-        msg.content("Pong!")
+    let future = command.edit_response(
+        &http,
+        EditInteractionResponse::new().content("pong!")
     ).await?;
     Ok(())
 }
 
-#[must_use]
-pub fn application_command() -> CreateApplicationCommand {
-    let mut command = CreateApplicationCommand::default();
-    command.name("ping").description("Pong!");
-    command
+pub fn application_command() -> CreateCommand {
+    CreateCommand::new("ping").description("Pong!")
 }

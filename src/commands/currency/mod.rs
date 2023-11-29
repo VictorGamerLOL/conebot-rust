@@ -1,11 +1,7 @@
 pub mod exchange;
 
 use anyhow::{ anyhow, Result };
-use serenity::{
-    builder::CreateApplicationCommand,
-    http::{ CacheHttp, Http },
-    model::prelude::application_command::{ ApplicationCommandInteraction, CommandDataOption },
-};
+use serenity::{ builder::CreateCommand, http::{ CacheHttp, Http }, all::CommandInteraction };
 
 use crate::event_handler::command_handler::CommandOptions;
 
@@ -13,7 +9,7 @@ use crate::event_handler::command_handler::CommandOptions;
 /// Serenity stuff.
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + Send + Sync + Clone + CacheHttp
 ) -> Result<()> {
     let (cmd_name, options) = options
@@ -28,13 +24,9 @@ pub async fn run(
     Ok(())
 }
 
-#[must_use]
-pub fn application_command() -> CreateApplicationCommand {
-    let mut command = CreateApplicationCommand::default();
-    command
-        .name("currency")
+pub fn application_command() -> CreateCommand {
+    CreateCommand::new("currency")
         .description("Commands related to managing currencies.")
         .dm_permission(false)
-        .add_option(exchange::option());
-    command
+        .add_option(exchange::option())
 }

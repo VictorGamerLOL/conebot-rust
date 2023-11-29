@@ -1,20 +1,18 @@
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
 use serenity::{
-    builder::CreateApplicationCommandOption,
     http::CacheHttp,
     http::Http,
-    model::prelude::{
-        application_command::ApplicationCommandInteraction,
-        command::CommandOptionType,
-    },
+    model::prelude::{},
+    all::{ CommandInteraction, CommandOptionType },
+    builder::{ EditInteractionResponse, CreateCommandOption },
 };
 
 use crate::{ db::models::Currency, event_handler::command_handler::CommandOptions };
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + Sync + Send + Clone + CacheHttp
 ) -> Result<()> {
     let currency_name = options
@@ -89,9 +87,12 @@ pub async fn run(
     if let Some(fut) = possible_fut {
         fut.await?;
     }
-    command.edit_original_interaction_response(http, |m| {
-        m.content(format!("{}'s {} field has been updated to {}", currency_name, field_name, value))
-    }).await?;
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().content(
+            format!("{}'s {} field has been updated to {}", currency_name, field_name, value)
+        )
+    ).await?;
 
     Ok(())
 }
@@ -100,30 +101,31 @@ const CURRENCY_OPTION_NAME: &str = "currency";
 const FIELD_OPTION_NAME: &str = "field";
 const VALUE_OPTION_NAME: &str = "value";
 
-#[must_use]
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("edit")
-        .description("Edit a currency's configuration given a field name.")
-        .kind(CommandOptionType::SubCommand)
-        .create_sub_option(|o| {
-            o.name(CURRENCY_OPTION_NAME)
-                .description("The currency to edit.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(FIELD_OPTION_NAME)
-                .description("The field to edit.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(VALUE_OPTION_NAME)
-                .description("The value to set the field to.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "edit",
+        "Edit a currency's configuration given a field name."
+    )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                CURRENCY_OPTION_NAME,
+                "The currency to edit."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                FIELD_OPTION_NAME,
+                "The field to edit."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                VALUE_OPTION_NAME,
+                "The value to set the field to."
+            ).required(true)
+        )
 }

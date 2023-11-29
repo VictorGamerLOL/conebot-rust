@@ -1,14 +1,9 @@
 use anyhow::{ anyhow, Result };
 use chrono::Duration;
-use serenity::model::prelude::application_command::CommandDataOptionValue;
-use serenity::{
-    builder::CreateApplicationCommandOption,
-    http::Http,
-    model::{
-        prelude::interaction::application_command::ApplicationCommandInteraction,
-        prelude::{ application_command::CommandDataOption, command::CommandOptionType },
-    },
-};
+use serenity::all::{ CommandOptionType, CommandInteraction };
+use serenity::builder::EditInteractionResponse;
+use serenity::http::CacheHttp;
+use serenity::{ builder::CreateCommandOption, http::Http, model::{} };
 
 use crate::db::{ uniques::DbGuildId, models::currency::builder::Builder };
 use crate::event_handler::command_handler::CommandOptions;
@@ -30,8 +25,8 @@ use crate::event_handler::command_handler::CommandOptions;
 #[allow(clippy::too_many_lines)] // Can't be asked.
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
-    http: impl AsRef<Http> + Send + Sync
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + Send + Sync + CacheHttp
 ) -> Result<()> {
     let mut currency_builder: Builder = Builder::new(
         DbGuildId::from(command.guild_id.unwrap()), // This is safe because this command is guild only
@@ -79,95 +74,100 @@ pub async fn run(
             .map(|n| Duration::seconds(n.cast_to_i64()))
     );
     currency_builder.build().await?;
-    command.edit_original_interaction_response(http, |m| {
-        m.content(format!("Made currency {symbol}{name}"))
-    }).await?;
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().content(
+            format!("Made currency {symbol}{name}", symbol = symbol, name = name)
+        )
+    ).await?;
     Ok(())
 }
 // There might be a more efficient and compact way to do this but I cannot think of it right now.
 
-#[must_use]
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("create")
-        .kind(CommandOptionType::SubCommand)
-        .description("Create a new currency.")
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::String)
-                .name("name")
-                .description("The name of the new currency.")
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::String)
-                .name("symbol")
-                .description("The symbol this currency will have")
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("visible")
-                .description("If the currency is visible to non-staff")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("base")
-                .description("If this will be the new base currency")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Number)
-                .name("base_value")
-                .description("Value of currency in terms of the base one")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("pay")
-                .description("If members can pay each other this")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("earn_by_chat")
-                .description("If members can earn this by chatting")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("channels_is_whitelist")
-                .description(
-                    "If channel restrictions are in whitelist mode (true) or blacklist mode (false)"
-                )
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Boolean)
-                .name("roles_is_whitelist")
-                .description(
-                    "If role restrictions are in whitelist mode (true) or blacklist mode (false)"
-                )
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Number)
-                .name("earn_min")
-                .description("Minimum amount of currency earned per message")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Number)
-                .name("earn_max")
-                .description("Maximum amount of currency earned per message")
-                .required(false)
-        })
-        .create_sub_option(|o| {
-            o.kind(CommandOptionType::Integer)
-                .name("earn_timeout")
-                .description("Cooldown in seconds between earning currency")
-                .required(false)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::SubCommand, "create", "Create a new currency")
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "name",
+                "The name of the new currency"
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "symbol",
+                "The symbol this currency will have"
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "visible",
+                "If the currency is visible to non-staff"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "base",
+                "If this will be the new base currency"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                "base_value",
+                "Value of currency in terms of the base one"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "pay",
+                "If members can pay each other this"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "earn_by_chat",
+                "If members can earn this by chatting"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "channels_is_whitelist",
+                "If channel restrictions are in whitelist mode (true) or blacklist mode (false)"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "roles_is_whitelist",
+                "If role restrictions are in whitelist mode (true) or blacklist mode (false)"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                "earn_min",
+                "Minimum amount of currency earned per message"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                "earn_max",
+                "Maximum amount of currency earned per message"
+            ).required(false)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "earn_timeout",
+                "Cooldown in seconds between earning currency"
+            ).required(false)
+        )
 }

@@ -1,16 +1,9 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
-    builder::CreateApplicationCommand,
     http::{ CacheHttp, Http },
-    model::{
-        prelude::{
-            application_command::{ ApplicationCommandInteraction, CommandDataOption },
-            command::CommandOptionType,
-            GuildId,
-        },
-        user::User,
-        Permissions,
-    },
+    model::{ prelude::GuildId, user::User, Permissions },
+    all::{ UserId, CommandInteraction, CommandOptionType },
+    builder::{ CreateCommand, EditInteractionResponse, CreateCommandOption },
 };
 
 use crate::{
@@ -21,7 +14,7 @@ use crate::{
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + Clone + CacheHttp
 ) -> Result<()> {
     let amount = truncate_2dp(
@@ -35,7 +28,8 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Failed to find currency"))??;
     let member: User = options
         .get_user_value("member")
-        .ok_or_else(|| anyhow!("Failed to find member"))??.0;
+        .ok_or_else(|| anyhow!("Failed to find member option."))??
+        .to_user(&http).await?;
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command may not be performed in DMs"))?;
 
     if Currency::try_from_name(guild_id.into(), currency.clone()).await?.is_none() {
@@ -43,7 +37,7 @@ pub async fn run(
     }
 
     if guild_id.member(&http, member.id).await.is_err() {
-        return Err(anyhow!("Member {} is not in guild {}", member.id, guild_id));
+        return Err(anyhow!("Member {} is not in guild {}", member, guild_id));
     }
 
     let mut balances = Balances::try_from_user(guild_id.into(), member.id.into()).await?;
@@ -80,38 +74,40 @@ pub async fn run(
 
     drop(balances);
 
-    command.edit_original_interaction_response(http, |m| {
-        m.content(format!("{} has been taken from {} of {}.", member.name, amount, currency))
-    }).await?;
+    command.edit_response(
+        &http,
+        EditInteractionResponse::new().content(
+            format!("{} has been taken from {} of {}", member.name, amount, currency)
+        )
+    ).await?;
     Ok(())
 }
 
-#[must_use]
-pub fn application_command() -> CreateApplicationCommand {
+pub fn application_command() -> CreateCommand {
     let perms = Permissions::MANAGE_GUILD;
-    let mut command = CreateApplicationCommand::default();
-    command
-        .name("take")
+    CreateCommand::new("take")
         .description("Take away from a user a specified amount of a currency.")
         .dm_permission(false)
         .default_member_permissions(perms)
-        .create_option(|o| {
-            o.name("currency")
-                .description("The currency to take.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_option(|o| {
-            o.name("amount")
-                .description("The amount to take.")
-                .kind(CommandOptionType::Number)
-                .required(true)
-        })
-        .create_option(|o| {
-            o.name("member")
-                .description("The member to take the currency away from.")
-                .kind(CommandOptionType::User)
-                .required(true)
-        });
-    command
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "currency",
+                "The currency to take."
+            ).required(true)
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                "amount",
+                "The amount to take."
+            ).required(true)
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::User,
+                "member",
+                "The member to take the currency away from."
+            ).required(true)
+        )
 }

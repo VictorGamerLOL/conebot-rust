@@ -1,16 +1,10 @@
 use anyhow::{ anyhow, bail, Result };
 use core::str::FromStr;
 use serenity::{
-    builder::CreateApplicationCommandOption,
     http::{ CacheHttp, Http },
-    model::prelude::{
-        application_command::ApplicationCommandInteraction,
-        command::CommandOptionType,
-        ChannelId,
-        GuildId,
-        Mention,
-        RoleId,
-    },
+    model::prelude::{ ChannelId, GuildId, Mention, RoleId },
+    all::{ CommandInteraction, CommandOptionType },
+    builder::{ EditInteractionResponse, CreateCommandOption },
 };
 use tokio::sync::MutexGuard;
 
@@ -21,7 +15,7 @@ use crate::{
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
     let currency_name = options
@@ -54,9 +48,10 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Currency is being used in breaking operation."))?;
     if operation.as_str() == "clear" {
         clear(currency_, &field_name).await?;
-        command.edit_original_interaction_response(&http, |m| {
-            m.content(format!("Cleared {}", field_name))
-        }).await?;
+        command.edit_response(
+            &http,
+            EditInteractionResponse::new().content(format!("Cleared {}", field_name))
+        ).await?;
         return Ok(());
     }
     let mut value = Mention::from_str(&value)?;
@@ -66,9 +61,12 @@ pub async fn run(
         _ => bail!("Invalid operation."),
     }
     drop(currency);
-    command.edit_original_interaction_response(&http, |m| {
-        m.content(format!("{}ed {} from/to {}", operation, value, field_name))
-    }).await?;
+    command.edit_response(
+        &http,
+        EditInteractionResponse::new().content(
+            format!("{}ed {} from/to {}", operation, value, field_name)
+        )
+    ).await?;
     Ok(())
 }
 
@@ -162,39 +160,42 @@ const FIELD_OPTION_NAME: &str = "field";
 const OPERATION_OPTION_NAME: &str = "operation";
 const VALUE_OPTION_NAME: &str = "value";
 
-#[must_use]
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("edit_list")
-        .description("Edit a configuration field that is a field of a list.")
-        .kind(CommandOptionType::SubCommand)
-        .create_sub_option(|o| {
-            o.name(CURRENCY_OPTION_NAME)
-                .description("The currency to edit.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(FIELD_OPTION_NAME)
-                .description("The list field to edit.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(OPERATION_OPTION_NAME)
-                .description("The operation to perform on the list.")
-                .kind(CommandOptionType::String)
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "edit_list",
+        "Edit a configuration field that is a field of a list."
+    )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                CURRENCY_OPTION_NAME,
+                "The currency to edit."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                FIELD_OPTION_NAME,
+                "The list field to edit."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                OPERATION_OPTION_NAME,
+                "The operation to perform on the list."
+            )
                 .required(true)
                 .add_string_choice("add", "add")
                 .add_string_choice("remove", "remove")
                 .add_string_choice("clear", "clear")
-        })
-        .create_sub_option(|o| {
-            o.name(VALUE_OPTION_NAME)
-                .description("The value to add/remove to the list. Type whatever if clearing.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        });
-    option
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                VALUE_OPTION_NAME,
+                "The value to add/remove to the list. Type whatever if clearing."
+            ).required(true)
+        )
 }

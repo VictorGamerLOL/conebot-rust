@@ -1,20 +1,17 @@
 use crate::event_handler::command_handler::CommandOptions;
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
-    builder::CreateApplicationCommandOption,
+    builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    model::application::{
-        command::CommandOptionType,
-        interaction::application_command::ApplicationCommandInteraction,
-    },
+    all::{ CommandOptionType, CommandInteraction },
 };
 
 use crate::db::models::Item;
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
-    _http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
     let item_name = options
         .get_string_value(NAME_OPTION_NAME)
@@ -26,26 +23,22 @@ pub async fn run(
     ).await?;
 
     Item::delete_item(item).await?;
-    command.edit_original_interaction_response(_http, |response|
-        response.content("Item deleted.")
-    ).await?;
+    command.edit_response(http, EditInteractionResponse::new().content("Item deleted.")).await?;
     Ok(())
 }
 
 const NAME_OPTION_NAME: &str = "name";
 
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("delete")
-        .kind(CommandOptionType::SubCommand)
-        .description("Delete an item.")
-        .create_sub_option(|option| {
-            option
-                .name(NAME_OPTION_NAME)
-                .description("The name of the item to delete.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "delete",
+        "Delete an item."
+    ).add_sub_option(
+        CreateCommandOption::new(
+            CommandOptionType::String,
+            NAME_OPTION_NAME,
+            "The name of the item to delete."
+        ).required(true)
+    )
 }

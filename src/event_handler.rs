@@ -4,14 +4,15 @@ mod message;
 use crate::commands;
 use anyhow::anyhow;
 use anyhow::Result;
-use serenity::model::prelude::application_command::ApplicationCommandInteraction;
+use serenity::all::Command;
+use serenity::all::CommandInteraction;
+use serenity::all::Interaction;
+use serenity::builder::CreateInteractionResponseMessage;
+use serenity::builder::EditInteractionResponse;
 // What the heck Rust?
 use crate::event_handler::message::message;
 use serenity::async_trait;
 use serenity::client::EventHandler;
-use serenity::model::application::command::Command;
-use serenity::model::application::interaction::Interaction;
-use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::{ Message, Ready };
 use serenity::prelude::Context;
 use tracing::{ error, info, instrument };
@@ -21,11 +22,7 @@ use self::command_handler::CommandOptions;
 pub struct Handler;
 
 impl Handler {
-    async fn handle_command<'a>(
-        &self,
-        command: &ApplicationCommandInteraction,
-        ctx: &Context
-    ) -> Result<()> {
+    async fn handle_command<'a>(&self, command: &CommandInteraction, ctx: &Context) -> Result<()> {
         let mut options: CommandOptions = command.data.options.clone().into();
         match command.data.name.as_str() {
             "ping" => commands::ping::run(options, command, ctx).await?,
@@ -62,19 +59,18 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is running!", ready.user.name);
         if
-            let Err(e) = Command::set_global_application_commands(&ctx.http, |commands| {
-                commands.set_application_commands(
-                    vec![
-                        commands::ping::application_command(),
-                        commands::test1::application_command(),
-                        commands::currency::application_command(),
-                        commands::balance::application_command(),
-                        commands::give::application_command(),
-                        commands::take::application_command(),
-                        commands::config::application_command()
-                    ]
-                )
-            }).await
+            let Err(e) = Command::set_global_commands(
+                &ctx.http,
+                vec![
+                    commands::ping::application_command(),
+                    commands::test1::application_command(),
+                    commands::currency::application_command(),
+                    commands::balance::application_command(),
+                    commands::give::application_command(),
+                    commands::take::application_command(),
+                    commands::config::application_command()
+                ]
+            ).await
         {
             error!("Error registering commands: {}", e);
         };
@@ -84,14 +80,15 @@ impl EventHandler for Handler {
     ///
     /// New commands must be entered here when added due to the nature of Rust.
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) -> () {
-        if let Interaction::ApplicationCommand(command) = interaction {
+        if let Interaction::Command(command) = interaction {
             info!("Received command interaction: {:#?}", command.data.name);
             command
-                .create_interaction_response(&ctx.http, |a| {
-                    a.kind(
-                        InteractionResponseType::DeferredChannelMessageWithSource
-                    ).interaction_response_data(|msg| msg.ephemeral(true))
-                }).await
+                .create_response(
+                    &ctx.http,
+                    serenity::builder::CreateInteractionResponse::Defer(
+                        CreateInteractionResponseMessage::new().ephemeral(true)
+                    )
+                ).await
                 .unwrap_or_else(|e| error!("Error creating response: {}", e)); // This returns
             let res = self.handle_command(&command, &ctx).await;
             if let Err(e) = res {
@@ -99,10 +96,10 @@ impl EventHandler for Handler {
                     // If it's serenity's fault it is futile to try to respond to the user
                     error!("Serenity error: {}", e);
                 } else if
-                    let Err(e) = command // If it is not serenity's fault we can respond to the user
-                        .edit_original_interaction_response(&ctx.http, |m| {
-                            m.content(format!("An error occurred: {e}"))
-                        }).await
+                    let Err(e) = command.edit_response(
+                        &ctx.http,
+                        EditInteractionResponse::new().content(format!("Error: {}", e))
+                    ).await
                 {
                     error!("Error editing response: {}", e); // Assuming serenity does not decide to error out now
                 }

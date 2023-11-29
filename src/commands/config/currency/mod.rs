@@ -1,11 +1,8 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
-    builder::CreateApplicationCommandOption,
     http::{ CacheHttp, Http },
-    model::application::{
-        command::CommandOptionType,
-        interaction::application_command::ApplicationCommandInteraction,
-    },
+    all::{ CommandInteraction, CommandOptionType },
+    builder::CreateCommandOption,
 };
 
 use crate::event_handler::command_handler::CommandOptions;
@@ -18,7 +15,7 @@ pub mod list;
 
 pub async fn run(
     options: CommandOptions,
-    _command: &ApplicationCommandInteraction,
+    _command: &CommandInteraction,
     _http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
     let (cmd_name, cmd_options) = options
@@ -34,16 +31,15 @@ pub async fn run(
     }
     Ok(())
 }
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("currency")
-        .description("Configure various things about currencies or view them.")
-        .kind(CommandOptionType::SubCommandGroup)
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(
+        CommandOptionType::SubCommandGroup,
+        "currency",
+        "Configure various things about currencies or view them."
+    )
         .add_sub_option(list::option())
         .add_sub_option(edit::option())
         .add_sub_option(edit_list::option())
         .add_sub_option(create::option())
-        .add_sub_option(delete::option());
-    option
+        .add_sub_option(delete::option())
 }

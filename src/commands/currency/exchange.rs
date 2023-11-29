@@ -1,11 +1,8 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
-    builder::CreateApplicationCommandOption,
+    builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    model::prelude::{
-        application_command::ApplicationCommandInteraction,
-        command::CommandOptionType,
-    },
+    all::{ CommandOptionType, CommandInteraction },
 };
 use tokio::join;
 
@@ -17,7 +14,7 @@ use crate::{
 
 pub async fn run(
     options: CommandOptions,
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: impl AsRef<Http> + Send + Sync + CacheHttp
 ) -> Result<()> {
     let input = options
@@ -57,8 +54,9 @@ pub async fn run(
 
     let given = exchange(input, output, amount, member).await?;
 
-    command.edit_original_interaction_response(http, |r| {
-        r.content(
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().content(
             format!(
                 "You gave {} {}{} and got {} {}{}.",
                 amount,
@@ -69,7 +67,7 @@ pub async fn run(
                 output.curr_name().as_str()
             )
         )
-    }).await?;
+    ).await?;
 
     Ok(())
 }
@@ -78,29 +76,27 @@ const INPUT_OPTION_NAME: &str = "input";
 const OUTPUT_OPTION_NAME: &str = "output";
 const AMOUNT_OPTION_NAME: &str = "amount";
 
-pub fn option() -> CreateApplicationCommandOption {
-    let mut option = CreateApplicationCommandOption::default();
-    option
-        .name("exchange")
-        .description("Exchange currency.")
-        .kind(CommandOptionType::SubCommand)
-        .create_sub_option(|o| {
-            o.name(INPUT_OPTION_NAME)
-                .description("The currency to exchange.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(OUTPUT_OPTION_NAME)
-                .description("The currency to exchange to.")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .create_sub_option(|o| {
-            o.name(AMOUNT_OPTION_NAME)
-                .description("The amount to exchange from input to output.")
-                .kind(CommandOptionType::Number)
-                .required(true)
-        });
-    option
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::SubCommand, "exchange", "Exchange currency.")
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                INPUT_OPTION_NAME,
+                "The currency to exchange."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                OUTPUT_OPTION_NAME,
+                "The currency to exchange to."
+            ).required(true)
+        )
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::Number,
+                AMOUNT_OPTION_NAME,
+                "The amount to exchange from input to output."
+            ).required(true)
+        )
 }

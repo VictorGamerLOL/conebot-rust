@@ -108,13 +108,13 @@ impl From<DbGuildId> for i64 {
 
 impl From<GuildId> for DbGuildId {
     fn from(id: GuildId) -> Self {
-        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
     }
 }
 
 impl From<DbGuildId> for GuildId {
     fn from(id: DbGuildId) -> Self {
-        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
@@ -194,13 +194,13 @@ impl From<u8> for DbUserId {
 
 impl From<UserId> for DbUserId {
     fn from(id: UserId) -> Self {
-        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
     }
 }
 
 impl From<DbUserId> for UserId {
     fn from(id: DbUserId) -> Self {
-        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
@@ -285,13 +285,13 @@ impl From<u8> for DbChannelId {
 
 impl From<ChannelId> for DbChannelId {
     fn from(id: ChannelId) -> Self {
-        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
     }
 }
 
 impl From<DbChannelId> for ChannelId {
     fn from(id: DbChannelId) -> Self {
-        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
@@ -383,13 +383,13 @@ impl From<DbRoleId> for i64 {
 
 impl From<RoleId> for DbRoleId {
     fn from(id: RoleId) -> Self {
-        Self(i64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
     }
 }
 
 impl From<DbRoleId> for RoleId {
     fn from(id: DbRoleId) -> Self {
-        Self(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
     }
 }
 
