@@ -663,30 +663,35 @@ impl Item {
         // doing the thing below because bson has no idea i set serde flatten in the item struct.
         match &new_item_type {
             ItemType::Trophy => {
-                update_set.insert("ActionType", "Trophy");
+                update_set.insert("ItemType", "Trophy");
             }
             ItemType::Consumable { message, action_type } => {
                 update_set.insert("Message", message);
-                update_set.insert("ActionType", "Consumable");
+                update_set.insert("ItemType", "Consumable");
+
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
+                        update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
+                        update_set.insert("ActionType", "Lootbox");
                         update_set.insert("DropTableName", drop_table_name);
                     }
                 }
             }
             ItemType::InstantConsumable { message, action_type } => {
                 update_set.insert("Message", message);
-                update_set.insert("ActionType", "InstantConsumable");
+                update_set.insert("ItemType", "InstantConsumable");
                 match action_type {
                     ItemActionType::None => {}
                     ItemActionType::Role { role_id } => {
+                        update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());
                     }
                     ItemActionType::Lootbox { drop_table_name } => {
+                        update_set.insert("ActionType", "Lootbox");
                         update_set.insert("DropTableName", drop_table_name);
                     }
                 }

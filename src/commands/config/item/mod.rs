@@ -22,6 +22,7 @@ pub async fn run(
         "create" => create::run(cmd_options, command, &http).await?,
         "delete" => delete::run(cmd_options, command, &http).await?,
         "edit" => edit::run(cmd_options, command, &http).await?,
+        "list" => list::run(cmd_options, command, &http).await?,
         &_ => bail!("Unknown item config subcommand."),
     }
     Ok(())
@@ -32,4 +33,5 @@ pub fn option() -> CreateCommandOption {
         .add_sub_option(create::option())
         .add_sub_option(delete::option())
         .add_sub_option(edit::option())
+        .add_sub_option(list::option())
 }
