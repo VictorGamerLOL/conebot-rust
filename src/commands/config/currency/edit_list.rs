@@ -4,14 +4,10 @@ use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    model::prelude::{ ChannelId, GuildId, Mention, RoleId },
+    model::prelude::Mention,
 };
-use tokio::sync::MutexGuard;
 
-use crate::{
-    db::{ models::Currency, uniques::DbGuildId, ArcTokioRwLockOption },
-    event_handler::command_handler::CommandOptions,
-};
+use crate::{ db::models::Currency, event_handler::command_handler::CommandOptions };
 
 pub async fn run(
     options: CommandOptions,
@@ -37,24 +33,24 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Value not found."))??;
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command can't be performed in DMs."))?;
 
-    let mut currency = Currency::try_from_name(guild_id.into(), currency_name).await?.ok_or_else(||
+    let currency = Currency::try_from_name(guild_id.into(), currency_name).await?.ok_or_else(||
         anyhow!("Currency not found.")
     )?;
 
     let mut currency = currency.write().await;
 
-    let mut currency_ = currency
+    let currency_ = currency
         .as_mut()
         .ok_or_else(|| anyhow!("Currency is being used in breaking operation."))?;
     if operation.as_str() == "clear" {
         clear(currency_, &field_name).await?;
         command.edit_response(
             &http,
-            EditInteractionResponse::new().content(format!("Cleared {}", field_name))
+            EditInteractionResponse::new().content(format!("Cleared {field_name}"))
         ).await?;
         return Ok(());
     }
-    let mut value = Mention::from_str(&value)?;
+    let value = Mention::from_str(&value)?;
     match operation.as_str() {
         "add" => add(currency_, &field_name, value).await?,
         "remove" => remove(currency_, &field_name, value).await?,
@@ -64,7 +60,7 @@ pub async fn run(
     command.edit_response(
         &http,
         EditInteractionResponse::new().content(
-            format!("{}ed {} from/to {}", operation, value, field_name)
+            format!("{operation}ed {value} from/to {field_name}")
         )
     ).await?;
     Ok(())

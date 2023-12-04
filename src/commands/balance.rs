@@ -10,7 +10,7 @@ use serenity::{
         EditInteractionResponse,
     },
     http::{ CacheHttp, Http },
-    model::{ prelude::{ GuildId, Member, PartialMember }, user::User, Colour },
+    model::{ prelude::{ GuildId, Member }, user::User, Colour },
 };
 
 use crate::{
@@ -70,8 +70,8 @@ async fn multi_currency<'a>(
     user: (&User, &Member),
     command: &'a CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
-    let mut balances = balances.lock().await;
-    let mut balances_ = balances
+    let balances = balances.lock().await;
+    let balances_ = balances
         .as_ref()
         .ok_or_else(|| {
             anyhow!("This user's balances are already being used in a breaking operation.")
@@ -93,17 +93,17 @@ async fn single_currency<'a>(
     user: (&User, &Member),
     command: &CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
-    let mut currency = c.read().await;
+    let currency = c.read().await;
     let currency_ = currency
         .as_ref()
         .ok_or_else(|| anyhow!("Currency is being used in a breaking operation."))?;
     let mut balances = balances.lock().await;
-    let mut balances_ = balances
+    let balances_ = balances
         .as_mut()
         .ok_or_else(|| {
             anyhow!("This user's balances are already being used in a breaking operation.")
         })?;
-    let mut balance = balances_
+    let balance = balances_
         .balances()
         .iter()
         .find(|b| b.curr_name() == currency_.curr_name());
@@ -131,7 +131,7 @@ fn single_currency_embed<'a>(
     target: &'a Member,
     executor: &'a Member
 ) -> CreateEmbed {
-    let mut author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
+    let author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
     CreateEmbed::default()
         .title(
             format!(
@@ -155,7 +155,7 @@ async fn multi_currency_embed(
     executor: &Member
 ) -> Result<CreateEmbed> {
     let mut field_data: Vec<(String, String, bool)> = Vec::new();
-    let mut t = try_join_all(
+    let t = try_join_all(
         balances
             .iter()
             .map(|b| async {
@@ -182,8 +182,8 @@ async fn multi_currency_embed(
         field_data.push((title, description, true));
         drop(currency);
     }
-    let mut embed = CreateEmbed::default();
-    let mut author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
+    let embed = CreateEmbed::default();
+    let author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
     Ok(
         CreateEmbed::default()
             .title(format!("{}'s balances", target.display_name()))
@@ -208,8 +208,8 @@ async fn parse_options<'a>(
     // return if the result is Err, then map the Option<(User, Option<PartialMember>)> to Option<Result<(User, PartialMember)>>
     // then also change that to Result<Option<(User, PartialMember)>>, then return if the result is Err to finally get
     // Option<(User, PartialMember)>. Easy enough.
-    let mut user: Option<UserId> = options.get_user_value("user").transpose()?;
-    let mut currency: Option<String> = options.get_string_value("currency").transpose()?;
+    let user: Option<UserId> = options.get_user_value("user").transpose()?;
+    let currency: Option<String> = options.get_string_value("currency").transpose()?;
 
     let currency: Option<ArcTokioRwLockOption<Currency>> = if let Some(currency) = currency {
         Currency::try_from_name(guild_id, currency).await?

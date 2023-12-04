@@ -21,7 +21,7 @@ use mongodb::{ ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use tokio::sync::{ Mutex, MutexGuard, RwLock, RwLockWriteGuard };
+use tokio::sync::{ Mutex, MutexGuard };
 
 use super::Currency;
 
@@ -73,7 +73,7 @@ impl Balances {
             return Ok(balances);
         }
 
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
         let filterdoc =
             doc! {
@@ -99,7 +99,7 @@ impl Balances {
     }
 
     pub async fn delete_currency(currency: &Currency) -> Result<()> {
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
         let filterdoc =
             doc! {
@@ -165,7 +165,7 @@ impl Balances {
     /// - Any `MongoDB` error occurs.
     /// - If the amount of deleted documents is 0.
     pub async fn delete_balance(&mut self, curr_name: &str) -> Result<()> {
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Balance> = db.collection("balances");
         // get the balance with the specified name from self's balance vec as owned value
         let bal = self.balances
@@ -208,7 +208,7 @@ impl Balance {
     /// - Any `MongoDB` error occurs.
     /// - The user already has a balance for that currency in that guild.
     pub async fn new(guild_id: DbGuildId, user_id: DbUserId, curr_name: String) -> Result<Self> {
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
@@ -270,8 +270,8 @@ impl Balance {
     #[inline]
     pub async fn set_amount(
         &mut self,
-        mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        amount: f64,
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_infinite() {
             return Err(anyhow!("Amount cannot be infinite."));
@@ -296,7 +296,7 @@ impl Balance {
     pub async fn add_amount(
         &mut self,
         mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
@@ -334,7 +334,7 @@ impl Balance {
     pub async fn sub_amount(
         &mut self,
         mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
@@ -367,7 +367,7 @@ impl Balance {
     pub async fn sub_amount_unchecked(
         &mut self,
         mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot subtract NaN."));
@@ -392,7 +392,7 @@ impl Balance {
     pub async fn add_amount_unchecked(
         &mut self,
         mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot add NaN."));
@@ -415,7 +415,7 @@ impl Balance {
     pub async fn set_amount_unchecked(
         &mut self,
         mut amount: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         if amount.is_nan() {
             return Err(anyhow!("Cannot set NaN."));
@@ -427,7 +427,7 @@ impl Balance {
             amount = 0.0;
         }
         amount = (amount * 100.0).round() / 100.0;
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
@@ -464,7 +464,7 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of modified documents is 0.
     #[inline]
-    pub async fn clear(&mut self, mut session: Option<&mut ClientSession>) -> Result<()> {
+    pub async fn clear(&mut self, session: Option<&mut ClientSession>) -> Result<()> {
         self.set_amount(0.0, session).await
     }
 
@@ -491,7 +491,7 @@ impl Balance {
     /// - If any `MongoDB` error occurs.
     /// - If the amount of deleted documents is 0.
     pub async fn delete(self) -> Result<(), (anyhow::Error, Self)> {
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("balances");
 
         let filterdoc =
@@ -523,9 +523,9 @@ mod test {
         crate::init_env().await;
         let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances_ = balances.as_mut().unwrap();
+        let balances_ = balances.as_mut().unwrap();
         assert_eq!(balances_.balances.len(), 2); // There are 2 test currencies in the DB matching the IDs
         drop(balances); // please the clippy nursery
     }
@@ -536,10 +536,10 @@ mod test {
         crate::init_env().await;
         let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances_ = balances.as_mut().unwrap();
-        let mut balance = balances_.balances
+        let balances_ = balances.as_mut().unwrap();
+        let balance = balances_.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();
@@ -588,10 +588,10 @@ mod test {
         crate::init_env().await;
         let user = crate::db::uniques::DbUserId::from(TEST_USER_ID);
         let guild = crate::db::uniques::DbGuildId::from(TEST_GUILD_ID);
-        let mut balances = super::Balances::try_from_user(guild, user).await.unwrap();
+        let balances = super::Balances::try_from_user(guild, user).await.unwrap();
         let mut balances = balances.lock().await;
-        let mut balances_ = balances.as_mut().unwrap();
-        let mut balance = balances_.balances
+        let balances_ = balances.as_mut().unwrap();
+        let balance = balances_.balances
             .iter_mut()
             .find(|b| b.curr_name == "test")
             .unwrap();

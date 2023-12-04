@@ -17,7 +17,7 @@ pub async fn run(
         .get_string_value("name")
         .transpose()?
         .ok_or_else(|| anyhow!("No currency name was found"))?;
-    let mut currency = Currency::try_from_name(
+    let currency = Currency::try_from_name(
         DbGuildId::from(command.guild_id.unwrap()),
         currency_name
     ).await?.ok_or_else(|| anyhow!("Currency not found"))?;

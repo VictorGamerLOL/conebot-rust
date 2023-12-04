@@ -26,11 +26,11 @@ pub async fn run(
     field_name.make_ascii_lowercase();
     field_name = field_name.replace([' ', '-'], "_");
 
-    let mut item = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
+    let item = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
 
     let mut item_ = item.write().await;
 
-    let mut item__ = item_
+    let item__ = item_
         .as_mut()
         .ok_or_else(|| anyhow::anyhow!("Item {} is being used in breaking operation", item_name))?;
 
@@ -74,7 +74,7 @@ pub async fn run(
                 item__.item_type().update_auto(
                     ItemTypeUpdateType::RoleId({
                         if value.contains('<') {
-                            let mut mention: Mention = value.parse()?;
+                            let mention: Mention = value.parse()?;
                             if let Mention::Role(role_id_) = mention {
                                 role_id_.into()
                             } else {

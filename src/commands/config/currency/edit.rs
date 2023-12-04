@@ -34,7 +34,7 @@ pub async fn run(
 
     let mut currency_ = currency.write().await;
 
-    let mut currency__ = currency_
+    let currency__ = currency_
         .as_mut()
         .ok_or_else(|| {
             anyhow!("Currency {} is being used in breaking operation", currency_name)

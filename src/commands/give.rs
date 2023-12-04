@@ -1,6 +1,6 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
-    all::{ CommandInteraction, CommandOptionType, User, UserId },
+    all::{ CommandInteraction, CommandOptionType, UserId },
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
     model::Permissions,
@@ -28,10 +28,10 @@ pub async fn run(
         .get_int_or_number_value("amount")
         .ok_or_else(|| anyhow!("No amount was provided."))??
         .cast_to_f64();
-    let mut currency = options
+    let currency = options
         .get_string_value("currency")
         .ok_or_else(|| anyhow!("No currency name was provided."))??;
-    let mut member = options
+    let member = options
         .get_user_value("member")
         .ok_or_else(|| anyhow!("No member was provided."))??
         .to_user(&http).await?;
@@ -62,13 +62,13 @@ pub async fn run(
         return Err(anyhow!("Member {} does not exist.", member.id));
     }
 
-    let mut balances = Balances::try_from_user(
+    let balances = Balances::try_from_user(
         command.guild_id.unwrap().into(),
         member.id.into()
     ).await?;
     let mut balances = balances.lock().await;
 
-    let Some(mut balances_) = balances.as_mut() else {
+    let Some(balances_) = balances.as_mut() else {
         return Err(anyhow!("{}'s balances are being used in a breaking operation.", member.id));
     };
 
@@ -85,7 +85,7 @@ pub async fn run(
             .find(|b| b.curr_name == currency);
     }
 
-    let Some(mut balance) = balance else {
+    let Some(balance) = balance else {
         return Err(
             anyhow!(
                 "{}'s balance for {} has been created but for some reason we could not find it afterwards. Strange...",

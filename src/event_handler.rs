@@ -23,7 +23,7 @@ pub struct Handler;
 
 impl Handler {
     async fn handle_command<'a>(&self, command: &CommandInteraction, ctx: &Context) -> Result<()> {
-        let mut options: CommandOptions = command.data.options.clone().into();
+        let options: CommandOptions = command.data.options.clone().into();
         match command.data.name.as_str() {
             "ping" => commands::ping::run(options, command, ctx).await?,
             "test" => commands::test1::run(options, command, ctx).await?,
@@ -98,7 +98,7 @@ impl EventHandler for Handler {
                 } else if
                     let Err(e) = command.edit_response(
                         &ctx.http,
-                        EditInteractionResponse::new().content(format!("Error: {}", e))
+                        EditInteractionResponse::new().content(format!("Error: {e}"))
                     ).await
                 {
                     error!("Error editing response: {}", e); // Assuming serenity does not decide to error out now

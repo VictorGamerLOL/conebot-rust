@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use anyhow::{ anyhow, bail, Result };
-use serde::{ Deserialize, Serialize };
 use crate::macros::const_impl;
+use anyhow::{ anyhow, Result };
+use serde::{ Deserialize, Serialize };
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]

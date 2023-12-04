@@ -3,7 +3,7 @@
 use std::{ num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, bail, Result };
-use futures::{ StreamExt, TryStreamExt };
+use futures::StreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, Collection };
@@ -92,8 +92,8 @@ impl Inventory {
     /// - Any mongodb error occurs.
     /// - The item entry does not exist.
     pub async fn delete_item(&mut self, item_name: String) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<InventoryEntry> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<InventoryEntry> = db.collection("inventories");
 
         let filterdoc =
             doc! {
@@ -118,8 +118,8 @@ impl InventoryEntry {
     /// - Any mongodb error occurs.
     /// - The item entry already exists.
     async fn new(guild_id: DbGuildId, user_id: DbUserId, item_name: String) -> Result<Self> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<Self> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
 
         let filterdoc =
             doc! {
@@ -151,8 +151,8 @@ impl InventoryEntry {
     /// # Errors
     /// - Any mongodb error occurs.
     async fn from_user(guild_id: &DbGuildId, user_id: &DbUserId) -> Result<Vec<Self>> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<Self> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
 
         let filterdoc =
             doc! {
@@ -180,10 +180,10 @@ impl InventoryEntry {
         user_id: DbUserId,
         item_name: String
     ) -> Result<Option<Self>> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<Self> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
 
-        let mut filterdoc =
+        let filterdoc =
             doc! {
             "GuildId": guild_id.as_i64(),
             "UserId": user_id.as_i64(),
@@ -205,10 +205,10 @@ impl InventoryEntry {
         user_id: DbUserId,
         search_query: String
     ) -> Result<Vec<Self>> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<Self> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
 
-        let mut filterdoc =
+        let filterdoc =
             doc! {
             "GuildId": guild_id.as_i64(),
             "UserId": user_id.as_i64(),
@@ -251,8 +251,8 @@ impl InventoryEntry {
         if amount < 0 {
             bail!("Amount cannot be negative");
         }
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
-        let mut coll: Collection<Self> = db.collection("inventories");
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
 
         let filterdoc =
             doc! {

@@ -1,16 +1,17 @@
-use crate::db::models::{ Balance, Balances, Currency };
-use crate::db::uniques::{ DbChannelId, DbGuildId, DbRoleId, DbUserId };
+use crate::db::models::{ Balances, Currency };
+use crate::db::uniques::{ DbChannelId, DbRoleId };
 use crate::util::currency::truncate_2dp;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use rand::prelude::*;
+use serenity::all::ChannelId;
 use serenity::client::Context;
 use serenity::model::channel::Message;
 use serenity::model::prelude::{ Channel, GuildId, Member, RoleId, UserId };
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{ debug, error, info, warn };
+use tracing::{ debug, error, warn };
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Timeout {
@@ -36,18 +37,18 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         return Ok(());
     };
 
-    let mut balances = Balances::try_from_user(guild_id.into(), user.into()).await?;
+    let balances = Balances::try_from_user(guild_id.into(), user.into()).await?;
     let mut balances = balances.lock().await;
-    let mut balances_ = if let Some(b) = balances.as_mut() {
+    let balances_ = if let Some(b) = balances.as_mut() {
         b
     } else {
         return Ok(());
     };
 
-    let mut currencies = Currency::try_from_guild(guild_id.into()).await?;
+    let currencies = Currency::try_from_guild(guild_id.into()).await?;
     // giant for loop moment
     for curr in currencies {
-        let mut currency = curr.read().await;
+        let currency = curr.read().await;
         let currency_ = if let Some(c) = currency.as_ref() {
             c
         } else {
@@ -95,7 +96,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 
         drop(currency);
 
-        let mut balance = balances_.ensure_has_currency(currency_name.as_ref()).await?;
+        let balance = balances_.ensure_has_currency(currency_name.as_ref()).await?;
         // get a number between earn_min and earn_max
         let amount = truncate_2dp(rand.gen_range(earn_min..=earn_max));
         balance.add_amount(amount, None).await?;
@@ -122,6 +123,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::useless_let_if_seq)]
 fn check_can_earn(
     guild_id: GuildId,
     member: Member,
@@ -133,9 +135,8 @@ fn check_can_earn(
         let roles = currency.roles_whitelist();
         if check_contains_role(guild_id, member.roles, roles) {
             return true;
-        } else {
-            can_earn = false;
         }
+        can_earn = false;
     } else {
         let roles = currency.roles_blacklist();
         if check_contains_role(guild_id, member.roles, roles) {
@@ -146,9 +147,8 @@ fn check_can_earn(
         let channels = currency.channels_whitelist();
         if check_contains_channel(guild_id, channel, channels) {
             return true;
-        } else {
-            can_earn = false;
         }
+        can_earn = false;
     } else {
         let channels = currency.channels_blacklist();
         if check_contains_channel(guild_id, channel, channels) {
@@ -160,14 +160,13 @@ fn check_can_earn(
 
 fn check_contains_channel(
     guild_id: GuildId,
-    current_channel: Channel,
+    current_channel: impl Into<ChannelId>,
     channels: &[DbChannelId]
 ) -> bool {
+    let id = current_channel.into();
     for db_channel in channels {
-        if &DbChannelId::from(current_channel.id()) == db_channel {
+        if &DbChannelId::from(id) == db_channel {
             return true;
-        } else {
-            continue;
         }
     }
     false
@@ -178,8 +177,6 @@ fn check_contains_role(guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[D
     for role in current_roles.iter().copied() {
         if roles.contains(&role.into()) {
             return true;
-        } else {
-            continue;
         }
     }
     false

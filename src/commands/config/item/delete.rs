@@ -1,5 +1,5 @@
 use crate::event_handler::command_handler::CommandOptions;
-use anyhow::{ anyhow, bail, Result };
+use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
@@ -17,7 +17,7 @@ pub async fn run(
         .get_string_value(NAME_OPTION_NAME)
         .transpose()?
         .ok_or_else(|| anyhow!("No item name was found"))?;
-    let mut item = Item::try_from_name(
+    let item = Item::try_from_name(
         command.guild_id.ok_or_else(|| anyhow!("Command cannot be done in DMs."))?.into(),
         item_name
     ).await?;

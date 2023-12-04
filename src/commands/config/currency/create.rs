@@ -6,7 +6,7 @@ use serenity::http::CacheHttp;
 use serenity::{ builder::CreateCommandOption, http::Http };
 
 use crate::db::{ models::currency::builder::Builder, uniques::DbGuildId };
-use crate::event_handler::command_handler::CommandOptions;
+use crate::event_handler::command_handler::{ CommandOptions, IntOrNumber };
 
 /// Runs the create currency subcommand.
 ///
@@ -33,10 +33,8 @@ pub async fn run(
         String::new(), // This will be set because it is a required option in the slash command
         String::new() // Same as above
     );
-    let mut name = options
-        .get_string_value("name")
-        .ok_or_else(|| anyhow!("Name value not found"))??;
-    let mut symbol = options
+    let name = options.get_string_value("name").ok_or_else(|| anyhow!("Name value not found"))??;
+    let symbol = options
         .get_string_value("symbol")
         .ok_or_else(|| anyhow!("Symbol value not found"))??;
     currency_builder.curr_name(name.clone());
@@ -44,10 +42,7 @@ pub async fn run(
     currency_builder.visible(options.get_bool_value("visible").transpose()?);
     currency_builder.base(options.get_bool_value("base").transpose()?);
     currency_builder.base_value(
-        options
-            .get_int_or_number_value("base_value")
-            .transpose()?
-            .map(|n| n.cast_to_f64())
+        options.get_int_or_number_value("base_value").transpose()?.map(IntOrNumber::cast_to_f64)
     );
     currency_builder.pay(options.get_bool_value("pay").transpose()?);
     currency_builder.earn_by_chat(options.get_bool_value("earn_by_chat").transpose()?);
@@ -56,16 +51,10 @@ pub async fn run(
     );
     currency_builder.roles_is_whitelist(options.get_bool_value("roles_is_whitelist").transpose()?);
     currency_builder.earn_min(
-        options
-            .get_int_or_number_value("earn_min")
-            .transpose()?
-            .map(|n| n.cast_to_f64())
+        options.get_int_or_number_value("earn_min").transpose()?.map(IntOrNumber::cast_to_f64)
     );
     currency_builder.earn_max(
-        options
-            .get_int_or_number_value("earn_max")
-            .transpose()?
-            .map(|n| n.cast_to_f64())
+        options.get_int_or_number_value("earn_max").transpose()?.map(IntOrNumber::cast_to_f64)
     );
     currency_builder.earn_timeout(
         options
@@ -76,9 +65,7 @@ pub async fn run(
     currency_builder.build().await?;
     command.edit_response(
         http,
-        EditInteractionResponse::new().content(
-            format!("Made currency {symbol}{name}", symbol = symbol, name = name)
-        )
+        EditInteractionResponse::new().content(format!("Made currency {symbol}{name}"))
     ).await?;
     Ok(())
 }

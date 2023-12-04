@@ -1,15 +1,10 @@
-use crate::{
-    commands::currency,
-    db::models::{ Currency, ToKVs },
-    event_handler::command_handler::CommandOptions,
-};
+use crate::{ db::models::{ Currency, ToKVs }, event_handler::command_handler::CommandOptions };
 use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, CreateEmbed, EditInteractionResponse },
     http::{ CacheHttp, Http },
 };
-use tokio::sync::MutexGuard;
 
 #[derive(Debug)]
 pub struct CurrencyConfigPrettifier<'a> {
@@ -22,12 +17,6 @@ impl<'a> CurrencyConfigPrettifier<'a> {
     }
 
     pub fn pretty(self) -> Result<CreateEmbed> {
-        let mut embed = CreateEmbed::default();
-        let kvs = self.options.try_to_kvs()?.into_iter();
-        let mut channels_is_whitelist: bool = false;
-        let mut roles_is_whitelist: bool = false;
-        let mut embed_title: String = String::from("Config for {SYMBOL}{CURR_NAME}");
-        // I need this only twice just in this function, so might as well just write it here.
         fn embed_field_default(k: &str, v: &str, mut embed: CreateEmbed) -> CreateEmbed {
             if k.is_empty() {
                 return embed;
@@ -44,6 +33,13 @@ impl<'a> CurrencyConfigPrettifier<'a> {
             embed = embed.field(k_, v, true);
             embed
         }
+        let mut embed = CreateEmbed::default();
+        let kvs = self.options.try_to_kvs()?.into_iter();
+        let mut channels_is_whitelist: bool = false;
+        let mut roles_is_whitelist: bool = false;
+        let mut embed_title: String = String::from("Config for {SYMBOL}{CURR_NAME}");
+        // I need this only twice just in this function, so might as well just write it here.
+
         for (k, v) in kvs.as_ref() {
             match k.as_str() {
                 // For fields that need special treatment like name symbol and stuff that need to be included in the title.

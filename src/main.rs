@@ -4,12 +4,11 @@
 #![allow(unused_mut)]
 #![allow(unused_imports)]
 #![allow(clippy::await_holding_lock)]
-
 // #![warn(clippy::pedantic)] // TODO Enable this when finishing code.
+#![allow(clippy::must_use_candidate)] // and keep this off
 #![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
 #![deny(elided_lifetimes_in_paths)]
-
 #![cfg_attr(feature = "is-nightly", feature(const_trait_impl))]
 
 pub mod commands;

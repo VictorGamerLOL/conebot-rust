@@ -1,9 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::{ anyhow, bail, Result };
-use mongodb::Client;
 use serenity::model::prelude::Member;
-use tokio::sync::RwLock;
 use tracing::error;
 
 use crate::db::{ ArcTokioRwLockOption, CLIENT };
@@ -27,7 +23,7 @@ use crate::{ db::models::{ Balance, Balances, Currency }, util::currency::trunca
 /// * If any of the currencies cannot be exchanged.
 /// * If the exchange amount is infinite or NaN.
 /// * If the exchange would lead to the user an infinite or NaN amount of the output currency.
-/// * Any MongoDB errors.
+/// * Any ``MongoDB`` errors.
 pub async fn exchange(
     input: &Currency,
     output: &Currency,
@@ -52,7 +48,7 @@ pub async fn exchange(
         1.0 // same here
     };
 
-    let mut currencies = Currency::try_from_guild(member.guild_id.into()).await?;
+    let currencies = Currency::try_from_guild(member.guild_id.into()).await?;
 
     get_base_currency(currencies).await?;
 
@@ -62,14 +58,11 @@ pub async fn exchange(
         bail!("Invalid exchange rate.");
     }
 
-    let mut balances = Balances::try_from_user(
-        member.guild_id.into(),
-        member.user.id.into()
-    ).await?;
+    let balances = Balances::try_from_user(member.guild_id.into(), member.user.id.into()).await?;
 
     let mut balances = balances.lock().await;
 
-    let mut balances_ = balances
+    let balances_ = balances
         .as_mut()
         .ok_or_else(|| anyhow!("Balances are being used in a breaking operation."))?;
 
@@ -105,7 +98,7 @@ pub async fn exchange(
         bail!("Invalid exchange rate result.");
     }
 
-    let mut amount_after = balance_out.amount() + to_give;
+    let amount_after = balance_out.amount() + to_give;
     if amount_after.is_infinite() || amount_after.is_nan() {
         bail!("Invalid exchange rate result.");
     }
@@ -131,9 +124,8 @@ pub async fn exchange(
         // than an unaborted transaction.
         session.abort_transaction().await?;
         bail!("Error when exchanging: {}", e);
-    } else {
-        session.commit_transaction().await?;
     }
+    session.commit_transaction().await?;
 
     drop(balances); // please the linter
 
@@ -159,9 +151,7 @@ async fn get_base_currency(
 
     for currency in currencies {
         let curr = currency.read().await;
-        let curr_ = if let Some(c) = curr.as_ref() {
-            c
-        } else {
+        let Some(curr_) = curr.as_ref() else {
             continue;
         };
         let is_base = curr_.base();
@@ -172,9 +162,7 @@ async fn get_base_currency(
         }
     }
 
-    let mut base_currency = if let Some(c) = base_currency {
-        c
-    } else {
+    let Some(base_currency) = base_currency else {
         bail!("No base currency found.");
     };
     Ok(base_currency)

@@ -1,4 +1,5 @@
 #![allow(clippy::module_name_repetitions)] // literally stop
+#![allow(clippy::must_use_candidate)]
 
 pub mod builder;
 pub mod fieldless;
@@ -21,7 +22,8 @@ use mongodb::ClientSession;
 use serde::{ Deserialize, Serialize };
 use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
-use tracing::instrument;
+
+use super::ToKVs;
 
 /// Represents an item a user can hold in their inventory. May or may not
 /// be worth something or be used in return for something.
@@ -42,6 +44,21 @@ pub struct Item {
     currency: String,
     /// The value of the item in the currency it corresponds to.
     value: f64,
+    // Serde flatten is here so the item does not end up like
+    /*
+    {
+        ...
+        item_type: {...}
+    }
+     */
+    // and instead it ends up.. well.. flat
+    /*
+    {
+        ...
+        item_type: "Consumable",
+        ...
+    }
+     */
     #[serde(flatten)]
     /// The type of the item along with its needed details.
     item_type: ItemType,
@@ -50,6 +67,7 @@ pub struct Item {
 /// The type of the item along with its needed details.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(tag = "ItemType")]
+#[non_exhaustive]
 pub enum ItemType {
     #[default]
     /// A trophy item, cannot be used as it does nothing. It just sits in your inventory.
@@ -120,7 +138,7 @@ pub enum ItemError {
     Other(#[from] anyhow::Error),
 }
 
-/// This exists strictly for the updating of the item types via [ItemType]'s
+/// This exists strictly for the updating of the item types via ``[ItemType]``'s
 /// `update_auto` function. It is used to make the update more intuitive on
 /// the user's end.
 pub enum ItemTypeUpdateType {
@@ -160,7 +178,7 @@ impl ItemType {
                     } else if let Self::InstantConsumable { message, .. } = self {
                         message.clone()
                     } else {
-                        "".to_owned()
+                        String::new()
                     },
                     action_type: if let Self::Consumable { action_type, .. } = self {
                         action_type.clone()
@@ -172,7 +190,7 @@ impl ItemType {
                 },
             ItemTypeFieldless::InstantConsumable =>
                 Self::InstantConsumable {
-                    message: "".to_owned(),
+                    message: String::new(),
                     action_type: ItemActionType::None,
                 },
         }
@@ -198,6 +216,7 @@ impl ItemType {
         }
     }
 
+    #[allow(unreachable_patterns)] // I said the enum is non_exhaustive why do I need to do this.
     fn update_from_action_type(&self, action_type: ItemActionTypeFieldless) -> Result<Self> {
         if action_type == ItemActionTypeFieldless::Lootbox {
             bail!(
@@ -217,11 +236,12 @@ impl ItemType {
                     message: message.clone(),
                     action_type: ItemActionType::None,
                 }),
-            _ =>
+            Self::Trophy =>
                 Ok(Self::Consumable {
-                    message: "".to_owned(),
+                    message: String::new(),
                     action_type: ItemActionType::None,
                 }),
+            _ => { bail!("Unimplemented.") }
         }
     }
 
@@ -239,7 +259,7 @@ impl ItemType {
                 },
             _ =>
                 Self::Consumable {
-                    message: "".to_owned(),
+                    message: String::new(),
                     action_type: ItemActionType::Role { role_id },
                 },
         }
@@ -263,7 +283,7 @@ impl ItemType {
                 },
             _ =>
                 Self::Consumable {
-                    message: "".to_owned(),
+                    message: String::new(),
                     action_type: ItemActionType::Lootbox {
                         drop_table_name: drop_table_name.into_string(),
                     },
@@ -323,7 +343,7 @@ impl Item {
         item_name: &str
     ) -> Result<ArcTokioRwLockOption<Self>, ItemError> {
         // i am using mongodb by the way
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -347,7 +367,7 @@ impl Item {
         guild_id: DbGuildId
     ) -> anyhow::Result<Vec<ArcTokioRwLockOption<Self>>> {
         // don't forget to use the cache
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter = doc! {
             "GuildId": guild_id.as_i64(),
@@ -396,36 +416,30 @@ impl Item {
 
     pub const fn message(&self) -> Option<&String> {
         match self.item_type {
-            ItemType::Consumable { ref message, .. } => Some(message),
-            ItemType::InstantConsumable { ref message, .. } => Some(message),
+            | ItemType::InstantConsumable { ref message, .. }
+            | ItemType::Consumable { ref message, .. } => Some(message),
             _ => None,
         }
     }
 
     pub const fn action_type(&self) -> Option<&ItemActionType> {
         match self.item_type {
-            ItemType::Consumable { ref action_type, .. } => Some(action_type),
-            ItemType::InstantConsumable { ref action_type, .. } => Some(action_type),
+            | ItemType::InstantConsumable { ref action_type, .. }
+            | ItemType::Consumable { ref action_type, .. } => Some(action_type),
             _ => None,
         }
     }
 
     pub fn drop_table_name(&self) -> Option<DropTableNameRef<'_>> {
         match self.item_type {
-            ItemType::Consumable {
-                action_type: ItemActionType::Lootbox { ref drop_table_name },
-                ..
-            } =>
-                Some(
-                    DropTableNameRef::from_str_and_guild_id_unchecked(
-                        self.guild_id,
-                        drop_table_name
-                    )
-                ),
-            ItemType::InstantConsumable {
-                action_type: ItemActionType::Lootbox { ref drop_table_name },
-                ..
-            } =>
+            | ItemType::InstantConsumable {
+                  action_type: ItemActionType::Lootbox { ref drop_table_name },
+                  ..
+              }
+            | ItemType::Consumable {
+                  action_type: ItemActionType::Lootbox { ref drop_table_name },
+                  ..
+              } =>
                 Some(
                     DropTableNameRef::from_str_and_guild_id_unchecked(
                         self.guild_id,
@@ -438,9 +452,8 @@ impl Item {
 
     pub const fn role_id(&self) -> Option<DbRoleId> {
         match self.item_type {
-            ItemType::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
-                Some(role_id),
-            ItemType::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. } =>
+            | ItemType::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. }
+            | ItemType::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
                 Some(role_id),
             _ => None,
         }
@@ -454,7 +467,7 @@ impl Item {
             None => bail!("Item is already being used in breaking operation."),
         };
 
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -483,9 +496,9 @@ impl Item {
     pub async fn update_description(
         &mut self,
         new_description: String,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -511,9 +524,9 @@ impl Item {
     pub async fn update_sellable(
         &mut self,
         new_sellable: bool,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -538,9 +551,9 @@ impl Item {
     pub async fn update_tradeable(
         &mut self,
         new_tradeable: bool,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -565,9 +578,9 @@ impl Item {
     pub async fn update_currency_value(
         &mut self,
         new_currency_value: String,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -592,9 +605,9 @@ impl Item {
     pub async fn update_value(
         &mut self,
         new_value: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -621,7 +634,7 @@ impl Item {
         new_item_type: ItemType,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -646,7 +659,7 @@ impl Item {
             "$set": {
             }
         };
-        let mut update_set = update.get_document_mut("$set")?;
+        let update_set = update.get_document_mut("$set")?;
         // doing the thing below because bson has no idea i set serde flatten in the item struct.
         match &new_item_type {
             ItemType::Trophy => {
@@ -692,12 +705,10 @@ impl Item {
     pub async fn delete_item(self_: ArcTokioRwLockOption<Self>) -> Result<()> {
         let mut cache = CACHE_ITEM.lock().await;
         let mut self_ = self_.write().await;
-        let taken = self_.take(); // this must be a separate line or the linter cries abt it.
-        let mut self__ = match taken {
-            Some(a) => a,
-            None => bail!("Item is already being used in breaking operation."),
+        let Some(self__) = self_.take() else {
+            bail!("Item is already being used in breaking operation.");
         };
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
             doc! {
@@ -722,12 +733,14 @@ impl Item {
     }
 }
 
+impl ToKVs for Item {}
+
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn test_serialization() {
-        let mut item = Item {
+        let item = Item {
             item_type: ItemType::Consumable {
                 action_type: ItemActionType::Role {
                     role_id: DbRoleId::default(),

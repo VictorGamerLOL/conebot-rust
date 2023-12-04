@@ -1,4 +1,4 @@
-use anyhow::{ anyhow, bail, Result };
+use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },

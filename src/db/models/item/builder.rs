@@ -1,9 +1,15 @@
-use std::str::FromStr;
+use std::sync::Arc;
 
-use super::fieldless::ItemTypeFieldless;
-use super::*;
-use crate::db::{ uniques::DbGuildId, ArcTokioRwLockOption };
+use super::{
+    fieldless::{ ItemActionTypeFieldless, ItemTypeFieldless },
+    Item,
+    ItemActionType,
+    ItemType,
+};
+use crate::db::{ uniques::{ DbGuildId, DbRoleId }, ArcTokioRwLockOption };
 use anyhow::{ anyhow, bail, Result };
+use mongodb::bson::doc;
+use serde::{ Deserialize, Serialize };
 
 pub struct Builder {
     guild_id: DbGuildId,
@@ -37,7 +43,7 @@ impl Builder {
             }
         }
 
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let coll = db.collection::<Item>("items");
 
         let filter =
@@ -68,7 +74,7 @@ impl Builder {
             item_type,
         };
 
-        let mut db = crate::db::CLIENT.get().await.database("conebot");
+        let db = crate::db::CLIENT.get().await.database("conebot");
         let coll = db.collection::<Item>("items");
 
         let mut cache = super::CACHE_ITEM.lock().await;
@@ -139,7 +145,7 @@ impl ItemTypeBuilder {
         }
     }
 
-    pub fn build(mut self) -> Result<ItemType> {
+    pub fn build(self) -> Result<ItemType> {
         let action_type = self.infer_action_type()?;
         let type_ = self.type_.unwrap_or_else(|| {
             if
@@ -273,7 +279,7 @@ mod test {
         item_builder.sellable(Some(true));
         assert!(item_builder.build().await.is_err());
 
-        let mut item_builder = Builder::new(guild_id, "existing_item".to_owned());
+        let item_builder = Builder::new(guild_id, "existing_item".to_owned());
         assert!(item_builder.build().await.is_err());
     }
 }

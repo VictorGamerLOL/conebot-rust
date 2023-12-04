@@ -30,7 +30,7 @@ use lru::LruCache;
 use mongodb::ClientSession;
 use mongodb::{ bson::doc, Collection };
 use serde::{ Deserialize, Serialize };
-use serde_json::{ Map, Value };
+use serde_json::Value;
 use serde_with::{ serde_as, DurationSeconds };
 use serenity::model::id::ChannelId;
 use serenity::model::mention::Mention;
@@ -39,7 +39,7 @@ use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
 use crate::db::models::ToKVs;
-use crate::db::uniques::{ self, CurrencyName, CurrencyNameRef };
+use crate::db::uniques::CurrencyNameRef;
 use crate::db::{
     uniques::DbChannelId,
     uniques::DbGuildId,
@@ -146,7 +146,7 @@ impl Currency {
         }
         // If not in cache, try to get from database. Keep holding the lock on the cache
         // so that another thread doesn't try to get the same currency from the database.
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
@@ -176,7 +176,7 @@ impl Currency {
     pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioRwLockOption<Self>>> {
         let mut cache = CACHE_CURRENCY.lock().await;
 
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc = doc! {
             "GuildId": guild_id.as_i64(),
@@ -333,7 +333,7 @@ impl Currency {
             },
         };
 
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if the new name already exists in the guild
@@ -386,7 +386,7 @@ impl Currency {
                 "Symbol": new_symbol,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -421,7 +421,7 @@ impl Currency {
                 "Visible": new_visible,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -458,7 +458,7 @@ impl Currency {
                 "Base": new_base,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if there is already a base currency in the guild
@@ -517,7 +517,7 @@ impl Currency {
                 "BaseValue": new_base_value,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -552,7 +552,7 @@ impl Currency {
                 "Pay": new_pay,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -587,7 +587,7 @@ impl Currency {
                 "EarnByChat": new_earn_by_chat,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -622,7 +622,7 @@ impl Currency {
                 "ChannelsIsWhitelist": new_channels_is_whitelist,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -657,7 +657,7 @@ impl Currency {
                 "RolesIsWhitelist": new_roles_is_whitelist,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -692,7 +692,7 @@ impl Currency {
                 "ChannelsWhitelist": channel_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if that channel is present in the whitelist
@@ -704,7 +704,7 @@ impl Currency {
                 "$in": [channel_id.as_i64()],
             }
         };
-        let mut res: Option<Self>;
+        let res: Option<Self>;
         if let Some(s) = &mut session {
             res = coll.find_one_with_session(filterdoc2, None, s).await?;
         } else {
@@ -749,7 +749,7 @@ impl Currency {
                 "ChannelsWhitelist": channel_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -784,7 +784,7 @@ impl Currency {
                 "RolesWhitelist": role_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if that role is present in the whitelist
@@ -796,7 +796,7 @@ impl Currency {
                 "$in": [role_id.as_i64()],
             }
         };
-        let mut res: Option<Self>;
+        let res: Option<Self>;
         if let Some(s) = &mut session {
             res = coll.find_one_with_session(filterdoc2, None, s).await?;
         } else {
@@ -825,7 +825,7 @@ impl Currency {
     pub async fn remove_whitelisted_role(
         &mut self,
         role_id: &DbRoleId,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -841,7 +841,7 @@ impl Currency {
                 "RolesWhitelist": role_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -876,7 +876,7 @@ impl Currency {
                 "ChannelsBlacklist": channel_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if that channel is present in the blacklist
@@ -888,8 +888,8 @@ impl Currency {
                 "$in": [channel_id.as_i64()],
             }
         };
-        let mut res: Option<Self>;
-        if let Some(s) = &mut session {
+        let res: Option<Self>;
+        if let Some(ref mut s) = session {
             res = coll.find_one_with_session(filterdoc2, None, s).await?;
         } else {
             res = coll.find_one(filterdoc2, None).await?;
@@ -933,7 +933,7 @@ impl Currency {
                 "ChannelsBlacklist": channel_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = &mut session {
@@ -968,7 +968,7 @@ impl Currency {
                 "RolesBlacklist": role_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         // check if that role is present in the blacklist
@@ -1025,7 +1025,7 @@ impl Currency {
                 "RolesBlacklist": role_id.as_i64(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = &mut session {
@@ -1047,7 +1047,7 @@ impl Currency {
     pub async fn overwrite_whitelisted_channels(
         &mut self,
         channels: Vec<DbChannelId>,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1060,7 +1060,7 @@ impl Currency {
                 "ChannelsWhitelist": channels.iter().copied().map(DbChannelId::as_i64).collect::<Vec<i64>>(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1082,7 +1082,7 @@ impl Currency {
     pub async fn overwrite_whitelisted_roles(
         &mut self,
         roles: Vec<DbRoleId>,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1095,7 +1095,7 @@ impl Currency {
                 "RolesWhitelist": roles.iter().copied().map(DbRoleId::as_i64).collect::<Vec<i64>>(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1117,7 +1117,7 @@ impl Currency {
     pub async fn overwrite_blacklisted_channels(
         &mut self,
         channels: Vec<DbChannelId>,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1130,7 +1130,7 @@ impl Currency {
                 "ChannelsBlacklist": channels.iter().copied().map(DbChannelId::as_i64).collect::<Vec<i64>>(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1152,7 +1152,7 @@ impl Currency {
     pub async fn overwrite_blacklisted_roles(
         &mut self,
         roles: Vec<DbRoleId>,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1165,7 +1165,7 @@ impl Currency {
                 "RolesBlacklist": roles.iter().copied().map(DbRoleId::as_i64).collect::<Vec<i64>>(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1187,7 +1187,7 @@ impl Currency {
     pub async fn update_earn_min(
         &mut self,
         new_earn_min: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1200,7 +1200,7 @@ impl Currency {
                 "EarnMin": new_earn_min,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1222,7 +1222,7 @@ impl Currency {
     pub async fn update_earn_max(
         &mut self,
         new_earn_max: f64,
-        mut session: Option<&mut ClientSession>
+        session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
             doc! {
@@ -1235,7 +1235,7 @@ impl Currency {
                 "EarnMax": new_earn_max,
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = session {
@@ -1270,7 +1270,7 @@ impl Currency {
                 "EarnTimeout": new_earn_timeout.num_seconds(),
             },
         };
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
         if let Some(s) = &mut session {
@@ -1298,9 +1298,7 @@ impl Currency {
         let mut cache = CACHE_CURRENCY.lock().await; // Get the cache here so no other task
         // can get the currency while were working on it.
         let mut self_ = self_.write().await;
-        let self__ = if let Some(c) = self_.take() {
-            c
-        } else {
+        let Some(self__) = self_.take() else {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
         };
 
@@ -1310,7 +1308,7 @@ impl Currency {
         // will not try to get the currency from the db while we're deleting it.
 
         // Delete the currency from the database.
-        let mut db = super::super::CLIENT.get().await.database("conebot");
+        let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
         let filterdoc =
             doc! {
@@ -1324,7 +1322,7 @@ impl Currency {
         Ok(())
     }
 
-    /// Consumes an RwLockWriteGuard to a currency and invalidates it in the cache. Waits for
+    /// Consumes an `RwLockWriteGuard` to a currency and invalidates it in the cache. Waits for
     /// all other references to the currency to be dropped before invalidating.
     ///
     /// Use this in case a transaction fails and you want to invalidate the cache.
@@ -1452,11 +1450,11 @@ mod test {
         let guild_id: u64 = 123_456_789;
         let curr_name = "test";
         let mut rng = thread_rng();
-        let mut threads = (0..20000).map(|i|
+        let threads = (0..20000).map(|i|
             sleepy_fetch_currency(guild_id, curr_name, rng.gen_range(0..5000), i)
         );
 
-        let mut handles: Vec<_> = threads.map(tokio::spawn).collect();
+        let handles: Vec<_> = threads.map(tokio::spawn).collect();
 
         for h in handles {
             h.await.unwrap();
@@ -1468,9 +1466,9 @@ mod test {
         crate::init_env().await;
         let guild_id: u64 = 123_456_789;
         let curr_name = "test";
-        let mut threads = (0..20000).map(|i| sleepy_fetch_currency(guild_id, curr_name, 0, i));
+        let threads = (0..20000).map(|i| sleepy_fetch_currency(guild_id, curr_name, 0, i));
 
-        let mut handles: Vec<_> = threads.map(tokio::spawn).collect();
+        let handles: Vec<_> = threads.map(tokio::spawn).collect();
 
         for h in handles {
             h.await.unwrap();
@@ -1483,11 +1481,11 @@ mod test {
             .unwrap()
             .unwrap();
         let currency = currency.read().await;
-        println!("Thread {} got currency.", i);
+        println!("Thread {i} got currency.");
         let currency_ = currency.as_ref().unwrap();
         assert_eq!(currency_.guild_id, DbGuildId::from(guild_id));
         assert_eq!(currency_.curr_name, curr_name);
-        drop(currency)
+        drop(currency);
     }
 
     #[tokio::test]

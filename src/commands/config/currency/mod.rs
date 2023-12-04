@@ -15,18 +15,18 @@ pub mod list;
 
 pub async fn run(
     options: CommandOptions,
-    _command: &CommandInteraction,
-    _http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
     let (cmd_name, cmd_options) = options
         .get_subcommand_args_and_name()
         .ok_or_else(|| anyhow!("Provided argument does not contain a subcommand."))?;
     match cmd_name.as_str() {
-        "list" => list::run(cmd_options, _command, _http).await?,
-        "edit" => edit::run(cmd_options, _command, _http).await?,
-        "edit_list" => edit_list::run(cmd_options, _command, _http).await?,
-        "create" => create::run(cmd_options, _command, _http).await?,
-        "delete" => delete::run(cmd_options, _command, _http).await?,
+        "list" => list::run(cmd_options, command, http).await?,
+        "edit" => edit::run(cmd_options, command, http).await?,
+        "edit_list" => edit_list::run(cmd_options, command, http).await?,
+        "create" => create::run(cmd_options, command, http).await?,
+        "delete" => delete::run(cmd_options, command, http).await?,
         &_ => bail!("Unknown currency config subcommand."),
     }
     Ok(())

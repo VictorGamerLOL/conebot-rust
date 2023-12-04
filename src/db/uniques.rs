@@ -19,16 +19,14 @@
 //! allocation or conversion. The functions claim that this is no-op so it should have
 //! little to no impact.
 //!
-//! The fact that MongoDB uses BigEndian and the average x86_64 CPU uses LittleEndian
+//! The fact that `MongoDB` uses `BigEndian` and the average `x86_64` CPU uses `LittleEndian`
 //! is trivial because the bson serializer and deserializer will handle that for us.
-
-use std::{ borrow::Borrow, str::FromStr };
 
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
-use crate::{ db::models::Currency, macros::{ nightly_const, const_impl } };
+use crate::{ db::models::Currency, macros::const_impl };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]

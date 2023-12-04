@@ -1,13 +1,13 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
-    all::{ CommandInteraction, CommandOptionType, UserId },
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
-    model::{ prelude::GuildId, user::User, Permissions },
+    model::{ user::User, Permissions },
 };
 
 use crate::{
-    db::{ models::{ Balances, Currency }, uniques::DbGuildId },
+    db::models::{ Balances, Currency },
     event_handler::command_handler::CommandOptions,
     util::currency::truncate_2dp,
 };
@@ -40,10 +40,10 @@ pub async fn run(
         return Err(anyhow!("Member {} is not in guild {}", member, guild_id));
     }
 
-    let mut balances = Balances::try_from_user(guild_id.into(), member.id.into()).await?;
+    let balances = Balances::try_from_user(guild_id.into(), member.id.into()).await?;
     let mut balances = balances.lock().await;
 
-    let Some(mut balances_) = balances.as_mut() else {
+    let Some(balances_) = balances.as_mut() else {
         return Err(anyhow!("{}'s balances are being used in a breaking operation.", member.name));
     };
 

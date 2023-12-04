@@ -1,15 +1,12 @@
+#![allow(clippy::must_use_candidate)]
 use anyhow::{ anyhow, Result };
-use serenity::{
-    all::{
-        ChannelId,
-        CommandDataOption,
-        CommandDataOptionValue,
-        CommandOptionType,
-        RoleId,
-        UserId,
-    },
-    http::{ CacheHttp, Http },
-    model::{ prelude::{ Channel, PartialChannel, PartialMember, Role }, user::User },
+use serenity::all::{
+    ChannelId,
+    CommandDataOption,
+    CommandDataOptionValue,
+    CommandOptionType,
+    RoleId,
+    UserId,
 };
 
 /// If a command expects a number but an integer is given, do not worry
@@ -24,6 +21,7 @@ pub enum IntOrNumber {
 impl IntOrNumber {
     /// Takes whatever option is in the enum
     /// and returns it as a f64.
+    #[allow(clippy::cast_precision_loss)]
     pub const fn cast_to_f64(self) -> f64 {
         match self {
             Self::Int(i) => i as f64, // Should not cause a lot of loss here.
@@ -33,6 +31,7 @@ impl IntOrNumber {
 
     /// Takes whatever option is in the enum
     /// and returns it as an i64.
+    #[allow(clippy::cast_possible_truncation)]
     pub const fn cast_to_i64(self) -> i64 {
         match self {
             Self::Int(i) => i,
@@ -46,9 +45,9 @@ pub struct CommandOptions {
     args: Vec<Opt>,
 }
 
-/// This exists because I do not need the unresolved value of [CommandDataOption], so this is
+/// This exists because I do not need the unresolved value of `[CommandDataOption]`, so this is
 /// to contain everything else besides those. If I do happen to need it, I can get it from the
-/// [ApplicationCommandInteraction] that is passed to a command.
+/// `[ApplicationCommandInteraction]` that is passed to a command.
 #[derive(Debug, Clone)]
 pub struct Opt {
     /// The name of the option as defined by the command.
