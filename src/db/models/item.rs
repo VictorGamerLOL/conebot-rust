@@ -1,15 +1,18 @@
 #![allow(clippy::module_name_repetitions)] // literally stop
 
 pub mod builder;
+pub mod fieldless;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
+use self::fieldless::ItemActionTypeFieldless;
 use crate::db::{
     uniques::{ DbGuildId, DbRoleId, DropTableName, DropTableNameRef },
     ArcTokioRwLockOption,
     TokioMutexCache,
 };
 use anyhow::{ anyhow, bail, Result };
+use fieldless::ItemTypeFieldless;
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
@@ -20,11 +23,9 @@ use thiserror::Error;
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 use tracing::instrument;
 
-use self::builder::{ ActionTypeItemTypeBuilder, ItemTypeTypeBuilder };
-
 /// Represents an item a user can hold in their inventory. May or may not
 /// be worth something or be used in return for something.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, PartialOrd)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct Item {
     /// The guild id of the guild this item belongs to.
@@ -47,7 +48,7 @@ pub struct Item {
 }
 
 /// The type of the item along with its needed details.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(tag = "ItemType")]
 pub enum ItemType {
     #[default]
@@ -87,7 +88,7 @@ impl ToString for ItemType {
 }
 
 /// The action to take when the item is used, can be none. It contains the details of the action.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 #[serde(tag = "ActionType")]
 pub enum ItemActionType {
@@ -123,9 +124,9 @@ pub enum ItemError {
 /// `update_auto` function. It is used to make the update more intuitive on
 /// the user's end.
 pub enum ItemTypeUpdateType {
-    Type(ItemTypeTypeBuilder),
+    Type(ItemTypeFieldless),
     Message(String),
-    ActionType(ActionTypeItemTypeBuilder),
+    ActionType(ItemActionTypeFieldless),
     RoleId(DbRoleId),
     DropTableName(DropTableName),
 }
@@ -149,10 +150,10 @@ impl ItemType {
         }
     }
 
-    fn update_from_type(&self, type_: ItemTypeTypeBuilder) -> Self {
+    fn update_from_type(&self, type_: ItemTypeFieldless) -> Self {
         match type_ {
-            ItemTypeTypeBuilder::Trophy => Self::Trophy,
-            ItemTypeTypeBuilder::Consumable =>
+            ItemTypeFieldless::Trophy => Self::Trophy,
+            ItemTypeFieldless::Consumable =>
                 Self::Consumable {
                     message: if let Self::Consumable { message, .. } = self {
                         message.clone()
@@ -169,7 +170,7 @@ impl ItemType {
                         ItemActionType::None
                     },
                 },
-            ItemTypeTypeBuilder::InstantConsumable =>
+            ItemTypeFieldless::InstantConsumable =>
                 Self::InstantConsumable {
                     message: "".to_owned(),
                     action_type: ItemActionType::None,
@@ -197,12 +198,12 @@ impl ItemType {
         }
     }
 
-    fn update_from_action_type(&self, action_type: ActionTypeItemTypeBuilder) -> Result<Self> {
-        if action_type == ActionTypeItemTypeBuilder::Lootbox {
+    fn update_from_action_type(&self, action_type: ItemActionTypeFieldless) -> Result<Self> {
+        if action_type == ItemActionTypeFieldless::Lootbox {
             bail!(
                 "Cannot change to lootbox like this. Use the update_drop_table_name field instead."
             );
-        } else if action_type == ActionTypeItemTypeBuilder::Role {
+        } else if action_type == ItemActionTypeFieldless::Role {
             bail!("Cannot change to role like this. Use the role_id field instead.");
         }
         match self {
@@ -267,6 +268,24 @@ impl ItemType {
                         drop_table_name: drop_table_name.into_string(),
                     },
                 },
+        }
+    }
+
+    pub const fn to_fieldless(&self) -> ItemTypeFieldless {
+        match self {
+            Self::Trophy => ItemTypeFieldless::Trophy,
+            Self::Consumable { .. } => ItemTypeFieldless::Consumable,
+            Self::InstantConsumable { .. } => ItemTypeFieldless::InstantConsumable,
+        }
+    }
+}
+
+impl ItemActionType {
+    pub const fn to_fieldless(&self) -> ItemActionTypeFieldless {
+        match self {
+            Self::None => ItemActionTypeFieldless::None,
+            Self::Role { .. } => ItemActionTypeFieldless::Role,
+            Self::Lootbox { .. } => ItemActionTypeFieldless::Lootbox,
         }
     }
 }
@@ -609,7 +628,7 @@ impl Item {
             "GuildId": self.guild_id.as_i64(),
             "ItemName": &self.item_name,
         };
-        let mut update =
+        let update_unset =
             doc! {
             "$unset": {
                 "ActionType": "",
@@ -617,6 +636,13 @@ impl Item {
                 "DropTableName": "",
                 "Message": ""
             },
+        };
+        if let Some(ref mut s) = session {
+            collection.update_one_with_session(filter.clone(), update_unset, None, s).await?;
+        } else {
+            collection.update_one(filter.clone(), update_unset, None).await?;
+        }
+        let mut update = doc! {
             "$set": {
             }
         };

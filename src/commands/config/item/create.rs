@@ -12,7 +12,8 @@ use serenity::{
 use crate::{
     db::models::item::{
         self,
-        builder::{ ActionTypeItemTypeBuilder, ItemTypeBuilder, ItemTypeTypeBuilder },
+        builder::ItemTypeBuilder,
+        fieldless::{ ItemActionTypeFieldless, ItemTypeFieldless },
     },
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
@@ -52,14 +53,14 @@ pub async fn run(
         .value(value);
     let mut item_type_builder = item::builder::ItemTypeBuilder::new();
     if let Some(s) = item_type {
-        let type_ = ItemTypeTypeBuilder::from_string(s)?;
+        let type_ = ItemTypeFieldless::from_string(s)?;
         item_type_builder.type_(Some(type_));
     }
     if let Some(s) = message {
         item_type_builder.message(Some(s));
     }
     if let Some(s) = action_type {
-        let action_type = ActionTypeItemTypeBuilder::from_string(s)?;
+        let action_type = ItemActionTypeFieldless::from_string(s)?;
         item_type_builder.action_type(Some(action_type));
     }
     item_type_builder.role(role.map(|r| r.into())).drop_table_name(drop_table);

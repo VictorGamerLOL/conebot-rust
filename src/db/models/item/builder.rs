@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use super::fieldless::ItemTypeFieldless;
 use super::*;
 use crate::db::{ uniques::DbGuildId, ArcTokioRwLockOption };
 use anyhow::{ anyhow, bail, Result };
@@ -117,39 +118,11 @@ impl Builder {
 /// need more information, then we can just return an
 /// error and have the user specify more fields.
 pub struct ItemTypeBuilder {
-    type_: Option<ItemTypeTypeBuilder>,
+    type_: Option<ItemTypeFieldless>,
     message: Option<String>,
-    action_type: Option<ActionTypeItemTypeBuilder>,
+    action_type: Option<ItemActionTypeFieldless>,
     role: Option<DbRoleId>,
     drop_table_name: Option<String>,
-}
-
-#[non_exhaustive]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
-/// This exists because the builder needs to be able to
-/// infer the type of the item, and the type of the item
-/// needs to be able to be set by the builder. It can either
-/// be set directly or inferred based on the presence of other
-/// fields.
-pub enum ItemTypeTypeBuilder {
-    #[default]
-    Trophy,
-    Consumable,
-    InstantConsumable,
-}
-
-#[non_exhaustive]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
-/// If the type of the item is not Trophy, then the action type
-/// must be specified or be able to be inferred from the presence
-/// of other fields. If neither `role` nor `drop_table_name` are
-/// present, then the action type is `None`. If both are present,
-/// then it is an error.
-pub enum ActionTypeItemTypeBuilder {
-    #[default]
-    None,
-    Role,
-    Lootbox,
 }
 
 impl ItemTypeBuilder {
@@ -175,25 +148,25 @@ impl ItemTypeBuilder {
                 self.role.is_some() ||
                 self.drop_table_name.is_some()
             {
-                ItemTypeTypeBuilder::Consumable
+                ItemTypeFieldless::Consumable
             } else {
-                ItemTypeTypeBuilder::Trophy
+                ItemTypeFieldless::Trophy
             }
         });
-        if type_ == ItemTypeTypeBuilder::Trophy {
+        if type_ == ItemTypeFieldless::Trophy {
             return Ok(Self::TROPHY);
         }
 
         let message = self.message.unwrap_or_default();
         let action_type: ItemActionType = match action_type {
-            ActionTypeItemTypeBuilder::None => ItemActionType::None,
-            ActionTypeItemTypeBuilder::Role => {
+            ItemActionTypeFieldless::None => ItemActionType::None,
+            ItemActionTypeFieldless::Role => {
                 let role = self.role.ok_or_else(||
                     anyhow!("Role must be present if action type is Role.")
                 )?;
                 ItemActionType::Role { role_id: role }
             }
-            ActionTypeItemTypeBuilder::Lootbox => {
+            ItemActionTypeFieldless::Lootbox => {
                 let drop_table_name = self.drop_table_name.ok_or_else(|| {
                     anyhow!("Drop table name must be present if action type is Lootbox.")
                 })?;
@@ -202,13 +175,13 @@ impl ItemTypeBuilder {
         };
 
         match type_ {
-            ItemTypeTypeBuilder::Trophy => Ok(ItemType::Trophy),
-            ItemTypeTypeBuilder::Consumable =>
+            ItemTypeFieldless::Trophy => Ok(ItemType::Trophy),
+            ItemTypeFieldless::Consumable =>
                 Ok(ItemType::Consumable {
                     message,
                     action_type,
                 }),
-            ItemTypeTypeBuilder::InstantConsumable =>
+            ItemTypeFieldless::InstantConsumable =>
                 Ok(ItemType::InstantConsumable {
                     message,
                     action_type,
@@ -216,16 +189,16 @@ impl ItemTypeBuilder {
         }
     }
 
-    pub fn infer_action_type(&self) -> Result<ActionTypeItemTypeBuilder> {
+    pub fn infer_action_type(&self) -> Result<ItemActionTypeFieldless> {
         if let Some(action_type) = self.action_type {
             return Ok(action_type);
         }
         if self.role.is_none() && self.drop_table_name.is_none() {
-            Ok(ActionTypeItemTypeBuilder::None)
+            Ok(ItemActionTypeFieldless::None)
         } else if self.role.is_some() && self.drop_table_name.is_none() {
-            Ok(ActionTypeItemTypeBuilder::Role)
+            Ok(ItemActionTypeFieldless::Role)
         } else if self.role.is_none() && self.drop_table_name.is_some() {
-            Ok(ActionTypeItemTypeBuilder::Lootbox)
+            Ok(ItemActionTypeFieldless::Lootbox)
         } else {
             Err(
                 anyhow!(
@@ -235,7 +208,7 @@ impl ItemTypeBuilder {
         }
     }
 
-    pub fn type_(&mut self, type_: Option<ItemTypeTypeBuilder>) -> &mut Self {
+    pub fn type_(&mut self, type_: Option<ItemTypeFieldless>) -> &mut Self {
         self.type_ = type_;
         self
     }
@@ -245,7 +218,7 @@ impl ItemTypeBuilder {
         self
     }
 
-    pub fn action_type(&mut self, action_type: Option<ActionTypeItemTypeBuilder>) -> &mut Self {
+    pub fn action_type(&mut self, action_type: Option<ItemActionTypeFieldless>) -> &mut Self {
         self.action_type = action_type;
         self
     }
@@ -260,105 +233,6 @@ impl ItemTypeBuilder {
         self
     }
 }
-
-impl ToString for ItemTypeTypeBuilder {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Trophy => "Trophy".to_owned(),
-            Self::Consumable => "Consumable".to_owned(),
-            Self::InstantConsumable => "InstantConsumable".to_owned(),
-        }
-    }
-}
-
-impl FromStr for ItemTypeTypeBuilder {
-    type Err = anyhow::Error;
-
-    /// The from_str implementation on this is
-    /// ***CASE SENSITIVE***. It assumes that the str passed
-    /// is already lowercase. The only other case this works is
-    /// if the first letter is capitalized.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "trophy" | "Trophy" => Ok(Self::Trophy),
-            "consumable" | "Consumable" => Ok(Self::Consumable),
-            "instantconsumable" | "InstantConsumable" | "Instantconsumable" => {
-                Ok(Self::InstantConsumable)
-            }
-            _ => Err(anyhow!("Invalid item type: {}", s)),
-        }
-    }
-}
-
-impl ItemTypeTypeBuilder {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Trophy => "Trophy",
-            Self::Consumable => "Consumable",
-            Self::InstantConsumable => "InstantConsumable",
-        }
-    }
-
-    pub fn from_string(mut s: String) -> Result<Self> {
-        s.make_ascii_lowercase();
-        match s.as_str() {
-            "trophy" => Ok(Self::Trophy),
-            "consumable" => Ok(Self::Consumable),
-            "instantconsumable" | "instant consumable" | "instant-consumable" => {
-                Ok(Self::InstantConsumable)
-            }
-            _ => Err(anyhow!("Invalid item type")),
-        }
-    }
-}
-
-impl ToString for ActionTypeItemTypeBuilder {
-    fn to_string(&self) -> String {
-        match self {
-            Self::None => "None".to_owned(),
-            Self::Role => "Role".to_owned(),
-            Self::Lootbox => "Lootbox".to_owned(),
-        }
-    }
-}
-
-impl FromStr for ActionTypeItemTypeBuilder {
-    type Err = anyhow::Error;
-
-    /// The from_str implementation on this is
-    /// ***CASE SENSITIVE***. It assumes that the str passed
-    /// is already lowercase. The only other case this works is
-    /// if the first letter is capitalized.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "none" | "None" => Ok(Self::None),
-            "role" | "Role" => Ok(Self::Role),
-            "lootbox" | "Lootbox" => Ok(Self::Lootbox),
-            _ => Err(anyhow!("Invalid action type: {}", s)),
-        }
-    }
-}
-
-impl ActionTypeItemTypeBuilder {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::None => "None",
-            Self::Role => "Role",
-            Self::Lootbox => "Lootbox",
-        }
-    }
-
-    pub fn from_string(mut s: String) -> Result<Self> {
-        s.make_ascii_lowercase();
-        match s.as_str() {
-            "none" => Ok(Self::None),
-            "role" => Ok(Self::Role),
-            "lootbox" => Ok(Self::Lootbox),
-            _ => Err(anyhow!("Invalid action type")),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::io::Write;

@@ -272,6 +272,7 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "async_once",
+ "cfg-if",
  "chrono",
  "dotenv",
  "futures",
@@ -282,6 +283,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
+ "rustversion",
  "serde",
  "serde_json",
  "serde_with 3.4.0",
@@ -1546,6 +1548,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "rustversion"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
 
 [[package]]
 name = "ryu"

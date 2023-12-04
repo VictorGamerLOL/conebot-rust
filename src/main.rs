@@ -1,18 +1,25 @@
+// lints to be enabled when finishing code:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(unused_imports)]
 #![allow(clippy::await_holding_lock)]
+
 // #![warn(clippy::pedantic)] // TODO Enable this when finishing code.
 #![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
 #![deny(elided_lifetimes_in_paths)]
+
+#![cfg_attr(feature = "is-nightly", feature(const_trait_impl))]
 
 pub mod commands;
 pub mod db;
 pub mod event_handler;
 pub mod mechanics;
 pub mod util;
+
+#[macro_use]
+pub mod macros;
 
 use dotenv::dotenv;
 use serenity::{ model::gateway::GatewayIntents, Client };
@@ -33,6 +40,10 @@ async fn main() {
     info!("test");
     debug!("test");
     trace!("test");
+
+    if cfg!(feature = "is-nightly") {
+        warn!("Rust nightly detected. Enabling nightly exclusive features.");
+    }
 
     let token = match env::var("TOKEN") {
         Ok(token) => token,

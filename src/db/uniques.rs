@@ -28,7 +28,7 @@ use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
-use crate::db::models::Currency;
+use crate::{ db::models::Currency, macros::{ nightly_const, const_impl } };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -46,75 +46,99 @@ impl DbGuildId {
     }
 }
 
-impl From<u64> for DbGuildId {
-    fn from(id: u64) -> Self {
-        Self(i64::from_ne_bytes(id.to_ne_bytes()))
+const_impl! {
+    impl From<u64> for DbGuildId {
+        fn from(id: u64) -> Self {
+            Self(i64::from_ne_bytes(id.to_ne_bytes()))
+        }
     }
 }
 
-impl From<i64> for DbGuildId {
-    fn from(id: i64) -> Self {
-        Self(id)
+const_impl! {
+    impl From<i64> for DbGuildId {
+        fn from(id: i64) -> Self {
+            Self(id)
+        }
     }
 }
 
-impl From<i32> for DbGuildId {
-    fn from(id: i32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i32> for DbGuildId {
+        fn from(id: i32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u32> for DbGuildId {
-    fn from(id: u32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u32> for DbGuildId {
+        fn from(id: u32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i16> for DbGuildId {
-    fn from(id: i16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i16> for DbGuildId {
+        fn from(id: i16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u16> for DbGuildId {
-    fn from(id: u16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u16> for DbGuildId {
+        fn from(id: u16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i8> for DbGuildId {
-    fn from(id: i8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i8> for DbGuildId {
+        fn from(id: i8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u8> for DbGuildId {
-    fn from(id: u8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u8> for DbGuildId {
+        fn from(id: u8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<DbGuildId> for u64 {
-    fn from(id: DbGuildId) -> Self {
-        Self::from_ne_bytes(id.0.to_ne_bytes())
+const_impl! {
+    impl From<DbGuildId> for u64 {
+        fn from(id: DbGuildId) -> Self {
+            Self::from_ne_bytes(id.0.to_ne_bytes())
+        }
     }
 }
 
-impl From<DbGuildId> for i64 {
-    fn from(id: DbGuildId) -> Self {
-        id.0
+const_impl! {
+    impl From<DbGuildId> for i64 {
+        fn from(id: DbGuildId) -> Self {
+            id.0
+        }
     }
 }
 
-impl From<GuildId> for DbGuildId {
-    fn from(id: GuildId) -> Self {
-        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+const_impl! {
+    impl From<GuildId> for DbGuildId {
+        fn from(id: GuildId) -> Self {
+            Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbGuildId> for GuildId {
-    fn from(id: DbGuildId) -> Self {
-        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+const_impl! {
+    impl From<DbGuildId> for GuildId {
+        fn from(id: DbGuildId) -> Self {
+            Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        }
     }
 }
 
@@ -138,69 +162,91 @@ impl DbUserId {
     }
 }
 
-impl From<u64> for DbUserId {
-    fn from(id: u64) -> Self {
-        Self(i64::from_ne_bytes(id.to_ne_bytes()))
+const_impl! {
+    impl From<u64> for DbUserId {
+        fn from(id: u64) -> Self {
+            Self(i64::from_ne_bytes(id.to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbUserId> for u64 {
-    fn from(id: DbUserId) -> Self {
-        Self::from_ne_bytes(id.0.to_ne_bytes())
+const_impl! {
+    impl From<DbUserId> for u64 {
+        fn from(id: DbUserId) -> Self {
+            Self::from_ne_bytes(id.0.to_ne_bytes())
+        }
     }
 }
 
-impl From<i64> for DbUserId {
-    fn from(id: i64) -> Self {
-        Self(id)
+const_impl! {
+    impl From<i64> for DbUserId {
+        fn from(id: i64) -> Self {
+            Self(id)
+        }
     }
 }
 
-impl From<i32> for DbUserId {
-    fn from(id: i32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i32> for DbUserId {
+        fn from(id: i32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u32> for DbUserId {
-    fn from(id: u32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u32> for DbUserId {
+        fn from(id: u32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i16> for DbUserId {
-    fn from(id: i16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i16> for DbUserId {
+        fn from(id: i16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u16> for DbUserId {
-    fn from(id: u16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u16> for DbUserId {
+        fn from(id: u16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i8> for DbUserId {
-    fn from(id: i8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i8> for DbUserId {
+        fn from(id: i8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u8> for DbUserId {
-    fn from(id: u8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u8> for DbUserId {
+        fn from(id: u8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<UserId> for DbUserId {
-    fn from(id: UserId) -> Self {
-        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+const_impl! {
+    impl From<UserId> for DbUserId {
+        fn from(id: UserId) -> Self {
+            Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbUserId> for UserId {
-    fn from(id: DbUserId) -> Self {
-        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+const_impl! {
+    impl From<DbUserId> for UserId {
+        fn from(id: DbUserId) -> Self {
+            Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        }
     }
 }
 
@@ -223,75 +269,99 @@ impl DbChannelId {
     }
 }
 
-impl From<u64> for DbChannelId {
-    fn from(id: u64) -> Self {
-        Self(i64::from_ne_bytes(id.to_ne_bytes()))
+const_impl! {
+    impl From<u64> for DbChannelId {
+        fn from(id: u64) -> Self {
+            Self(i64::from_ne_bytes(id.to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbChannelId> for u64 {
-    fn from(id: DbChannelId) -> Self {
-        Self::from_ne_bytes(id.0.to_ne_bytes())
+const_impl! {
+    impl From<DbChannelId> for u64 {
+        fn from(id: DbChannelId) -> Self {
+            Self::from_ne_bytes(id.0.to_ne_bytes())
+        }
     }
 }
 
-impl From<DbChannelId> for i64 {
-    fn from(id: DbChannelId) -> Self {
-        id.0
+const_impl! {
+    impl From<DbChannelId> for i64 {
+        fn from(id: DbChannelId) -> Self {
+            id.0
+        }
     }
 }
 
-impl From<i64> for DbChannelId {
-    fn from(id: i64) -> Self {
-        Self(id)
+const_impl! {
+    impl From<i64> for DbChannelId {
+        fn from(id: i64) -> Self {
+            Self(id)
+        }
     }
 }
 
-impl From<i32> for DbChannelId {
-    fn from(id: i32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i32> for DbChannelId {
+        fn from(id: i32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u32> for DbChannelId {
-    fn from(id: u32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u32> for DbChannelId {
+        fn from(id: u32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i16> for DbChannelId {
-    fn from(id: i16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i16> for DbChannelId {
+        fn from(id: i16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u16> for DbChannelId {
-    fn from(id: u16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u16> for DbChannelId {
+        fn from(id: u16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i8> for DbChannelId {
-    fn from(id: i8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i8> for DbChannelId {
+        fn from(id: i8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u8> for DbChannelId {
-    fn from(id: u8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u8> for DbChannelId {
+        fn from(id: u8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<ChannelId> for DbChannelId {
-    fn from(id: ChannelId) -> Self {
-        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+const_impl! {
+    impl From<ChannelId> for DbChannelId {
+        fn from(id: ChannelId) -> Self {
+            Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbChannelId> for ChannelId {
-    fn from(id: DbChannelId) -> Self {
-        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+const_impl! {
+    impl From<DbChannelId> for ChannelId {
+        fn from(id: DbChannelId) -> Self {
+            Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        }
     }
 }
 
@@ -321,75 +391,99 @@ impl DbRoleId {
     }
 }
 
-impl From<u64> for DbRoleId {
-    fn from(id: u64) -> Self {
-        Self(i64::from_ne_bytes(id.to_ne_bytes()))
+const_impl! {
+    impl From<u64> for DbRoleId {
+        fn from(id: u64) -> Self {
+            Self(i64::from_ne_bytes(id.to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbRoleId> for u64 {
-    fn from(id: DbRoleId) -> Self {
-        Self::from_ne_bytes(id.0.to_ne_bytes())
+const_impl! {
+    impl From<DbRoleId> for u64 {
+        fn from(id: DbRoleId) -> Self {
+            Self::from_ne_bytes(id.0.to_ne_bytes())
+        }
     }
 }
 
-impl From<i64> for DbRoleId {
-    fn from(id: i64) -> Self {
-        Self(id)
+const_impl! {
+    impl From<i64> for DbRoleId {
+        fn from(id: i64) -> Self {
+            Self(id)
+        }
     }
 }
 
-impl From<i32> for DbRoleId {
-    fn from(id: i32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i32> for DbRoleId {
+        fn from(id: i32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u32> for DbRoleId {
-    fn from(id: u32) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u32> for DbRoleId {
+        fn from(id: u32) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i16> for DbRoleId {
-    fn from(id: i16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i16> for DbRoleId {
+        fn from(id: i16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u16> for DbRoleId {
-    fn from(id: u16) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u16> for DbRoleId {
+        fn from(id: u16) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<i8> for DbRoleId {
-    fn from(id: i8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<i8> for DbRoleId {
+        fn from(id: i8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<u8> for DbRoleId {
-    fn from(id: u8) -> Self {
-        Self(i64::from(id))
+const_impl! {
+    impl From<u8> for DbRoleId {
+        fn from(id: u8) -> Self {
+            Self(i64::from(id))
+        }
     }
 }
 
-impl From<DbRoleId> for i64 {
-    fn from(id: DbRoleId) -> Self {
-        id.0
+const_impl! {
+    impl From<DbRoleId> for i64 {
+        fn from(id: DbRoleId) -> Self {
+            id.0
+        }
     }
 }
 
-impl From<RoleId> for DbRoleId {
-    fn from(id: RoleId) -> Self {
-        Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+const_impl! {
+    impl From<RoleId> for DbRoleId {
+        fn from(id: RoleId) -> Self {
+            Self(i64::from_ne_bytes(id.get().to_ne_bytes()))
+        }
     }
 }
 
-impl From<DbRoleId> for RoleId {
-    fn from(id: DbRoleId) -> Self {
-        Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+const_impl! {
+    impl From<DbRoleId> for RoleId {
+        fn from(id: DbRoleId) -> Self {
+            Self::from(u64::from_ne_bytes(id.0.to_ne_bytes()))
+        }
     }
 }
 
@@ -418,7 +512,6 @@ impl CurrencyName {
         &self.1
     }
 
-    #[allow(clippy::missing_const_for_fn)]
     pub async fn validate(&self) -> Result<bool> {
         Ok(Currency::try_from_name(self.0, self.1.clone()).await?.is_some())
     }
