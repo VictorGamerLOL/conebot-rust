@@ -29,7 +29,7 @@ pub async fn run(
         .ok_or_else(|| anyhow!("No amount was provided."))??
         .cast_to_f64();
     let currency = options
-        .get_string_value("currency")
+        .get_string_value("currency-name")
         .ok_or_else(|| anyhow!("No currency name was provided."))??;
     let member = options
         .get_user_value("member")
@@ -40,7 +40,7 @@ pub async fn run(
     if currency == String::new() {
         return Err(anyhow!("No currency name was provided."));
     } else if amount == 0.0 {
-        return Err(anyhow!("No amount was provided."));
+        return Err(anyhow!("No amount was provided or provided amount was 0."));
     } else if member.id == UserId::default() {
         return Err(anyhow!("No member was provided."));
     }
@@ -108,55 +108,27 @@ pub async fn run(
     Ok(())
 }
 
-pub fn application_command() -> CreateCommand {
-    let perms = Permissions::MANAGE_GUILD;
-    CreateCommand::new("give")
-        .description("Give a user an amount of a currency.")
-        .dm_permission(false)
-        .default_member_permissions(perms)
-        .add_option(
+pub fn command() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::String, "currency", "Give the user currency.")
+        .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                "currency",
+                "currency-name",
                 "The currency to give."
             ).required(true)
         )
-        .add_option(
+        .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::Number,
                 "amount",
                 "The amount to give."
             ).required(true)
         )
-        .add_option(
+        .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::User,
                 "member",
                 "The member to give the currency to."
             ).required(true)
         )
-    // command
-    //     .name("give")
-    //     .description("Give a user an amount of a currency.")
-    //     .dm_permission(false)
-    //     .default_member_permissions(perms)
-    //     .create_option(|o| {
-    //         o.name("currency")
-    //             .description("The currency to give.")
-    //             .kind(CommandOptionType::String)
-    //             .required(true)
-    //     })
-    //     .create_option(|o| {
-    //         o.name("amount")
-    //             .description("The amount to give.")
-    //             .kind(CommandOptionType::Number)
-    //             .required(true)
-    //     })
-    //     .create_option(|o| {
-    //         o.name("member")
-    //             .description("The member to give the currency to.")
-    //             .kind(CommandOptionType::User)
-    //             .required(true)
-    //     });
-    // command
 }

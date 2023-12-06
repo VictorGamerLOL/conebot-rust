@@ -732,7 +732,7 @@ impl Currency {
     /// If any mongodb operation errors, or if channel is not whitelisted.
     pub async fn remove_whitelisted_channel(
         &mut self,
-        channel_id: &DbChannelId,
+        channel_id: DbChannelId,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
@@ -758,7 +758,7 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        self.channels_whitelist.retain(|x| x != channel_id);
+        self.channels_whitelist.retain(|x| *x != channel_id);
 
         Ok(())
     }
@@ -824,7 +824,7 @@ impl Currency {
     /// If any mongodb operation errors, or if role is not whitelisted.
     pub async fn remove_whitelisted_role(
         &mut self,
-        role_id: &DbRoleId,
+        role_id: DbRoleId,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
@@ -850,7 +850,7 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        self.roles_whitelist.retain(|x| x != role_id);
+        self.roles_whitelist.retain(|x| *x != role_id);
 
         Ok(())
     }
@@ -916,7 +916,7 @@ impl Currency {
     /// If any mongodb operation errors, or if channel is not blacklisted.
     pub async fn remove_blacklisted_channel(
         &mut self,
-        channel_id: &DbChannelId,
+        channel_id: DbChannelId,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
@@ -942,7 +942,7 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        self.channels_blacklist.retain(|x| x != channel_id);
+        self.channels_blacklist.retain(|x| *x != channel_id);
 
         Ok(())
     }
@@ -1008,7 +1008,7 @@ impl Currency {
     /// If any mongodb operation errors, or if role is not blacklisted.
     pub async fn remove_blacklisted_role(
         &mut self,
-        role_id: &DbRoleId,
+        role_id: DbRoleId,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         let filterdoc =
@@ -1034,7 +1034,7 @@ impl Currency {
             coll.update_one(filterdoc, updatedoc, None).await?;
         }
 
-        self.roles_blacklist.retain(|x| x != role_id);
+        self.roles_blacklist.retain(|x| *x != role_id);
 
         Ok(())
     }

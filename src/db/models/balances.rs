@@ -242,13 +242,13 @@ impl Balance {
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub const fn guild_id(&self) -> &DbGuildId {
-        &self.guild_id
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
     }
 
     #[allow(clippy::must_use_candidate)]
-    pub const fn user_id(&self) -> &DbUserId {
-        &self.user_id
+    pub const fn user_id(&self) -> DbUserId {
+        self.user_id
     }
 
     #[allow(clippy::must_use_candidate)]

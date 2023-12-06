@@ -227,7 +227,7 @@ async fn parse_options<'a>(
     Ok(Options { user, currency })
 }
 
-pub fn application_command() -> CreateCommand {
+pub fn command() -> CreateCommand {
     CreateCommand::new("balance")
         .description("Check your balance or someone else's for one currency or all of them.")
         .dm_permission(false)

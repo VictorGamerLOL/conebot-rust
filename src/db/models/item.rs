@@ -331,7 +331,7 @@ impl Item {
         if let Some(item) = CACHE_ITEM.lock().await.get(&key) {
             return Ok(item.clone());
         }
-        let item = Self::try_from_name_uncached(&key.0, &key.1).await?;
+        let item = Self::try_from_name_uncached(key.0, &key.1).await?;
         CACHE_ITEM.lock().await.put(key, item.clone());
         // were cloning a pointer above, not all of the data so it's fine.
         Ok(item)
@@ -339,7 +339,7 @@ impl Item {
 
     /// Internal function to just get the item from the database without checking the cache.
     async fn try_from_name_uncached(
-        guild_id: &DbGuildId,
+        guild_id: DbGuildId,
         item_name: &str
     ) -> Result<ArcTokioRwLockOption<Self>, ItemError> {
         // i am using mongodb by the way
@@ -670,7 +670,9 @@ impl Item {
                 update_set.insert("ItemType", "Consumable");
 
                 match action_type {
-                    ItemActionType::None => {}
+                    ItemActionType::None => {
+                        update_set.insert("ActionType", "None");
+                    }
                     ItemActionType::Role { role_id } => {
                         update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());
@@ -685,7 +687,9 @@ impl Item {
                 update_set.insert("Message", message);
                 update_set.insert("ItemType", "InstantConsumable");
                 match action_type {
-                    ItemActionType::None => {}
+                    ItemActionType::None => {
+                        update_set.insert("ActionType", "None");
+                    }
                     ItemActionType::Role { role_id } => {
                         update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());

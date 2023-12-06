@@ -165,7 +165,7 @@ fn check_contains_channel(
 ) -> bool {
     let id = current_channel.into();
     for db_channel in channels {
-        if &DbChannelId::from(id) == db_channel {
+        if DbChannelId::from(id) == *db_channel {
             return true;
         }
     }

@@ -83,7 +83,7 @@ pub async fn run(
     Ok(())
 }
 
-pub fn application_command() -> CreateCommand {
+pub fn command() -> CreateCommand {
     let perms = Permissions::MANAGE_GUILD;
     CreateCommand::new("take")
         .description("Take away from a user a specified amount of a currency.")

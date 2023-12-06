@@ -24,7 +24,7 @@ pub async fn run(
     Ok(())
 }
 
-pub fn application_command() -> CreateCommand {
+pub fn command() -> CreateCommand {
     CreateCommand::new("currency")
         .description("Commands related to managing currencies.")
         .dm_permission(false)

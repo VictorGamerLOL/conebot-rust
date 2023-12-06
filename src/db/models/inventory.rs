@@ -6,25 +6,39 @@ use anyhow::{ anyhow, bail, Result };
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
-use mongodb::{ bson::doc, Collection };
+use mongodb::{ bson::doc, ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
+use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::db::{ uniques::{ DbGuildId, DbUserId }, ArcTokioMutexOption, TokioMutexCache };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Inventory {
     guild_id: DbGuildId,
     user_id: DbUserId,
     inventory: Vec<InventoryEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InventoryEntry {
     guild_id: DbGuildId,
     user_id: DbUserId,
     item_name: String,
     amount: i64, // Should not go into negatives. Enforce at runtime. Here because MongoDB has no unsigned integers.
+}
+
+#[derive(Debug, Error)]
+pub enum InventoryError {
+    #[error("The amount of the item will underflow.")]
+    AmountUnderflow,
+    #[error("The amount of the item will overflow.")]
+    AmountOverflow,
+    #[error("The amount of the item is negative.")]
+    BelowZero,
+    #[error("The item does not exist or user has 0 of the item.")]
+    ZeroOrNotExists,
+    #[error(transparent)] Other(#[from] anyhow::Error),
 }
 
 lazy_static! {
@@ -46,7 +60,7 @@ impl Inventory {
         if let Some(inventory) = cache.get(&key) {
             return Ok(inventory.to_owned());
         }
-        let inv_entries = InventoryEntry::from_user(&guild_id, &user_id).await?;
+        let inv_entries = InventoryEntry::from_user(guild_id, user_id).await?;
         let inventory = Arc::new(
             Mutex::new(
                 Some(Self {
@@ -61,11 +75,13 @@ impl Inventory {
         Ok(inventory)
     }
 
-    /// Gets the inventory entry matching the item name provided,
-    /// or makes it.
+    /// Gets the inventory entry matching the item name provided.
+    /// If the user does not have the item or the item does not exist,
+    /// it returns `None`
     ///
     /// # Errors
-    /// - Any mongodb error occurs.
+    /// - Item does not exist.
+    /// - User has 0 of the item.
     ///
     /// # Panics
     /// Will not panic. I just use a direct vector access in there after i find
@@ -75,15 +91,12 @@ impl Inventory {
     /// Whoever inspects this code and starts crying at the sight of a `vec[i]`,
     /// stop, I assure you what I did here won't crash unless `position()` fails
     /// colossally.
-    pub async fn get_or_make_item(&mut self, item_name: String) -> Result<&mut InventoryEntry> {
+    pub fn get_item(&mut self, item_name: String) -> Option<&mut InventoryEntry> {
         // There is something wrong with the borrow checker so i need to do the thing below instead.
         if let Some(i) = self.inventory.iter().position(|e| e.item_name == item_name) {
-            return Ok(&mut self.inventory[i]);
+            return Some(&mut self.inventory[i]);
         }
-
-        let entry = InventoryEntry::new(self.guild_id, self.user_id, item_name).await?;
-        self.inventory.push(entry);
-        Ok(self.inventory.last_mut().unwrap())
+        None
     }
 
     /// Gets the inventory entry matching the item and deletes it.
@@ -91,7 +104,11 @@ impl Inventory {
     /// # Errors
     /// - Any mongodb error occurs.
     /// - The item entry does not exist.
-    pub async fn delete_item(&mut self, item_name: String) -> Result<()> {
+    pub async fn delete_item(
+        &mut self,
+        item_name: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<InventoryEntry> = db.collection("inventories");
 
@@ -102,7 +119,11 @@ impl Inventory {
             "ItemName": &item_name,
         };
 
-        coll.delete_one(filterdoc, None).await?;
+        if let Some(s) = session {
+            coll.delete_one_with_session(filterdoc, None, s).await?;
+        } else {
+            coll.delete_one(filterdoc, None).await?;
+        }
 
         self.inventory.retain(|e| e.item_name != item_name); // slightly risky take
         // if by any chance it happens to be named differently than it is in the DB.
@@ -117,7 +138,12 @@ impl InventoryEntry {
     /// # Errors
     /// - Any mongodb error occurs.
     /// - The item entry already exists.
-    async fn new(guild_id: DbGuildId, user_id: DbUserId, item_name: String) -> Result<Self> {
+    async fn new(
+        guild_id: DbGuildId,
+        user_id: DbUserId,
+        item_name: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<Self> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");
 
@@ -139,7 +165,11 @@ impl InventoryEntry {
             amount: 0,
         };
 
-        coll.insert_one(&new_self, None).await?;
+        if let Some(s) = session {
+            coll.insert_one_with_session(&new_self, None, s).await?;
+        } else {
+            coll.insert_one(&new_self, None).await?;
+        }
 
         Ok(new_self)
     }
@@ -150,7 +180,7 @@ impl InventoryEntry {
     ///
     /// # Errors
     /// - Any mongodb error occurs.
-    async fn from_user(guild_id: &DbGuildId, user_id: &DbUserId) -> Result<Vec<Self>> {
+    async fn from_user(guild_id: DbGuildId, user_id: DbUserId) -> Result<Vec<Self>> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");
 
@@ -226,12 +256,12 @@ impl InventoryEntry {
 
     // I do not understand how this can be a const Fn because DbGuildId just holds a string, and
     // string borrows are not allowed in const fns.
-    pub const fn guild_id(&self) -> &DbGuildId {
-        &self.guild_id
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
     }
 
-    pub const fn user_id(&self) -> &DbUserId {
-        &self.user_id
+    pub const fn user_id(&self) -> DbUserId {
+        self.user_id
     }
 
     pub fn item_name(&self) -> &str {
@@ -247,9 +277,14 @@ impl InventoryEntry {
     /// # Errors
     /// - The amount is negative.
     /// - Any mongodb error occurs.
-    pub async fn set_amount(&mut self, amount: i64) -> Result<()> {
+    pub async fn set_amount(
+        &mut self,
+        amount: i64,
+        session: Option<&mut ClientSession>
+    ) -> Result<(), InventoryError> {
+        // The negative check. The one I said I need earlier.
         if amount < 0 {
-            bail!("Amount cannot be negative");
+            return Err(InventoryError::BelowZero);
         }
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");
@@ -267,7 +302,15 @@ impl InventoryEntry {
             }
         };
 
-        coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Some(s) = session {
+            coll
+                .update_one_with_session(filterdoc, updatedoc, None, s).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        } else {
+            coll
+                .update_one(filterdoc, updatedoc, None).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        }
 
         self.amount = amount;
 
@@ -283,9 +326,14 @@ impl InventoryEntry {
     /// - Any mongodb error occurs.
     /// - The amount underflows.
     #[inline]
-    pub async fn sub_amount(&mut self, amount: i64) -> Result<()> {
+    pub async fn sub_amount(
+        &mut self,
+        amount: i64,
+        session: Option<&mut ClientSession>
+    ) -> Result<(), InventoryError> {
         self.set_amount(
-            self.amount.checked_sub(amount).ok_or_else(|| anyhow!("Amount will underflow"))?
+            self.amount.checked_sub(amount).ok_or(InventoryError::AmountUnderflow)?,
+            session
         ).await
     }
 
@@ -298,9 +346,14 @@ impl InventoryEntry {
     /// - Any mongodb error occurs.
     /// - The amount overflows.
     #[inline]
-    pub async fn add_amount(&mut self, amount: i64) -> Result<()> {
+    pub async fn add_amount(
+        &mut self,
+        amount: i64,
+        session: Option<&mut ClientSession>
+    ) -> Result<(), InventoryError> {
         self.set_amount(
-            self.amount.checked_add(amount).ok_or_else(|| anyhow!("Amount will overflow"))?
+            self.amount.checked_add(amount).ok_or(InventoryError::AmountOverflow)?,
+            session
         ).await
     }
 }

@@ -105,28 +105,28 @@ async fn remove(currency: &mut Currency, field_name: &str, value: Mention) -> Re
     match field_name {
         "roles_whitelist" => {
             if let Mention::Role(r) = value {
-                currency.remove_whitelisted_role(&r.into(), None).await?;
+                currency.remove_whitelisted_role(r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "roles_blacklist" => {
             if let Mention::Role(r) = value {
-                currency.remove_blacklisted_role(&r.into(), None).await?;
+                currency.remove_blacklisted_role(r.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_whitelist" => {
             if let Mention::Channel(c) = value {
-                currency.remove_whitelisted_channel(&c.into(), None).await?;
+                currency.remove_whitelisted_channel(c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }
         }
         "channels_blacklist" => {
             if let Mention::Channel(c) = value {
-                currency.remove_blacklisted_channel(&c.into(), None).await?;
+                currency.remove_blacklisted_channel(c.into(), None).await?;
             } else {
                 bail!("Invalid value type for field {}", field_name);
             }

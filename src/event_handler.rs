@@ -62,13 +62,14 @@ impl EventHandler for Handler {
             let Err(e) = Command::set_global_commands(
                 &ctx.http,
                 vec![
-                    commands::ping::application_command(),
-                    commands::test1::application_command(),
-                    commands::currency::application_command(),
-                    commands::balance::application_command(),
-                    commands::give::application_command(),
-                    commands::take::application_command(),
-                    commands::config::application_command()
+                    commands::ping::command(),
+                    commands::test1::command(),
+                    commands::currency::command(),
+                    commands::balance::command(),
+                    commands::give::command(),
+                    commands::take::command(),
+                    commands::config::command(),
+                    commands::use_item::command()
                 ]
             ).await
         {

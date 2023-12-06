@@ -133,13 +133,13 @@ pub fn option() -> CreateCommandOption {
                 CommandOptionType::String,
                 FIELD_OPTION_NAME,
                 "The field of the item to edit."
-            ).required(false)
+            ).required(true)
         )
         .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 VALUE_OPTION_NAME,
                 "The value to set the field to."
-            ).required(false)
+            ).required(true)
         )
 }

@@ -21,6 +21,6 @@ pub async fn run(
     Ok(())
 }
 
-pub fn application_command() -> CreateCommand {
+pub fn command() -> CreateCommand {
     CreateCommand::new("test").description("aaa")
 }

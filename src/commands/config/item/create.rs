@@ -90,7 +90,7 @@ pub fn option() -> CreateCommandOption {
                 CommandOptionType::String,
                 NAME_OPTION_NAME,
                 "The name of the item, cannot be blank."
-            )
+            ).required(true)
         )
         .add_sub_option(
             CreateCommandOption::new(
