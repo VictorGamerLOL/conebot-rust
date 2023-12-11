@@ -1,4 +1,5 @@
 #![allow(unused_macros)]
+
 #[rustversion::not(nightly)]
 /// A macro that implements a trait for a type. If it detects that it is being
 /// compiled on nightly, it will implement the trait as `const`, assuming that
@@ -77,5 +78,23 @@ macro_rules! nightly_const {
     };
 }
 
+/* macro_rules! if_with_session {
+    (
+        $session:ident,
+        $($other_ident:ident).*,
+        $fn_name:ident($($args:tt)*),
+        true
+    ) => {
+        use paste::paste;
+        paste! {
+            if let Some(ref mut s) = $session {
+                $($other_ident).*.[<$fn_name _with_session>](s, $($args)*).await?;
+            } else {
+                $($other_ident).*.$fn_name($($args)*).await?;
+            }
+        };
+    };
+} */
 pub(crate) use const_impl;
 // pub(crate) use nightly_const;
+// pub(crate) use if_with_session;

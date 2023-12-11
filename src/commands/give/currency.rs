@@ -108,8 +108,8 @@ pub async fn run(
     Ok(())
 }
 
-pub fn command() -> CreateCommandOption {
-    CreateCommandOption::new(CommandOptionType::String, "currency", "Give the user currency.")
+pub fn option() -> CreateCommandOption {
+    CreateCommandOption::new(CommandOptionType::SubCommand, "currency", "Give the user currency.")
         .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::String,

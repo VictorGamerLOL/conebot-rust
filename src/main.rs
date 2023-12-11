@@ -21,6 +21,7 @@ pub mod util;
 pub mod macros;
 
 use dotenv::dotenv;
+use paste::paste;
 use serenity::{ model::gateway::GatewayIntents, Client };
 use std::env;
 use tracing::{ debug, error, info, span, trace, warn };

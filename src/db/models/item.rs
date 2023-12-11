@@ -386,6 +386,10 @@ impl Item {
         Ok(items)
     }
 
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
+    }
+
     pub fn name(&self) -> &str {
         &self.item_name
     }

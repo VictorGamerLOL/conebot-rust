@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // *no*.
 
-use std::{ num::NonZeroUsize, sync::Arc };
+use std::{ borrow::Cow, num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, bail, Result };
 use futures::StreamExt;
@@ -21,6 +21,7 @@ pub struct Inventory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "PascalCase")]
 pub struct InventoryEntry {
     guild_id: DbGuildId,
     user_id: DbUserId,
@@ -91,12 +92,63 @@ impl Inventory {
     /// Whoever inspects this code and starts crying at the sight of a `vec[i]`,
     /// stop, I assure you what I did here won't crash unless `position()` fails
     /// colossally.
-    pub fn get_item(&mut self, item_name: String) -> Option<&mut InventoryEntry> {
+    pub fn get_item(&mut self, item_name: &str) -> Option<&mut InventoryEntry> {
         // There is something wrong with the borrow checker so i need to do the thing below instead.
         if let Some(i) = self.inventory.iter().position(|e| e.item_name == item_name) {
             return Some(&mut self.inventory[i]);
         }
         None
+    }
+
+    /// Gives the user the specified amount of an item. If the user has 0 of the item,
+    /// it will attempt to create an inventory entry for the item.
+    pub async fn give_item(
+        &mut self,
+        item_name: Cow<'_, str>, // Clone on write. Neat little performance improvement.
+        // It more serves as a signal that "This function may or may not clone the str."
+        amount: i64,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        //                                                      VVVVVVVVVV get the &str out of the Cow<'_,str>.
+        if let Some(entry) = dbg!(self.get_item(&item_name)) {
+            entry.add_amount(amount, session).await.map_err(Into::into)
+        } else {
+            let entry = InventoryEntry::new(
+                self.guild_id,
+                self.user_id,
+                // Otherwise clone it and get an entire owned string.
+                item_name.into_owned(),
+                amount,
+                session
+            ).await?;
+            self.inventory.push(entry);
+            Ok(())
+        }
+    }
+
+    /// Takes the specified amount of an item from the user. If the user reaches 0
+    /// of the item, it will delete the inventory entry for the item.
+    pub async fn take_item(
+        &mut self,
+        item_name: &str,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        if let Some(entry) = self.get_item(item_name) {
+            entry.sub_amount(
+                1,
+                // Since the option itself is owned, passing it would move it. Calling as_mut() on it
+                // will return a Option<&mut &mut ClientSession>, but sub_amount() expects a Option<&mut ClientSession>.
+                // No they are not the same thing apparently. So I need to map the &mut &mut ClientSession to &mut ClientSession
+                // with the thing below by casting it. *** W O W ***.
+                session.as_mut().map(|r| r as &mut ClientSession)
+            ).await?;
+            if entry.amount == 0 {
+                self.delete_item(item_name, session).await?;
+            }
+            Ok(())
+        } else {
+            Err(anyhow!("User does not have the item or the item does not exist."))
+        }
     }
 
     /// Gets the inventory entry matching the item and deletes it.
@@ -106,7 +158,7 @@ impl Inventory {
     /// - The item entry does not exist.
     pub async fn delete_item(
         &mut self,
-        item_name: String,
+        item_name: &str,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         let db = crate::db::CLIENT.get().await.database("conebot");
@@ -142,6 +194,7 @@ impl InventoryEntry {
         guild_id: DbGuildId,
         user_id: DbUserId,
         item_name: String,
+        amount: i64,
         session: Option<&mut ClientSession>
     ) -> Result<Self> {
         let db = crate::db::CLIENT.get().await.database("conebot");
@@ -162,7 +215,7 @@ impl InventoryEntry {
             guild_id,
             user_id,
             item_name,
-            amount: 0,
+            amount,
         };
 
         if let Some(s) = session {
@@ -208,7 +261,7 @@ impl InventoryEntry {
     async fn from_user_and_item(
         guild_id: DbGuildId,
         user_id: DbUserId,
-        item_name: String
+        item_name: &str
     ) -> Result<Option<Self>> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");
@@ -233,7 +286,7 @@ impl InventoryEntry {
     async fn from_user_and_search_query(
         guild_id: DbGuildId,
         user_id: DbUserId,
-        search_query: String
+        search_query: &str
     ) -> Result<Vec<Self>> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");
@@ -326,7 +379,7 @@ impl InventoryEntry {
     /// - Any mongodb error occurs.
     /// - The amount underflows.
     #[inline]
-    pub async fn sub_amount(
+    async fn sub_amount(
         &mut self,
         amount: i64,
         session: Option<&mut ClientSession>
@@ -352,7 +405,7 @@ impl InventoryEntry {
         session: Option<&mut ClientSession>
     ) -> Result<(), InventoryError> {
         self.set_amount(
-            self.amount.checked_add(amount).ok_or(InventoryError::AmountOverflow)?,
+            dbg!(dbg!(&self).amount.checked_add(amount).ok_or(InventoryError::AmountOverflow)?),
             session
         ).await
     }

@@ -36,6 +36,7 @@ mongodb = { version = "^2.7.1", features = [
 rand = "^0.8.5"
 rustversion = "^1.0.14"
 cfg-if = "^1.0.0"
+paste = "^1.0.14"
 
 [dependencies.serenity]
 default-features = false

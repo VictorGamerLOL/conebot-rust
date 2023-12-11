@@ -1,23 +1,64 @@
-use anyhow::Result;
+use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
 };
 
-use crate::event_handler::command_handler::CommandOptions;
+use crate::{
+    db::models::{ Inventory, Item, ItemError },
+    event_handler::command_handler::{ CommandOptions, IntOrNumber },
+};
 
 pub async fn run(
-    _options: CommandOptions,
-    _command: &CommandInteraction,
-    _http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    options: CommandOptions,
+    command: &CommandInteraction,
+    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
-    _command.edit_response(_http, EditInteractionResponse::new().content("Unimplemented.")).await?;
+    let member = options
+        .get_user_value("member")
+        .ok_or_else(|| anyhow!("No member was provided."))??;
+    let item_name = options
+        .get_string_value("item_name")
+        .ok_or_else(|| anyhow!("No item name was provided."))??;
+    let amount = options
+        .get_int_or_number_value("amount")
+        .transpose()?
+        .unwrap_or(IntOrNumber::Int(1))
+        .cast_to_i64();
+    let guild_id = command.guild_id.ok_or_else(|| anyhow!("Cannot use commands in DMs."))?;
+
+    // just checking if the item exists.
+    let _ = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
+
+    let member_inv = Inventory::from_user(guild_id.into(), member.into()).await?;
+    let mut member_inv = member_inv.lock().await;
+    let member_inv_ = member_inv
+        .as_mut()
+        .ok_or_else(|| anyhow!("Member's inventory is being used in a breaking operation."))?;
+
+    member_inv_.give_item(std::borrow::Cow::Borrowed(&item_name), amount, None).await?;
+
+    drop(member_inv);
+
+    command.edit_response(
+        http,
+        EditInteractionResponse::new().content(
+            format!("Gave the user {} amount of {}", item_name, amount)
+        )
+    ).await?;
     Ok(())
 }
 
 pub fn option() -> CreateCommandOption {
     CreateCommandOption::new(CommandOptionType::SubCommand, "item", "Give an item to a user.")
+        .add_sub_option(
+            CreateCommandOption::new(
+                CommandOptionType::User,
+                "member",
+                "The member to give the item to."
+            ).required(true)
+        )
         .add_sub_option(
             CreateCommandOption::new(
                 CommandOptionType::String,

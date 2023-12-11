@@ -22,6 +22,7 @@ pub async fn run(
 
     match cmd_name.as_str() {
         "currency" => currency::run(cmd_options, command, http).await?,
+        "item" => item::run(cmd_options, command, http).await?,
         &_ => anyhow::bail!("Unknown config subcommand."),
     }
     Ok(())
@@ -32,4 +33,6 @@ pub fn command() -> CreateCommand {
         .description("Give a member something.")
         .dm_permission(false)
         .default_member_permissions(Permissions::MANAGE_GUILD)
+        .add_option(currency::option())
+        .add_option(item::option())
 }

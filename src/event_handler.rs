@@ -32,6 +32,7 @@ impl Handler {
             "give" => commands::give::run(options, command, ctx).await?,
             "take" => commands::take::run(options, command, ctx).await?,
             "config" => commands::config::run(options, command, ctx).await?,
+            "use-item" => commands::use_item::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }
