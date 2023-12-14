@@ -16,6 +16,7 @@ use serenity::{
 use crate::{
     db::{ models::{ Balance, Balances, Currency }, uniques::DbGuildId, ArcTokioRwLockOption },
     event_handler::command_handler::CommandOptions,
+    ACCENT_COLOUR,
 };
 
 /// # Errors
@@ -81,7 +82,7 @@ async fn multi_currency<'a>(
         guild_id,
         user.1,
         command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
-    ).await?;
+    ).await?.colour(ACCENT_COLOUR);
     drop(balances);
     Ok(embed)
 }
@@ -118,7 +119,7 @@ async fn single_currency<'a>(
         guild_id,
         user.1,
         command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
-    );
+    ).colour(ACCENT_COLOUR);
     drop(balances);
     drop(currency);
     Ok(embed)
@@ -143,7 +144,7 @@ fn single_currency_embed<'a>(
         )
         .description(format!("{}{}", currency.symbol(), balance.amount()))
         .colour(Colour::DARK_GREEN)
-        .image(target.face())
+        .thumbnail(target.face())
         .timestamp(chrono::Utc::now())
 }
 
@@ -189,8 +190,9 @@ async fn multi_currency_embed(
             .title(format!("{}'s balances", target.display_name()))
             .description(format!("{}'s balances for all currencies", target.display_name()))
             .colour(Colour::DARK_GREEN)
-            .image(target.face())
+            .thumbnail(target.face())
             .fields(field_data)
+            .timestamp(chrono::Utc::now())
     )
 }
 

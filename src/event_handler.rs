@@ -33,6 +33,7 @@ impl Handler {
             "take" => commands::take::run(options, command, ctx).await?,
             "config" => commands::config::run(options, command, ctx).await?,
             "use-item" => commands::use_item::run(options, command, ctx).await?,
+            "inv" => commands::inv::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }
@@ -70,7 +71,8 @@ impl EventHandler for Handler {
                     commands::give::command(),
                     commands::take::command(),
                     commands::config::command(),
-                    commands::use_item::command()
+                    commands::use_item::command(),
+                    commands::inv::command()
                 ]
             ).await
         {

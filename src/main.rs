@@ -27,6 +27,9 @@ use std::env;
 use tracing::{ debug, error, info, span, trace, warn };
 use tracing_subscriber::{ fmt, fmt::format, EnvFilter };
 
+const ACCENT_COLOUR: u32 = 0x0375b4;
+const ACCENT_COLOR: u32 = ACCENT_COLOUR;
+
 #[tokio::main]
 async fn main() {
     let filter = EnvFilter::from_default_env();

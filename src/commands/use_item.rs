@@ -1,7 +1,8 @@
-use anyhow::{ anyhow, Result };
+use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
+    constants::MESSAGE_CODE_LIMIT,
     http::{ CacheHttp, Http },
 };
 
@@ -10,6 +11,8 @@ use crate::{
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
     mechanics::item_action_handler::use_item,
 };
+
+use std::borrow::Cow;
 
 const ITEM_NAME_OPTION_NAME: &str = "item_name";
 const AMOUNT_OPTION_NAME: &str = "amount";
@@ -41,6 +44,13 @@ pub async fn run(
         .as_ref()
         .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
 
+    let mut entry = user_inventory_
+        .get_item(&item_name)
+        .ok_or_else(|| anyhow!("You do not have that item."))?;
+    if entry.amount() < amount {
+        bail!("You do not have enough of that item.");
+    }
+
     let mut response_content = String::new();
 
     //TODO: make the response not be just the response messages one after another.
@@ -48,19 +58,25 @@ pub async fn run(
         let use_result = use_item(command.user.id, item_, &http).await?;
 
         if !use_result.success {
-            command.edit_response(
-                http,
-                EditInteractionResponse::new().content(
-                    use_result.message.unwrap_or("Something went wrong.")
-                )
-            ).await?;
-            return Ok(());
+            response_content.push_str(
+                use_result.message.unwrap_or(Cow::Borrowed("Failed to use item.")).as_ref()
+            );
+            response_content.push('\n');
+            break;
         }
         user_inventory_.take_item(&item_name, None).await?;
-        response_content.push_str(use_result.message.unwrap_or(&format!("Used {}", item_name)));
-        response_content.push('\n');
         amount -= 1;
+        if response_content.chars().count() >= MESSAGE_CODE_LIMIT {
+            continue;
+        }
+        response_content.push_str(
+            use_result.message.unwrap_or_else(|| Cow::Owned(format!("Used {}", item_name))).as_ref()
+        );
+        response_content.push('\n');
     }
+
+    // keep only the first 2000 chars
+    response_content = response_content.chars().take(MESSAGE_CODE_LIMIT).collect::<String>();
 
     drop(user_inventory);
     drop(item);

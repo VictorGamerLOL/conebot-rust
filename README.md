@@ -23,13 +23,13 @@ This bot aims to make everything highly configurable and be as feature packed as
 - [ ] Items
   - [x] Trophies <!-- These do nothing they are pretty much done -->
   - [ ] Consumables
-    - [ ] Message
-    - [ ] Role giving
+    - [x] Message
+    - [x] Role giving
     - [ ] Lootboxes (must complete below)
   - [ ] Instant consumables
     - [ ] Same as above
-  - [ ] Changing config values <!-- Backend done -->
-  - [ ] Inventories for each member
+  - [x] Changing config values
+  - [x] Inventories for each member
 - [ ] Lootboxes
   - [ ] Create loot tables
   - [ ] Delete loot tables
@@ -66,8 +66,10 @@ To run the bot, you must do the following on your server:
 ```env
 TOKEN = # Your discord bot token here.
 MONGO_URI = # Your MongoDB cluster URI here.
-MONGO_DB =  #What is the MongoDB database called.
+MONGO_DB =  # What is the MongoDB database called.
 ```
+
+***⚠️⚠️Make sure your MongoDB cluster has replication enabled. Otherwise anything that uses transactions will NOT work.⚠️⚠️***
 
 - Build the bot for release:
 

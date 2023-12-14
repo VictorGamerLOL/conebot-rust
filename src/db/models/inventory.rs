@@ -110,7 +110,7 @@ impl Inventory {
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         //                                                      VVVVVVVVVV get the &str out of the Cow<'_,str>.
-        if let Some(entry) = dbg!(self.get_item(&item_name)) {
+        if let Some(entry) = self.get_item(&item_name) {
             entry.add_amount(amount, session).await.map_err(Into::into)
         } else {
             let entry = InventoryEntry::new(
@@ -181,6 +181,18 @@ impl Inventory {
         // if by any chance it happens to be named differently than it is in the DB.
 
         Ok(())
+    }
+
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
+    }
+
+    pub const fn user_id(&self) -> DbUserId {
+        self.user_id
+    }
+
+    pub fn inventory(&self) -> &[InventoryEntry] {
+        &self.inventory
     }
 }
 
@@ -405,7 +417,7 @@ impl InventoryEntry {
         session: Option<&mut ClientSession>
     ) -> Result<(), InventoryError> {
         self.set_amount(
-            dbg!(dbg!(&self).amount.checked_add(amount).ok_or(InventoryError::AmountOverflow)?),
+            self.amount.checked_add(amount).ok_or(InventoryError::AmountOverflow)?,
             session
         ).await
     }
