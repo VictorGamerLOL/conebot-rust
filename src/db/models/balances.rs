@@ -183,6 +183,41 @@ impl Balances {
         Ok(())
     }
 
+    /// Gets all of the balances from a guild, then looks
+    /// inside of them to see if they have a balance for the specified currency.
+    /// If they do, it deletes it. Effectively deleting the currency from the guild.
+    ///
+    /// Basically a makeshift cascading delete for currencies.
+    ///
+    /// # Errors
+    /// - Any `MongoDB` error occurs.
+    pub async fn purge_currency(guild_id: DbGuildId, curr_name: CurrencyNameRef<'_>) -> Result<()> {
+        let mut cache = CACHE_BALANCES.lock().await;
+        let mut cache_iter = cache.iter_mut();
+
+        for (k, v) in cache_iter {
+            if k.0 != guild_id {
+                continue;
+            }
+            let mut lock_res = v.lock().await;
+            if let Some(balances) = lock_res.as_mut() {
+                balances.balances.retain(|bal| bal.curr_name != curr_name);
+            }
+            drop(lock_res);
+        }
+        drop(cache);
+
+        let db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Balance> = db.collection("balances");
+        let filterdoc =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "CurrName": curr_name.as_str(),
+        };
+        coll.delete_many(filterdoc, None).await?;
+        Ok(())
+    }
+
     pub async fn invalidate_cache(mut self_: MutexGuard<'_, Option<Self>>) -> Result<()> {
         let take_res = self_.take();
         let self__ = match take_res {

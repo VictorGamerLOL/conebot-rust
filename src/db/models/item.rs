@@ -124,6 +124,7 @@ pub enum ItemActionType {
     Lootbox {
         /// The name of the drop table to use when opening the lootbox.
         drop_table_name: String,
+        count: i64,
     },
 }
 
@@ -141,12 +142,15 @@ pub enum ItemError {
 /// This exists strictly for the updating of the item types via ``[ItemType]``'s
 /// `update_auto` function. It is used to make the update more intuitive on
 /// the user's end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ItemTypeUpdateType {
     Type(ItemTypeFieldless),
     Message(String),
     ActionType(ItemActionTypeFieldless),
     RoleId(DbRoleId),
     DropTableName(DropTableName),
+    Count(i64),
 }
 
 // This giant block is needed in order to make the update more intuitive on
@@ -165,6 +169,7 @@ impl ItemType {
             ItemTypeUpdateType::DropTableName(drop_table_name) => {
                 Ok(self.update_from_drop_table_name(drop_table_name))
             }
+            ItemTypeUpdateType::Count(count) => Ok(self.update_from_count(count)?),
         }
     }
 
@@ -266,12 +271,14 @@ impl ItemType {
     }
 
     fn update_from_drop_table_name(&self, drop_table_name: DropTableName) -> Self {
+        let count = self.count().unwrap_or(1);
         match self {
             Self::Consumable { message, .. } =>
                 Self::Consumable {
                     message: message.clone(),
                     action_type: ItemActionType::Lootbox {
                         drop_table_name: drop_table_name.into_string(),
+                        count,
                     },
                 },
             Self::InstantConsumable { message, .. } =>
@@ -279,6 +286,7 @@ impl ItemType {
                     message: message.clone(),
                     action_type: ItemActionType::Lootbox {
                         drop_table_name: drop_table_name.into_string(),
+                        count,
                     },
                 },
             _ =>
@@ -286,8 +294,87 @@ impl ItemType {
                     message: String::new(),
                     action_type: ItemActionType::Lootbox {
                         drop_table_name: drop_table_name.into_string(),
+                        count,
                     },
                 },
+        }
+    }
+
+    fn update_from_count(&self, count: i64) -> Result<Self> {
+        match self {
+            Self::Consumable { message, action_type } =>
+                Ok(Self::Consumable {
+                    message: message.clone(),
+                    action_type: match action_type {
+                        ItemActionType::Lootbox { drop_table_name, .. } =>
+                            ItemActionType::Lootbox {
+                                drop_table_name: drop_table_name.clone(),
+                                count,
+                            },
+                        _ => bail!("Cannot update count on non-lootbox item."),
+                    },
+                }),
+            Self::InstantConsumable { message, action_type } =>
+                Ok(Self::InstantConsumable {
+                    message: message.clone(),
+                    action_type: match action_type {
+                        ItemActionType::Lootbox { drop_table_name, .. } =>
+                            ItemActionType::Lootbox {
+                                drop_table_name: drop_table_name.clone(),
+                                count,
+                            },
+                        _ => bail!("Cannot update count on non-lootbox item."),
+                    },
+                }),
+            _ => bail!("Cannot update count on non-lootbox item."),
+        }
+    }
+
+    pub const fn message(&self) -> Option<&String> {
+        match self {
+            Self::Consumable { message, .. } => Some(message),
+            Self::InstantConsumable { message, .. } => Some(message),
+            _ => None,
+        }
+    }
+
+    pub const fn action_type(&self) -> Option<&ItemActionType> {
+        match self {
+            Self::Consumable { action_type, .. } => Some(action_type),
+            Self::InstantConsumable { action_type, .. } => Some(action_type),
+            _ => None,
+        }
+    }
+
+    pub const fn role_id(&self) -> Option<DbRoleId> {
+        match self {
+            Self::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
+                Some(*role_id),
+            Self::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. } =>
+                Some(*role_id),
+            _ => None,
+        }
+    }
+
+    pub const fn drop_table_name_string(&self) -> Option<&String> {
+        match self {
+            Self::Consumable { action_type: ItemActionType::Lootbox { drop_table_name, .. }, .. } =>
+                Some(drop_table_name),
+            Self::InstantConsumable {
+                action_type: ItemActionType::Lootbox { drop_table_name, .. },
+                ..
+            } => Some(drop_table_name),
+            _ => None,
+        }
+    }
+
+    pub const fn count(&self) -> Option<i64> {
+        match self {
+            Self::Consumable { action_type: ItemActionType::Lootbox { count, .. }, .. } =>
+                Some(*count),
+            Self::InstantConsumable { action_type: ItemActionType::Lootbox { count, .. }, .. } =>
+                Some(*count),
+            _ => None,
         }
     }
 
@@ -437,11 +524,11 @@ impl Item {
     pub fn drop_table_name(&self) -> Option<DropTableNameRef<'_>> {
         match self.item_type {
             | ItemType::InstantConsumable {
-                  action_type: ItemActionType::Lootbox { ref drop_table_name },
+                  action_type: ItemActionType::Lootbox { ref drop_table_name, .. },
                   ..
               }
             | ItemType::Consumable {
-                  action_type: ItemActionType::Lootbox { ref drop_table_name },
+                  action_type: ItemActionType::Lootbox { ref drop_table_name, .. },
                   ..
               } =>
                 Some(
@@ -638,6 +725,8 @@ impl Item {
         new_item_type: ItemType,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
+        // TODO: make a smarter update function that only updates the fields that have changed.
+        // So it does not need to do 2 updates.
         let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
@@ -648,10 +737,12 @@ impl Item {
         let update_unset =
             doc! {
             "$unset": {
+                "ItemType": "",
                 "ActionType": "",
                 "RoleId": "",
                 "DropTableName": "",
-                "Message": ""
+                "Message": "",
+                "Count": ""
             },
         };
         if let Some(ref mut s) = session {
@@ -681,9 +772,10 @@ impl Item {
                         update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());
                     }
-                    ItemActionType::Lootbox { drop_table_name } => {
+                    ItemActionType::Lootbox { drop_table_name, count } => {
                         update_set.insert("ActionType", "Lootbox");
                         update_set.insert("DropTableName", drop_table_name);
+                        update_set.insert("Count", count);
                     }
                 }
             }
@@ -698,9 +790,10 @@ impl Item {
                         update_set.insert("ActionType", "Role");
                         update_set.insert("RoleId", role_id.as_i64());
                     }
-                    ItemActionType::Lootbox { drop_table_name } => {
+                    ItemActionType::Lootbox { drop_table_name, count } => {
                         update_set.insert("ActionType", "Lootbox");
                         update_set.insert("DropTableName", drop_table_name);
+                        update_set.insert("Count", count);
                     }
                 }
             }
@@ -714,8 +807,10 @@ impl Item {
         Ok(())
     }
 
-    // instrument at debug level with no skipping
-    pub async fn delete_item(self_: ArcTokioRwLockOption<Self>) -> Result<()> {
+    pub async fn delete_item(
+        self_: ArcTokioRwLockOption<Self>,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut cache = CACHE_ITEM.lock().await;
         let mut self_ = self_.write().await;
         let Some(self__) = self_.take() else {
@@ -728,7 +823,11 @@ impl Item {
             "GuildId": self__.guild_id.as_i64(),
             "ItemName": &self__.item_name,
         };
-        collection.delete_one(filter, None).await?;
+        if let Some(s) = session {
+            collection.delete_one_with_session(filter, None, s).await?;
+        } else {
+            collection.delete_one(filter, None).await?;
+        }
         cache.pop(&(self__.guild_id, self__.item_name.clone()));
         drop(self_);
         drop(cache);

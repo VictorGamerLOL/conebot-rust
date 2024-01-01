@@ -129,6 +129,7 @@ pub struct ItemTypeBuilder {
     action_type: Option<ItemActionTypeFieldless>,
     role: Option<DbRoleId>,
     drop_table_name: Option<String>,
+    count: Option<i64>,
 }
 
 impl ItemTypeBuilder {
@@ -142,6 +143,7 @@ impl ItemTypeBuilder {
             action_type: None,
             role: None,
             drop_table_name: None,
+            count: None,
         }
     }
 
@@ -176,7 +178,11 @@ impl ItemTypeBuilder {
                 let drop_table_name = self.drop_table_name.ok_or_else(|| {
                     anyhow!("Drop table name must be present if action type is Lootbox.")
                 })?;
-                ItemActionType::Lootbox { drop_table_name }
+                let count = self.count.unwrap_or(1);
+                ItemActionType::Lootbox {
+                    drop_table_name,
+                    count,
+                }
             }
         };
 
@@ -238,6 +244,11 @@ impl ItemTypeBuilder {
         self.drop_table_name = drop_table_name;
         self
     }
+
+    pub fn count(&mut self, count: Option<i64>) -> &mut Self {
+        self.count = count;
+        self
+    }
 }
 #[cfg(test)]
 mod test {
@@ -266,7 +277,7 @@ mod test {
         }
         println!();
         super::super::Item
-            ::delete_item(item).await
+            ::delete_item(item, None).await
             .expect("Failed to delete item.\n !!THE ITEM MUST NOW BE DELETED MANUALLY!!");
     }
 

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::{ anyhow, Result };
-use serenity::{ all::{ GuildId, RoleId, UserId, Mention }, http::{ CacheHttp, Http } };
+use serenity::{ all::{ GuildId, Mention, RoleId, UserId }, http::{ CacheHttp, Http } };
 
 use crate::db::models::{ item::{ ItemActionType, ItemType }, Item };
 
@@ -51,7 +51,7 @@ pub async fn use_item(
                 content: UseResultContent::RoleAdd((*role_id).into()),
             })
         }
-        ItemActionType::Lootbox { drop_table_name } =>
+        ItemActionType::Lootbox { drop_table_name, count } =>
             Ok(UseResult {
                 success: false,
                 message: Some(Cow::Borrowed("Lootboxes are not implemented yet.")),

@@ -5,7 +5,7 @@ use anyhow::{ anyhow, Result };
 use serde::{ Deserialize, Serialize };
 
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 /// This exists because the builder needs to be able to
 /// infer the type of the item, and the type of the item
 /// needs to be able to be set by the builder. It can either

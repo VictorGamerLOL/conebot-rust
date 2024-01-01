@@ -1,32 +1,32 @@
 use std::time::Duration;
 
-use anyhow::{ Result, anyhow, bail };
+use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{
-        CommandInteraction,
         ActionRow,
         Button,
-        ComponentType,
         ButtonKind,
         ButtonStyle,
+        CommandInteraction,
+        ComponentType,
         ReactionType,
     },
-    http::{ CacheHttp, Http },
     builder::{
+        CreateActionRow,
+        CreateButton,
         CreateCommand,
         CreateCommandOption,
         CreateEmbed,
         CreateEmbedAuthor,
         EditInteractionResponse,
-        CreateButton,
-        CreateActionRow,
     },
     client::Context,
+    http::{ CacheHttp, Http },
 };
 
 use crate::{
-    event_handler::command_handler::CommandOptions,
     db::models::Inventory,
+    event_handler::command_handler::CommandOptions,
     util::paginator::Paginator,
     ACCENT_COLOUR,
 };
@@ -52,7 +52,7 @@ pub async fn run(
     let entries = user_inv_
         .inventory()
         .iter()
-        .map(|entry| { (entry.item_name().to_owned(), entry.amount()) })
+        .map(|entry| (entry.item_name().to_owned(), entry.amount()))
         .collect::<Vec<_>>();
 
     drop(user_inv);

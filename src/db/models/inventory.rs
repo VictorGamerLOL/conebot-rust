@@ -48,6 +48,17 @@ lazy_static! {
 }
 
 impl Inventory {
+    pub const fn guild_id(&self) -> DbGuildId {
+        self.guild_id
+    }
+
+    pub const fn user_id(&self) -> DbUserId {
+        self.user_id
+    }
+
+    pub fn inventory(&self) -> &[InventoryEntry] {
+        &self.inventory
+    }
     /// Makes an Inventory for a user in a guild.
     ///
     /// # Errors
@@ -183,16 +194,52 @@ impl Inventory {
         Ok(())
     }
 
-    pub const fn guild_id(&self) -> DbGuildId {
-        self.guild_id
-    }
+    /// Gets all of the inventories of users from a guild, then
+    /// looks inside each of the inventories for the specified item. If the item
+    /// is found, it will delete the inventory entry for the item. Effectively
+    /// deleting the item from all users in the guild. Useful if an item is
+    /// being removed from a guild.
+    ///
+    /// Basically a makeshift cascading delete for items.
+    ///
+    /// # Errors
+    /// - Any mongodb error occurs.
+    pub async fn purge_item(
+        guild_id: DbGuildId,
+        item_name: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        // don't forget to delete it from the cache as well
+        let mut cache = CACHE_INVENTORY.lock().await;
+        let mut cache_iter = cache.iter_mut();
+        for (k, v) in cache_iter {
+            if k.0 != guild_id {
+                continue;
+            }
+            let mut lock_res = v.lock().await;
+            if let Some(inv) = lock_res.as_mut() {
+                inv.inventory.retain(|e| e.item_name != item_name);
+            }
+            drop(lock_res);
+        }
+        drop(cache);
 
-    pub const fn user_id(&self) -> DbUserId {
-        self.user_id
-    }
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<InventoryEntry> = db.collection("inventories");
 
-    pub fn inventory(&self) -> &[InventoryEntry] {
-        &self.inventory
+        let filterdoc =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "ItemName": item_name,
+        };
+
+        if let Some(s) = session {
+            coll.delete_many_with_session(filterdoc, None, s).await?;
+        } else {
+            coll.delete_many(filterdoc, None).await?;
+        }
+
+        Ok(())
     }
 }
 
