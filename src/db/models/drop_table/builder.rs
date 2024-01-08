@@ -1,9 +1,13 @@
-use crate::db::uniques::DbGuildId;
+use std::sync::Arc;
 
-use super::{ DropTablePart, DropTablePartOption };
+use crate::db::{ uniques::DbGuildId, ArcTokioRwLockOption };
+
+use super::{ DropTable, DropTablePart, DropTablePartOption };
 
 use anyhow::{ anyhow, Result };
+use futures::future::join_all;
 use mongodb::{ bson::doc, ClientSession };
+use tokio::sync::RwLock;
 
 pub struct DropTablePartBuilder {
     guild_id: Option<DbGuildId>,
@@ -12,6 +16,12 @@ pub struct DropTablePartBuilder {
     min: Option<i64>,
     max: Option<i64>,
     weight: Option<i64>,
+}
+
+pub struct DropTableBuilder {
+    guild_id: Option<DbGuildId>,
+    drop_table_name: Option<String>,
+    drop_table_parts: Vec<DropTablePartBuilder>,
 }
 
 impl DropTablePartBuilder {
@@ -26,33 +36,63 @@ impl DropTablePartBuilder {
         }
     }
 
-    pub const fn guild_id(mut self, guild_id: DbGuildId) -> Self {
-        self.guild_id = Some(guild_id);
+    pub const fn guild_id(mut self, guild_id: Option<DbGuildId>) -> Self {
+        self.guild_id = guild_id;
         self
     }
 
-    pub fn drop_table_name(mut self, drop_table_name: String) -> Self {
-        self.drop_table_name = Some(drop_table_name);
+    pub fn byref_guild_id(&mut self, guild_id: Option<DbGuildId>) -> &mut Self {
+        self.guild_id = guild_id;
         self
     }
 
-    pub fn drop(mut self, drop: DropTablePartOption) -> Self {
-        self.drop = Some(drop);
+    pub fn drop_table_name(mut self, drop_table_name: Option<String>) -> Self {
+        self.drop_table_name = drop_table_name;
         self
     }
 
-    pub const fn min(mut self, min: i64) -> Self {
-        self.min = Some(min);
+    pub fn byref_drop_table_name(&mut self, drop_table_name: Option<String>) -> &mut Self {
+        self.drop_table_name = drop_table_name;
         self
     }
 
-    pub const fn max(mut self, max: i64) -> Self {
-        self.max = Some(max);
+    pub fn drop(mut self, drop: Option<DropTablePartOption>) -> Self {
+        self.drop = drop;
         self
     }
 
-    pub const fn weight(mut self, weight: i64) -> Self {
-        self.weight = Some(weight);
+    pub fn byref_drop(&mut self, drop: Option<DropTablePartOption>) -> &mut Self {
+        self.drop = drop;
+        self
+    }
+
+    pub const fn min(mut self, min: Option<i64>) -> Self {
+        self.min = min;
+        self
+    }
+
+    pub fn byref_min(&mut self, min: Option<i64>) -> &mut Self {
+        self.min = min;
+        self
+    }
+
+    pub const fn max(mut self, max: Option<i64>) -> Self {
+        self.max = max;
+        self
+    }
+
+    pub fn byref_max(&mut self, max: Option<i64>) -> &mut Self {
+        self.max = max;
+        self
+    }
+
+    pub const fn weight(mut self, weight: Option<i64>) -> Self {
+        self.weight = weight;
+        self
+    }
+
+    pub fn byref_weight(&mut self, weight: Option<i64>) -> &mut Self {
+        self.weight = weight;
         self
     }
 
@@ -89,5 +129,117 @@ impl DropTablePartBuilder {
             collection.insert_one(&part, None).await?;
         }
         Ok(part)
+    }
+}
+
+impl DropTableBuilder {
+    pub const fn new() -> Self {
+        Self {
+            guild_id: None,
+            drop_table_name: None,
+            drop_table_parts: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn new_part(&mut self) -> &mut DropTablePartBuilder {
+        let mut part = DropTablePartBuilder::new()
+            .guild_id(self.guild_id)
+            .drop_table_name(self.drop_table_name.clone());
+        self.drop_table_parts.push(part);
+        self.drop_table_parts.last_mut().unwrap()
+    }
+
+    pub fn guild_id(mut self, guild_id: Option<DbGuildId>) -> Self {
+        self.guild_id = guild_id;
+        self.drop_table_parts.iter_mut().for_each(|part| {
+            part.byref_guild_id(guild_id);
+        });
+        self
+    }
+
+    pub fn drop_table_name(mut self, drop_table_name: Option<String>) -> Self {
+        self.drop_table_name = drop_table_name.clone();
+        self.drop_table_parts.iter_mut().for_each(|part| {
+            part.byref_drop_table_name(drop_table_name.clone());
+        });
+        self
+    }
+
+    pub fn add_drop_table_part(
+        mut self,
+        mut drop_table_part: DropTablePartBuilder
+    ) -> Result<Self> {
+        if let Some(guild_id) = self.guild_id {
+            if drop_table_part.guild_id.is_none() {
+                drop_table_part.byref_guild_id(Some(guild_id));
+            }
+            if guild_id != drop_table_part.guild_id.unwrap() {
+                return Err(anyhow!("Guild ID does not match"));
+            }
+        }
+        if let Some(drop_table_name) = &self.drop_table_name {
+            if drop_table_part.drop_table_name.is_none() {
+                drop_table_part.byref_drop_table_name(Some(drop_table_name.clone()));
+            }
+            if drop_table_name != drop_table_part.drop_table_name.as_ref().unwrap() {
+                return Err(anyhow!("Drop table name does not match"));
+            }
+        }
+        self.drop_table_parts.push(drop_table_part);
+        Ok(self)
+    }
+
+    pub fn clear_drop_table_parts(mut self) -> Self {
+        self.drop_table_parts.clear();
+        self
+    }
+
+    pub async fn build(
+        mut self,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<ArcTokioRwLockOption<DropTable>> {
+        let Some(guild_id) = self.guild_id else {
+            return Err(anyhow!("Guild ID is missing"));
+        };
+        let Some(drop_table_name) = self.drop_table_name else {
+            return Err(anyhow!("Drop table name is missing"));
+        };
+
+        let mut cache = super::DROP_TABLES_CACHE.lock().await;
+
+        if let Some(drop_table) = cache.get(&(guild_id, drop_table_name.clone())) {
+            return Err(anyhow!("Drop table already exists"));
+        }
+
+        let mut owned_session: Option<ClientSession> = None;
+        if session.is_none() {
+            let client = crate::db::CLIENT.get().await;
+            owned_session = Some(client.start_session(None).await?);
+            session = owned_session.as_mut();
+        }
+
+        let mut parts: Vec<DropTablePart> = Vec::with_capacity(self.drop_table_parts.len());
+        let session_ref = session.unwrap(); // It's guaranteed to be Some(thing) at this point
+        session_ref.start_transaction(None).await?;
+        for part_builder in self.drop_table_parts {
+            let part = part_builder.build(Some(session_ref)).await?;
+            parts.push(part);
+        }
+        if let Some(mut session) = owned_session {
+            session.commit_transaction().await?;
+        }
+        let mut table = DropTable {
+            guild_id,
+            drop_table_name: drop_table_name.clone(),
+            drop_table_parts: parts,
+        };
+
+        let arc: ArcTokioRwLockOption<DropTable> = Arc::new(RwLock::new(Some(table)));
+
+        cache.put((guild_id, drop_table_name), arc.clone());
+
+        drop(cache);
+        Ok(arc)
     }
 }

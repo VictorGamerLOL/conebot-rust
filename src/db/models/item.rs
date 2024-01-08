@@ -521,7 +521,7 @@ impl Item {
         }
     }
 
-    pub fn drop_table_name(&self) -> Option<DropTableNameRef<'_>> {
+    pub const fn drop_table_name(&self) -> Option<DropTableNameRef<'_>> {
         match self.item_type {
             | ItemType::InstantConsumable {
                   action_type: ItemActionType::Lootbox { ref drop_table_name, .. },
@@ -531,12 +531,12 @@ impl Item {
                   action_type: ItemActionType::Lootbox { ref drop_table_name, .. },
                   ..
               } =>
-                Some(
-                    DropTableNameRef::from_str_and_guild_id_unchecked(
+                Some(unsafe {
+                    DropTableNameRef::from_string_ref_and_guild_id_unchecked(
                         self.guild_id,
                         drop_table_name
                     )
-                ),
+                }),
             _ => None,
         }
     }

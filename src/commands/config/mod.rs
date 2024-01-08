@@ -1,5 +1,6 @@
 pub mod currency;
 pub mod item;
+pub mod drop_table;
 
 use anyhow::{ anyhow, Result };
 use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
@@ -17,6 +18,7 @@ pub async fn run(
     match cmd_name.as_str() {
         "currency" => currency::run(cmd_options, command, http).await?,
         "item" => item::run(cmd_options, command, http).await?,
+        "drop_table" => drop_table::run(cmd_options, command, http).await?,
         &_ => anyhow::bail!("Unknown config subcommand."),
     }
     Ok(())
@@ -27,5 +29,6 @@ pub fn command() -> CreateCommand {
         .description("Configure various things about currencies or view them.")
         .add_option(currency::option())
         .add_option(item::option())
+        .add_option(drop_table::option())
         .dm_permission(false)
 }

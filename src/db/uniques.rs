@@ -28,6 +28,8 @@ use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 use crate::{ db::models::Currency, macros::const_impl };
 
+use super::models::DropTable;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 /// A wrapper around a guild ID as it should be stored in the database.
@@ -604,11 +606,20 @@ impl DropTableName {
         }
     }
 
-    pub const fn from_string_and_guild_id_unchecked(guild_id: DbGuildId, name: String) -> Self {
+    /// # Safety
+    /// This function is unsafe because it does not check if the drop table name exists in the
+    /// database. It is up to the caller to ensure that the drop table name exists.
+    pub const unsafe fn from_string_and_guild_id_unchecked(
+        guild_id: DbGuildId,
+        name: String
+    ) -> Self {
         Self(guild_id, name)
     }
 
-    pub fn as_ref(&self) -> DropTableNameRef<'_> {
+    /// The actual AsRef trait is not implemented because
+    /// "`Borrow` (and `AsRef`) can only return _references to something that already exists_" and
+    /// "a `FooRef` is a new thing; there is no preexisting memory that has a `FooRef` in it"
+    pub const fn as_ref(&self) -> DropTableNameRef<'_> {
         DropTableNameRef(self.0, &self.1)
     }
 
@@ -617,15 +628,15 @@ impl DropTableName {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub struct DropTableNameRef<'a>(#[serde(skip)] DbGuildId, &'a str);
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DropTableNameRef<'a>(DbGuildId, &'a String);
 
 impl<'a> DropTableNameRef<'a> {
     pub const fn db_guild_id(&self) -> DbGuildId {
         self.0
     }
 
-    pub const fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &String {
         self.1
     }
 
@@ -634,10 +645,19 @@ impl<'a> DropTableNameRef<'a> {
         Ok(true)
     }
 
-    pub const fn from_str_and_guild_id_unchecked(guild_id: DbGuildId, name: &'a str) -> Self {
+    /// # Safety
+    /// This function is unsafe because it does not check if the drop table name exists in the
+    /// database. It is up to the caller to ensure that the drop table name exists.
+    pub const unsafe fn from_string_ref_and_guild_id_unchecked(
+        guild_id: DbGuildId,
+        name: &'a String
+    ) -> Self {
         Self(guild_id, name)
     }
 
+    /// The actual ToOwned trait is not implemented because
+    /// "`Borrow` (and `AsRef`) can only return _references to something that already exists_" and
+    /// "a `FooRef` is a new thing; there is no preexisting memory that has a `FooRef` in it"
     pub fn to_owned(&self) -> DropTableName {
         DropTableName(self.0, self.1.to_owned())
     }

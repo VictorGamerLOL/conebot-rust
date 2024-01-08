@@ -1,16 +1,18 @@
 #![allow(clippy::module_name_repetitions)] // no.
 
-use std::{ num::NonZeroUsize, ops::RangeInclusive };
+use std::{ borrow::Cow, collections::HashSet, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
 
 use anyhow::Result;
+use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
+use mongodb::{ bson::doc, ClientSession };
 use rand::distributions::uniform::SampleRange;
 use serde::{ Deserialize, Serialize };
-use tokio::sync::Mutex;
+use tokio::sync::{ Mutex, RwLock };
 
 use crate::{
-    db::{ uniques::DbGuildId, ArcTokioRwLockOption, TokioMutexCache },
+    db::{ uniques::{ DbGuildId, DropTableNameRef }, ArcTokioRwLockOption, TokioMutexCache, CLIENT },
     mechanics::drop_generator::{ DropGenerator, Droppable, DroppableKind },
 };
 
@@ -31,6 +33,7 @@ pub struct DropTablePart {
     #[serde(flatten)]
     drop: DropTablePartOption,
     min: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<i64>,
     weight: i64,
 }
@@ -48,7 +51,7 @@ pub enum DropTablePartOption {
 }
 
 lazy_static! {
-    static ref DROP_TABLES_CACHE: TokioMutexCache<(String, String), ArcTokioRwLockOption<DropTable>> =
+    static ref DROP_TABLES_CACHE: TokioMutexCache<(DbGuildId, String), ArcTokioRwLockOption<DropTable>> =
         Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
@@ -79,6 +82,37 @@ impl From<DropTable> for DropGenerator<RangeInclusive<i64>> {
 }
 
 impl DropTable {
+    pub async fn try_from_name(
+        guild_id: DbGuildId,
+        drop_table_name: Cow<'_, str>,
+        session: Option<&mut ClientSession>
+    ) -> Result<ArcTokioRwLockOption<Self>> {
+        let mut cache = DROP_TABLES_CACHE.lock().await;
+
+        if let Some(drop_table) = cache.get(&(guild_id, drop_table_name.clone().into_owned())) {
+            return Ok(drop_table.to_owned());
+        }
+
+        let drop_table_parts = DropTablePart::try_from_name(
+            guild_id,
+            drop_table_name.clone(),
+            session
+        ).await?;
+
+        let drop_table = Self {
+            guild_id,
+            drop_table_name: drop_table_name.clone().into_owned(),
+            drop_table_parts,
+        };
+
+        let arc: ArcTokioRwLockOption<Self> = Arc::new(RwLock::new(Some(drop_table)));
+
+        cache.put((guild_id, drop_table_name.into_owned()), arc.clone());
+        drop(cache);
+
+        Ok(arc)
+    }
+
     pub const fn guild_id(&self) -> DbGuildId {
         self.guild_id
     }
@@ -93,12 +127,38 @@ impl DropTable {
 }
 
 impl DropTablePart {
+    pub async fn try_from_name(
+        guild_id: DbGuildId,
+        drop_table_name: Cow<'_, str>,
+        session: Option<&mut ClientSession>
+    ) -> Result<Vec<Self>> {
+        let db = CLIENT.get().await.database("conebot");
+        let collection = db.collection::<Self>("dropTables");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "DropTableName": drop_table_name.as_ref(),
+        };
+
+        if let Some(s) = session {
+            Ok(collection.find_with_session(filter, None, s).await?.stream(s).try_collect().await?)
+        } else {
+            Ok(collection.find(filter, None).await?.try_collect().await?)
+        }
+    }
+
     pub const fn guild_id(&self) -> DbGuildId {
         self.guild_id
     }
 
-    pub const fn drop_table_name(&self) -> &String {
-        &self.drop_table_name
+    pub const fn drop_table_name(&self) -> DropTableNameRef<'_> {
+        unsafe {
+            DropTableNameRef::from_string_ref_and_guild_id_unchecked(
+                self.guild_id,
+                &self.drop_table_name
+            )
+        }
     }
 
     pub const fn drop(&self) -> &DropTablePartOption {
