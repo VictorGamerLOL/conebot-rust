@@ -3,14 +3,19 @@ pub mod item;
 pub mod drop_table;
 
 use anyhow::{ anyhow, Result };
-use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
+use serenity::{
+    all::CommandInteraction,
+    builder::CreateCommand,
+    http::{ CacheHttp, Http },
+    client::Context,
+};
 
 use crate::event_handler::command_handler::CommandOptions;
 
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
-    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    http: &Context
 ) -> Result<()> {
     let (cmd_name, cmd_options): (String, CommandOptions) = options
         .get_subcommand_args_and_name()

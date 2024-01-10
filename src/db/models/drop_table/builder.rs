@@ -10,8 +10,8 @@ use mongodb::{ bson::doc, ClientSession };
 use tokio::sync::RwLock;
 
 pub struct DropTablePartBuilder {
-    guild_id: Option<DbGuildId>,
-    drop_table_name: Option<String>,
+    pub(super) guild_id: Option<DbGuildId>,
+    pub(super) drop_table_name: Option<String>,
     drop: Option<DropTablePartOption>,
     min: Option<i64>,
     max: Option<i64>,
@@ -96,6 +96,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    // pub super only because we do not want a stray DropTablePart to be created.
     pub(super) async fn build(self, session: Option<&mut ClientSession>) -> Result<DropTablePart> {
         let guild_id = self.guild_id.ok_or_else(|| anyhow!("Guild ID is missing"))?;
         let drop_table_name = self.drop_table_name.ok_or_else(||

@@ -30,13 +30,17 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [ ] Same as above
   - [x] Changing config values
   - [x] Inventories for each member
+  - [ ] Sell to the void
 - [ ] Lootboxes
-  - [ ] Create loot tables
-  - [ ] Delete loot tables
+  - [x] Create loot tables
+  - [x] Delete loot tables
   - [ ] Make loot tables generate drops
     - [ ] Of items
     - [ ] Of currencies
   - [ ] Associate loot tables to lootboxes
+- [ ] Shops
+  - [ ] Make listings
+  - [ ] Take currency in exchange for item
 - [ ] Global currencies
   - [ ] Create
   - [ ] Permission management
