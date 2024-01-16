@@ -21,7 +21,7 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [x] Roles
   - [x] Exchanging between currencies
 - [ ] Items
-  - [x] Trophies <!-- These do nothing they are pretty much done -->
+  - [x] Trophies
   - [ ] Consumables
     - [x] Message
     - [x] Role giving
@@ -37,15 +37,10 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [ ] Make loot tables generate drops
     - [ ] Of items
     - [ ] Of currencies
-  - [ ] Associate loot tables to lootboxes
+  - [x] Associate loot tables to lootboxes
 - [ ] Shops
   - [ ] Make listings
   - [ ] Take currency in exchange for item
-- [ ] Global currencies
-  - [ ] Create
-  - [ ] Permission management
-  - [ ] Delete
-  - [ ] Exchange
 
 ---
 
