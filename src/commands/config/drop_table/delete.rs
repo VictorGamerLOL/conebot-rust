@@ -1,12 +1,13 @@
 use drop_table::DropTable;
 use serenity::{
+    all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
-    all::{ CommandOptionType, CommandInteraction },
     http::{ CacheHttp, Http },
 };
 
-use crate::{ event_handler::command_handler::CommandOptions, db::models::drop_table };
+use crate::{ db::models::drop_table, event_handler::command_handler::CommandOptions };
 
+#[allow(clippy::significant_drop_tightening)] // bug in clippy
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
@@ -24,7 +25,8 @@ pub async fn run(
         std::borrow::Cow::from(&name),
         None
     ).await?;
-    if let Some(drop_table) = drop_table.read().await.as_ref() {
+    let drop_table = drop_table.write().await;
+    if let Some(drop_table) = drop_table.as_ref() {
         if drop_table.drop_table_parts().is_empty() {
             anyhow::bail!("Drop table does not exist.");
         }

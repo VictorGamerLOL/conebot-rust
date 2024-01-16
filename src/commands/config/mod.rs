@@ -1,13 +1,13 @@
 pub mod currency;
-pub mod item;
 pub mod drop_table;
+pub mod item;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
     all::CommandInteraction,
     builder::CreateCommand,
-    http::{ CacheHttp, Http },
     client::Context,
+    http::{ CacheHttp, Http },
 };
 
 use crate::event_handler::command_handler::CommandOptions;

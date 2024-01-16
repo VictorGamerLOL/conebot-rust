@@ -38,14 +38,16 @@ impl<T> Paginator<T> {
         } else {
             false
         };
-        Ok(Self {
+        let mut self_ = Self {
             start: 0,
             end,
-            hit_end: false,
+            hit_end,
             end_count: data.len() % per_page,
             per_page,
             data,
-        })
+        };
+        self_.first_page();
+        Ok(self_)
     }
 
     /// Get the first page of data
@@ -56,7 +58,7 @@ impl<T> Paginator<T> {
     pub fn first_page(&mut self) -> &[T] {
         self.start = 0;
         self.hit_end = false;
-        self.end = if self.data.len() < self.per_page {
+        self.end = if self.data.len() <= self.per_page {
             self.hit_end = true;
             self.data.len() - 1
         } else {
@@ -135,14 +137,9 @@ impl<T> Paginator<T> {
     pub fn last_page(&mut self) -> &[T] {
         self.hit_end = true;
         self.end = self.data.len() - 1;
-        self.start =
-            self.end.saturating_sub(
-                if self.end_count == 0 {
-                    self.per_page
-                } else {
-                    self.end_count
-                }
-            ) + 1; // It's inclusive, if i had 17 and 19, it would return 3 items, not 2. I would need 18 and 19 if I wanted 2 items.
+        self.start = self.end
+            .checked_sub(if self.end_count == 0 { self.per_page } else { self.end_count })
+            .map_or(0, |start| start + 1);
         &self.data[self.start..=self.end]
     }
 }
@@ -210,7 +207,7 @@ mod test {
     }
 
     #[test]
-    fn stress_test() {
+    fn stress_test_long() {
         let data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
         let per_page = 3;
         let mut paginator = Paginator::new(data, per_page).unwrap();
@@ -239,5 +236,92 @@ mod test {
         assert!(paginator.next_page().is_none());
         assert_eq!(paginator.current_page(), vec![19, 20]);
         assert_eq!(paginator.prev_page().unwrap(), vec![16, 17, 18]);
+    }
+
+    #[test]
+    fn stress_test_short_2() {
+        let data = vec![1, 2];
+        let per_page = 3;
+        let mut paginator = Paginator::new(data, per_page).unwrap();
+        assert!(paginator.end_count == 2);
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1, 2]);
+        assert!(paginator.next_page().is_none());
+        let page = paginator.last_page();
+        assert_eq!(page, vec![1, 2]);
+        assert!(paginator.prev_page().is_none());
+        assert!(paginator.prev_page().is_none());
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1, 2]);
+        assert!(paginator.prev_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1, 2]);
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        assert_eq!(paginator.current_page(), vec![1, 2]);
+        assert!(paginator.next_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1, 2]);
+        assert!(paginator.prev_page().is_none());
+    }
+
+    #[test]
+    fn stress_test_short_1() {
+        let data = vec![1];
+        let per_page = 3;
+        let mut paginator = Paginator::new(data, per_page).unwrap();
+        assert!(paginator.end_count == 1);
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1]);
+        assert!(paginator.next_page().is_none());
+        let page = paginator.last_page();
+        assert_eq!(page, vec![1]);
+        assert!(paginator.prev_page().is_none());
+        assert!(paginator.prev_page().is_none());
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1]);
+        assert!(paginator.prev_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1]);
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        assert_eq!(paginator.current_page(), vec![1]);
+        assert!(paginator.next_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1]);
+        assert!(paginator.prev_page().is_none());
+    }
+
+    #[test]
+    fn stress_test_short_3() {
+        let data = vec![1, 2, 3];
+        let per_page = 3;
+        let mut paginator = Paginator::new(data, per_page).unwrap();
+        assert!(paginator.end_count == 0);
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1, 2, 3]);
+        assert!(paginator.next_page().is_none());
+        let page = paginator.last_page();
+        assert_eq!(page, vec![1, 2, 3]);
+        assert!(paginator.prev_page().is_none());
+        assert!(paginator.prev_page().is_none());
+        let page = paginator.first_page();
+        assert_eq!(page, vec![1, 2, 3]);
+        assert!(paginator.prev_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1, 2, 3]);
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        paginator.next_page();
+        assert_eq!(paginator.current_page(), vec![1, 2, 3]);
+        assert!(paginator.next_page().is_none());
+        assert_eq!(paginator.current_page(), vec![1, 2, 3]);
+        assert!(paginator.prev_page().is_none());
     }
 }

@@ -2,22 +2,22 @@ use std::borrow::Cow;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
+    all::{ ActionRow, ButtonStyle, CommandInteraction, CommandOptionType, ReactionType },
     builder::{
-        CreateCommandOption,
-        EditInteractionResponse,
-        CreateEmbed,
-        CreateButton,
         CreateActionRow,
+        CreateButton,
+        CreateCommandOption,
+        CreateEmbed,
         CreateInteractionResponse,
+        EditInteractionResponse,
     },
-    all::{ CommandOptionType, CommandInteraction, ButtonStyle, ReactionType, ActionRow },
-    http::{ Http, CacheHttp },
     client::Context,
+    http::{ CacheHttp, Http },
 };
 
 use crate::{
-    event_handler::command_handler::{ CommandOptions, IntOrNumber },
     db::models::{ drop_table::{ builder::DropTablePartBuilder, DropTablePartOption }, DropTable },
+    event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 
 pub async fn run(

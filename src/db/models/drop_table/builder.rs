@@ -102,14 +102,24 @@ impl DropTablePartBuilder {
         let drop_table_name = self.drop_table_name.ok_or_else(||
             anyhow!("Drop table name is missing")
         )?;
+        let drop = self.drop.ok_or_else(|| anyhow!("Drop is missing"))?;
         let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<DropTablePart>("dropTables");
 
-        let filter =
+        let mut filter =
             doc! {
             "GuildId": guild_id.as_i64(),
             "DropTableName": &drop_table_name,
         };
+
+        match drop {
+            DropTablePartOption::Item { ref item_name } => {
+                filter.insert("ItemName", item_name);
+            }
+            DropTablePartOption::Currency { ref currency_name } => {
+                filter.insert("CurrencyName", currency_name);
+            }
+        }
 
         if collection.find_one(filter, None).await?.is_some() {
             return Err(anyhow!("Drop table part already exists"));
@@ -118,7 +128,7 @@ impl DropTablePartBuilder {
         let part = DropTablePart {
             guild_id,
             drop_table_name,
-            drop: self.drop.ok_or_else(|| anyhow!("Drop is missing"))?,
+            drop,
             min: self.min.unwrap_or(1),
             max: self.max,
             weight: self.weight.unwrap_or(1),
@@ -210,7 +220,17 @@ impl DropTableBuilder {
         let mut cache = super::DROP_TABLES_CACHE.lock().await;
 
         if let Some(drop_table) = cache.get(&(guild_id, drop_table_name.clone())) {
-            return Err(anyhow!("Drop table already exists"));
+            let drop_table = drop_table.to_owned();
+            let mut drop_table_ = drop_table.write().await;
+            if let Some(drop_table__) = drop_table_.as_ref() {
+                if !drop_table__.drop_table_parts().is_empty() {
+                    return Err(anyhow!("Drop table already exists"));
+                } else {
+                    drop_table_.take();
+                    drop(drop_table_);
+                    cache.pop(&(guild_id, drop_table_name.clone()));
+                }
+            }
         }
 
         let mut owned_session: Option<ClientSession> = None;

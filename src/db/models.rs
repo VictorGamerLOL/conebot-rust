@@ -1,7 +1,6 @@
 pub mod balances;
 pub mod currency;
 pub mod drop_table;
-pub mod global;
 mod inventory;
 pub mod item;
 mod multipliers;

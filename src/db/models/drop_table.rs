@@ -3,13 +3,13 @@
 use std::{ borrow::Cow, collections::HashSet, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
 
 use anyhow::{ anyhow, Result };
-use futures::TryStreamExt;
+use futures::{ TryStreamExt, StreamExt, future::{ self, join_all } };
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession };
 use rand::distributions::uniform::SampleRange;
 use serde::{ Deserialize, Serialize };
-use tokio::sync::{ Mutex, RwLock };
+use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
 use crate::{
     db::{ uniques::{ DbGuildId, DropTableNameRef }, ArcTokioRwLockOption, TokioMutexCache, CLIENT },
@@ -107,6 +107,10 @@ impl DropTable {
             session
         ).await?;
 
+        if drop_table_parts.is_empty() {
+            anyhow::bail!("Drop table not found.");
+        }
+
         let drop_table = Self {
             guild_id,
             drop_table_name: drop_table_name.clone().into_owned(),
@@ -173,15 +177,16 @@ impl DropTable {
     }
 
     pub async fn delete(
-        self_: ArcTokioRwLockOption<Self>,
+        mut self_: RwLockWriteGuard<'_, Option<Self>>,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         let mut cache = DROP_TABLES_CACHE.lock().await;
 
         let drop_table = self_
-            .write().await
             .take()
-            .ok_or_else(|| { anyhow!("Drop table is being used in breaking operation.") })?;
+            .ok_or_else(|| anyhow!("Drop table is being used in breaking operation."))?;
+
+        drop(self_);
 
         let db = CLIENT.get().await.database("conebot");
         let collection = db.collection::<DropTablePart>("dropTables");
@@ -224,6 +229,134 @@ impl DropTable {
         let part = self.drop_table_parts.swap_remove(i);
         part.delete().await?;
         Ok(())
+    }
+
+    /// Deletes all occurrences of a currency from all drop tables within a guild.
+    pub async fn purge_currency(
+        guild_id: DbGuildId,
+        currency_name: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let mut cache = DROP_TABLES_CACHE.lock().await;
+
+        // remove currency from drop tables
+        futures::stream
+            ::iter(cache.iter())
+            .filter(|(k, _)| future::ready(k.0 == guild_id))
+            .map(|(k, v)| async {
+                let mut v_lock = v.write().await;
+                let Some(v) = v_lock.as_mut() else {
+                    return;
+                };
+                v.drop_table_parts.retain(|drop_table_part| {
+                    match &drop_table_part.drop {
+                        DropTablePartOption::Item { .. } => true,
+                        DropTablePartOption::Currency { currency_name: c } => c != currency_name,
+                    }
+                });
+                drop(v_lock);
+            })
+            .buffer_unordered(10)
+            .collect::<()>().await;
+        // magically nothing above returns an error.
+
+        drop(cache);
+
+        let db = CLIENT.get().await.database("conebot");
+        let collection = db.collection::<DropTablePart>("dropTables");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "CurrencyName": currency_name,
+        };
+
+        if let Some(s) = session {
+            collection.delete_many_with_session(filter, None, s).await?;
+        } else {
+            collection.delete_many(filter, None).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Deletes all occurrences of an item from all drop tables within a guild.
+    pub async fn purge_item(
+        guild_id: DbGuildId,
+        item_name: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let mut cache = DROP_TABLES_CACHE.lock().await;
+
+        // remove item from drop tables
+        futures::stream
+            ::iter(cache.iter())
+            .filter(|(k, _)| future::ready(k.0 == guild_id))
+            .map(|(k, v)| async {
+                let mut v_lock = v.write().await;
+                let Some(v) = v_lock.as_mut() else {
+                    return;
+                };
+                v.drop_table_parts.retain(|drop_table_part| {
+                    match &drop_table_part.drop {
+                        DropTablePartOption::Item { item_name: i } => i != item_name,
+                        DropTablePartOption::Currency { .. } => true,
+                    }
+                });
+                drop(v_lock);
+            })
+            .buffer_unordered(10)
+            .collect::<()>().await;
+        // magically nothing above returns an error.
+
+        drop(cache);
+
+        let db = CLIENT.get().await.database("conebot");
+        let collection = db.collection::<DropTablePart>("dropTables");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "ItemName": item_name,
+        };
+
+        if let Some(s) = session {
+            collection.delete_many_with_session(filter, None, s).await?;
+        } else {
+            collection.delete_many(filter, None).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Invalidates the cache of this drop table in a lenient way. This means that
+    /// it will simply remove it from the cache without setting its its value to None
+    /// beforehand. Useful when you want to dispose of an empty drop table.
+    pub async fn invalidate_cache_lenient(&self) {
+        let mut cache = DROP_TABLES_CACHE.lock().await;
+
+        cache.pop(&(self.guild_id, self.drop_table_name.clone()));
+
+        drop(cache);
+    }
+
+    /// Invalidates the cache of this drop table. This means that it will set its value
+    /// to None before removing it from the cache. Useful when you want to dispose of
+    /// a drop table properly.
+    pub async fn invalidate_cache(mut self_: RwLockWriteGuard<'_, Option<Self>>) {
+        let mut cache = DROP_TABLES_CACHE.lock().await;
+
+        let drop_table = self_
+            .take()
+            .ok_or_else(|| anyhow!("Drop table is being used in breaking operation."));
+
+        drop(self_);
+
+        if let Ok(drop_table) = drop_table {
+            cache.pop(&(drop_table.guild_id, drop_table.drop_table_name));
+        }
+
+        drop(cache);
     }
 }
 
@@ -314,6 +447,20 @@ impl DropTablePartOption {
         match self {
             Self::Item { .. } => None,
             Self::Currency { currency_name } => Some(currency_name),
+        }
+    }
+
+    pub const fn name(&self) -> &String {
+        match self {
+            Self::Item { item_name } => item_name,
+            Self::Currency { currency_name } => currency_name,
+        }
+    }
+
+    pub const fn kind_as_str(&self) -> &'static str {
+        match self {
+            Self::Item { .. } => "item",
+            Self::Currency { .. } => "currency",
         }
     }
 }

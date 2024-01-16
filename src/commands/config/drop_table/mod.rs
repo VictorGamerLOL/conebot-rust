@@ -2,16 +2,17 @@ use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::CreateCommandOption,
-    http::{ CacheHttp, Http },
     client::Context,
+    http::{ CacheHttp, Http },
 };
 
 use crate::event_handler::command_handler::CommandOptions;
 
-pub mod create;
 pub mod add_entry;
+pub mod create;
 pub mod delete;
 pub mod delete_entry;
+pub mod view_table;
 
 pub async fn run(
     options: CommandOptions,
@@ -26,6 +27,7 @@ pub async fn run(
         "add_entry" => add_entry::run(cmd_options, command, http).await?,
         "delete" => delete::run(cmd_options, command, http).await?,
         "delete_entry" => delete_entry::run(cmd_options, command, http).await?,
+        "view_table" => view_table::run(cmd_options, command, http).await?,
         &_ => anyhow::bail!("Unknown config subcommand."),
     }
     Ok(())
@@ -41,4 +43,5 @@ pub fn option() -> CreateCommandOption {
         .add_sub_option(add_entry::option())
         .add_sub_option(delete::option())
         .add_sub_option(delete_entry::option())
+        .add_sub_option(view_table::option())
 }
