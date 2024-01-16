@@ -1,7 +1,7 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
     all::CommandInteraction,
-    builder::{ CreateCommand, EditInteractionResponse },
+    builder::CreateCommand,
     http::{ CacheHttp, Http },
     model::Permissions,
 };

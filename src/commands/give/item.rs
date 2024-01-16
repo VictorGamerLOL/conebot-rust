@@ -1,4 +1,4 @@
-use anyhow::{ anyhow, bail, Result };
+use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
@@ -6,7 +6,7 @@ use serenity::{
 };
 
 use crate::{
-    db::models::{ Inventory, Item, ItemError },
+    db::models::{ Inventory, Item },
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 

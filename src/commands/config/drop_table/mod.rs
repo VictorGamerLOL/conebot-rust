@@ -3,7 +3,6 @@ use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::CreateCommandOption,
     client::Context,
-    http::{ CacheHttp, Http },
 };
 
 use crate::event_handler::command_handler::CommandOptions;

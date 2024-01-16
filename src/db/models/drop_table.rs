@@ -1,13 +1,12 @@
 #![allow(clippy::module_name_repetitions)] // no.
 
-use std::{ borrow::Cow, collections::HashSet, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
+use std::{ borrow::Cow, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
 
 use anyhow::{ anyhow, Result };
-use futures::{ TryStreamExt, StreamExt, future::{ self, join_all } };
+use futures::{ future::{ self }, StreamExt, TryStreamExt };
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession };
-use rand::distributions::uniform::SampleRange;
 use serde::{ Deserialize, Serialize };
 use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 

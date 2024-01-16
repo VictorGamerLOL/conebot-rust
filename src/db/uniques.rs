@@ -28,8 +28,6 @@ use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 use crate::{ db::models::Currency, macros::const_impl };
 
-use super::models::DropTable;
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 /// A wrapper around a guild ID as it should be stored in the database.

@@ -1,14 +1,11 @@
-use anyhow::{ anyhow, bail, Result };
+use anyhow::{ bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     http::{ CacheHttp, Http },
 };
 
-use crate::{
-    db::models::{ drop_table, DropTable },
-    event_handler::command_handler::CommandOptions,
-};
+use crate::{ db::models::DropTable, event_handler::command_handler::CommandOptions };
 
 pub async fn run(
     options: CommandOptions,

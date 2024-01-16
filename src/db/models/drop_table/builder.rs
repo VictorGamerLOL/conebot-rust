@@ -5,7 +5,6 @@ use crate::db::{ uniques::DbGuildId, ArcTokioRwLockOption };
 use super::{ DropTable, DropTablePart, DropTablePartOption };
 
 use anyhow::{ anyhow, Result };
-use futures::future::join_all;
 use mongodb::{ bson::doc, ClientSession };
 use tokio::sync::RwLock;
 

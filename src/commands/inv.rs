@@ -2,26 +2,16 @@ use std::time::Duration;
 
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
-    all::{
-        ActionRow,
-        Button,
-        ButtonKind,
-        ButtonStyle,
-        CommandInteraction,
-        ComponentType,
-        ReactionType,
-    },
+    all::{ ButtonStyle, CommandInteraction, ReactionType },
     builder::{
         CreateActionRow,
         CreateButton,
         CreateCommand,
-        CreateCommandOption,
         CreateEmbed,
         CreateEmbedAuthor,
         EditInteractionResponse,
     },
     client::Context,
-    http::{ CacheHttp, Http },
 };
 
 use crate::{

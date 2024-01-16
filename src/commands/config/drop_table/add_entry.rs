@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use anyhow::{ anyhow, Result };
 use serenity::{
-    all::{ ActionRow, ButtonStyle, CommandInteraction, CommandOptionType, ReactionType },
+    all::{ ButtonStyle, CommandInteraction, CommandOptionType, ReactionType },
     builder::{
         CreateActionRow,
         CreateButton,
@@ -12,11 +12,10 @@ use serenity::{
         EditInteractionResponse,
     },
     client::Context,
-    http::{ CacheHttp, Http },
 };
 
 use crate::{
-    db::models::{ drop_table::{ builder::DropTablePartBuilder, DropTablePartOption }, DropTable },
+    db::models::{ drop_table::DropTablePartOption, DropTable },
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 

@@ -1,9 +1,9 @@
-use std::{ sync::Arc, time::Duration };
+use std::time::Duration;
 
 use anyhow::Result;
 use chrono::Utc;
 use serenity::{
-    all::{ ActionRow, CommandInteraction, CommandOptionType, Message, ReactionType },
+    all::{ CommandInteraction, CommandOptionType, ReactionType },
     builder::{
         CreateActionRow,
         CreateButton,
@@ -13,18 +13,14 @@ use serenity::{
         EditInteractionResponse,
     },
     client::Context,
-    gateway::{ ShardManager, ShardMessenger },
-    http::{ CacheHttp, Http },
+    gateway::ShardMessenger,
 };
-use tokio::{ join, try_join };
 
 use crate::{
     db::models::{ drop_table::DropTablePart, DropTable },
     event_handler::command_handler::CommandOptions,
     util::paginator::Paginator,
 };
-
-use super::create;
 
 pub async fn run(
     options: CommandOptions,
