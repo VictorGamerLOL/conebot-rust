@@ -47,10 +47,10 @@ pub async fn run(
         .transpose()?
         .map(IntOrNumber::cast_to_i64);
 
-    let mut drop_table = DropTable::try_from_name(guild_id.into(), Cow::from(&name), None).await?;
+    let drop_table = DropTable::try_from_name(guild_id.into(), Cow::from(&name), None).await?;
     let mut drop_table = drop_table.write().await;
 
-    let mut drop_table_ = drop_table
+    let drop_table_ = drop_table
         .as_mut()
         .ok_or_else(|| anyhow!("Drop table is being used in breaking operation."))?;
 
@@ -122,21 +122,21 @@ pub async fn run(
 }
 
 fn warn_prompt(yes_id: impl Into<String>, no_id: impl Into<String>) -> EditInteractionResponse {
-    let mut response = EditInteractionResponse::new();
+    let response = EditInteractionResponse::new();
 
-    let mut embed = CreateEmbed::new()
+    let embed = CreateEmbed::new()
         .title("⚠️ Warning ⚠️")
         .description(
             "A drop table of this name does not exist. This command will create a new drop table. Would you like to continue?"
         );
-    let mut button_yes = CreateButton::new(yes_id)
+    let button_yes = CreateButton::new(yes_id)
         .style(ButtonStyle::Success)
         .emoji(ReactionType::Unicode("✅".to_string()));
-    let mut button_no = CreateButton::new(no_id)
+    let button_no = CreateButton::new(no_id)
         .style(ButtonStyle::Danger)
         .emoji(ReactionType::Unicode("✖️".to_string()));
 
-    let mut action_row = CreateActionRow::Buttons(vec![button_yes, button_no]);
+    let action_row = CreateActionRow::Buttons(vec![button_yes, button_no]);
 
     response.add_embed(embed).components(vec![action_row])
 }

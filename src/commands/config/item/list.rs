@@ -20,10 +20,10 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Could not find item name."))??;
     let mut embed = CreateEmbed::new();
 
-    let mut item = Item::try_from_name(guild_id.into(), item_name).await?;
-    let mut item = item.read().await;
+    let item = Item::try_from_name(guild_id.into(), item_name).await?;
+    let item = item.read().await;
 
-    let mut item_ = item.as_ref().ok_or_else(|| anyhow!("Item not found."))?;
+    let item_ = item.as_ref().ok_or_else(|| anyhow!("Item not found."))?;
 
     for (key, value) in item_.try_to_kvs()? {
         embed = embed.field(key, value, true);

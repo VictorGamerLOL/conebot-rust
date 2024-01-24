@@ -53,9 +53,9 @@ pub async fn run<'a>(
     let balances = Balances::try_from_user(guild_id, user.0.id.into()).await?;
 
     let embed = if let Some(c) = opts.currency {
-        single_currency(c, &balances, guild_id.into(), user, command).await?
+        single_currency(c, &balances, user, command).await?
     } else {
-        multi_currency(balances, guild_id.into(), user, command).await?
+        multi_currency(balances, user, command).await?
     };
 
     command.edit_response(
@@ -67,7 +67,6 @@ pub async fn run<'a>(
 
 async fn multi_currency<'a>(
     balances: std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
-    guild_id: GuildId,
     user: (&User, &Member),
     command: &'a CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
@@ -79,7 +78,6 @@ async fn multi_currency<'a>(
         })?;
     let embed = multi_currency_embed(
         balances_.balances(),
-        guild_id,
         user.1,
         command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
     ).await?.colour(ACCENT_COLOUR);
@@ -90,7 +88,6 @@ async fn multi_currency<'a>(
 async fn single_currency<'a>(
     c: std::sync::Arc<tokio::sync::RwLock<Option<Currency>>>,
     balances: &'a std::sync::Arc<tokio::sync::Mutex<Option<Balances>>>,
-    guild_id: GuildId,
     user: (&User, &Member),
     command: &CommandInteraction
 ) -> Result<CreateEmbed, anyhow::Error> {
@@ -116,7 +113,6 @@ async fn single_currency<'a>(
     let embed = single_currency_embed(
         balance,
         currency_,
-        guild_id,
         user.1,
         command.member.as_ref().ok_or_else(|| anyhow!("DMs not allowed"))?
     ).colour(ACCENT_COLOUR);
@@ -128,7 +124,6 @@ async fn single_currency<'a>(
 fn single_currency_embed<'a>(
     balance: &'a Balance,
     currency: &'a Currency,
-    guild: GuildId,
     target: &'a Member,
     executor: &'a Member
 ) -> CreateEmbed {
@@ -146,12 +141,12 @@ fn single_currency_embed<'a>(
         .colour(Colour::DARK_GREEN)
         .thumbnail(target.face())
         .timestamp(chrono::Utc::now())
+        .author(author)
 }
 
 #[allow(clippy::unused_async)]
 async fn multi_currency_embed(
     balances: &[Balance],
-    guild: GuildId,
     target: &Member,
     executor: &Member
 ) -> Result<CreateEmbed> {
@@ -183,7 +178,6 @@ async fn multi_currency_embed(
         field_data.push((title, description, true));
         drop(currency);
     }
-    let embed = CreateEmbed::default();
     let author = CreateEmbedAuthor::new(executor.display_name()).icon_url(executor.face());
     Ok(
         CreateEmbed::default()
@@ -193,6 +187,7 @@ async fn multi_currency_embed(
             .thumbnail(target.face())
             .fields(field_data)
             .timestamp(chrono::Utc::now())
+            .author(author)
     )
 }
 

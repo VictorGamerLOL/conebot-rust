@@ -30,7 +30,7 @@ async fn test_new_client() {
     use dotenv::dotenv;
     dotenv().ok();
     let uri = std::env::var("MONGO_URI").expect("MONGO_URI must be set");
-    let client = Client::with_uri_str(&uri).await.unwrap();
+    let _ = Client::with_uri_str(&uri).await.unwrap();
 }
 
 pub mod uniques;

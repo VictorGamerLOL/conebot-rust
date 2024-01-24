@@ -19,6 +19,7 @@ use lru::LruCache;
 use mongodb::bson::doc;
 use mongodb::{ ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
+use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::{ Mutex, MutexGuard };
@@ -147,14 +148,11 @@ impl Balances {
     ///
     /// # Errors
     /// - Any `MongoDB` error occurs.
-    pub async fn ensure_has_currency(
-        &mut self,
-        curr_name: CurrencyNameRef<'_>
-    ) -> Result<&mut Balance> {
+    pub async fn ensure_has_currency(&mut self, curr_name: Cow<'_, str>) -> Result<&mut Balance> {
         if let Some(i) = self.balances.iter().position(|b| b.curr_name == curr_name) {
             return Ok(&mut self.balances[i]);
         }
-        self.create_balance(curr_name.to_owned().into_string()).await
+        self.create_balance(curr_name.into_owned()).await
     }
 
     /// Delete the balance for the specified currency for the user in the guild.
@@ -166,7 +164,7 @@ impl Balances {
     /// - If the amount of deleted documents is 0.
     pub async fn delete_balance(&mut self, curr_name: &str) -> Result<()> {
         let db = super::super::CLIENT.get().await.database("conebot");
-        let coll: Collection<Balance> = db.collection("balances");
+        let _coll: Collection<Balance> = db.collection("balances");
         // get the balance with the specified name from self's balance vec as owned value
         let bal = self.balances
             .iter()
@@ -183,6 +181,56 @@ impl Balances {
         Ok(())
     }
 
+    pub async fn bulk_update_currency_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let cache = CACHE_BALANCES.lock().await;
+
+        let cache_iter = cache
+            .iter()
+            .filter_map(|(k, v)| {
+                if k.0 == guild_id { Some(v.to_owned()) } else { None }
+            })
+            .collect::<Vec<_>>();
+
+        drop(cache);
+
+        for balances in cache_iter {
+            let mut lock_res = balances.lock().await;
+            if let Some(balances) = lock_res.as_mut() {
+                for balance in &mut balances.balances {
+                    if balance.curr_name == before {
+                        balance.curr_name = after.clone();
+                    }
+                }
+            }
+            drop(lock_res);
+        }
+
+        let db = super::super::CLIENT.get().await.database("conebot");
+        let coll: Collection<Balance> = db.collection("balances");
+        let filterdoc =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "CurrName": before,
+        };
+        let updatedoc =
+            doc! {
+            "$set": {
+                "CurrName": after,
+            },
+        };
+        if let Some(session) = session {
+            coll.update_many_with_session(filterdoc, updatedoc, None, session).await?;
+        } else {
+            coll.update_many(filterdoc, updatedoc, None).await?;
+        }
+        Ok(())
+    }
+
     /// Gets all of the balances from a guild, then looks
     /// inside of them to see if they have a balance for the specified currency.
     /// If they do, it deletes it. Effectively deleting the currency from the guild.
@@ -193,7 +241,7 @@ impl Balances {
     /// - Any `MongoDB` error occurs.
     pub async fn purge_currency(guild_id: DbGuildId, curr_name: CurrencyNameRef<'_>) -> Result<()> {
         let mut cache = CACHE_BALANCES.lock().await;
-        let mut cache_iter = cache.iter_mut();
+        let cache_iter = cache.iter_mut();
 
         for (k, v) in cache_iter {
             if k.0 != guild_id {

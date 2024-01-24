@@ -282,6 +282,7 @@ dependencies = [
  "once_cell",
  "paste",
  "rand",
+ "regex",
  "rustversion",
  "serde",
  "serde_json",

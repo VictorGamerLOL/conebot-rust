@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use anyhow::Result;
 use rand::distributions::{ uniform::SampleRange, Distribution };
@@ -23,7 +23,7 @@ pub enum DroppableKind {
     Currency,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DropResult<'a> {
     pub result: DropResultKind<'a>,
     pub quantity: i64,
@@ -68,29 +68,24 @@ impl<T> DropGenerator<T> where T: SampleRange<i64> + Clone {
         self.drops.push(droppable);
     }
 
-    pub fn generate(&self) -> Result<Vec<DropResult<'_>>> {
+    #[allow(clippy::option_if_let_else)] // cannot borrow mutable more than once
+    pub fn generate(&self, times: i64) -> Result<Vec<DropResult<'_>>> {
         let mut rng = rand::rngs::OsRng;
-        let choices = self.drops
+        let (choices, weights): (Vec<_>, Vec<_>) = self.drops
             .iter()
-            .map(|d| d.as_small())
-            .collect::<Vec<_>>();
-        let weights = self.drops
-            .iter()
-            .map(|d| d.weight)
-            .collect::<Vec<_>>();
+            .map(|d| (d.as_small(), d.weight))
+            .unzip();
 
         let dist = rand::distributions::WeightedIndex::new(weights)?;
-        let mut results: HashSet<(DroppableSmall<'_>, i64)> = HashSet::new();
-        for _ in 0..self.amount {
+        let mut results: HashMap<DroppableSmall<'_>, i64> = HashMap::new();
+        for _ in 0..self.amount * times {
             let choice = dist.sample(&mut rng);
             let droppable = choices[choice];
             let amount = self.drops[choice].range.clone().sample_single(&mut rng);
-            // get from the results an already existing record if possible, otherwise create a new one and keep a ref of it
-            if let Some(mut res) = results.take(&(droppable, amount)) {
-                res.1 += amount;
-                results.insert(res);
+            if let Some(amount_stored) = results.get_mut(&droppable) {
+                *amount_stored += amount;
             } else {
-                results.insert((droppable, amount));
+                results.insert(droppable, amount);
             }
         }
 
@@ -163,7 +158,7 @@ mod tests {
             weight: 1,
         };
         drop_gen.add_droppable(droppable);
-        let result = drop_gen.generate();
+        let result = drop_gen.generate(1);
         assert!(result.is_ok());
     }
 
@@ -188,7 +183,7 @@ mod tests {
         let mut count1 = 0;
         let mut count2 = 0;
         for _ in 0..1000 {
-            let results = drop_gen.generate().unwrap();
+            let results = drop_gen.generate(1).unwrap();
             for result in results {
                 if result.name() == "Test Item 1" {
                     count1 += 1;
@@ -212,7 +207,7 @@ mod tests {
         drop_gen.add_droppable(droppable);
 
         for _ in 0..1000 {
-            let results = drop_gen.generate().unwrap();
+            let results = drop_gen.generate(1).unwrap();
             for result in results {
                 assert!(
                     result.quantity >= 5 && result.quantity <= 10,
@@ -234,7 +229,7 @@ mod tests {
         drop_gen.add_droppable(droppable);
 
         for _ in 0..1000 {
-            let results = drop_gen.generate().unwrap();
+            let results = drop_gen.generate(1).unwrap();
             for result in results {
                 assert!(
                     result.quantity == 5,

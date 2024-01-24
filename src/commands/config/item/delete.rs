@@ -20,7 +20,7 @@ pub async fn run(
         .ok_or_else(|| anyhow!("No item name was found"))?;
     let item = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
 
-    let mut client = CLIENT.get().await;
+    let client = CLIENT.get().await;
 
     let mut session = client.start_session(None).await?;
 

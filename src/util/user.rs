@@ -15,11 +15,3 @@ pub async fn is_hanging_item_entry(item: &InventoryEntry) -> Result<bool> {
     }
     Ok(false)
 }
-
-pub async fn is_hanging_balance_entry(balance: &Balance) -> Result<bool> {
-    let balance = Item::try_from_name(
-        balance.guild_id().to_owned(),
-        balance.curr_name().to_owned()
-    ).await;
-    Ok(false)
-}

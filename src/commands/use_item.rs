@@ -26,25 +26,25 @@ pub async fn run(
     let item_name = options
         .get_string_value(ITEM_NAME_OPTION_NAME)
         .ok_or_else(|| anyhow!("No item name provided."))??;
-    let mut amount = options
+    let amount = options
         .get_int_or_number_value(AMOUNT_OPTION_NAME)
         .transpose()?
         .unwrap_or(IntOrNumber::Int(1))
         .cast_to_i64();
 
-    let user_inventory = Inventory::from_user(guild_id.into(), command.user.id.into()).await?;
+    let user_inventory = Inventory::try_from_user(guild_id.into(), command.user.id.into()).await?;
     let mut user_inventory = user_inventory.lock().await;
-    let mut user_inventory_ = user_inventory
+    let user_inventory_ = user_inventory
         .as_mut()
         .ok_or_else(|| anyhow!("User's inventory is being used in a breaking operation."))?;
 
     let item = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
-    let mut item = item.read().await;
+    let item = item.read().await;
     let item_ = item
         .as_ref()
         .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
 
-    let mut entry = user_inventory_
+    let entry = user_inventory_
         .get_item(&item_name)
         .ok_or_else(|| anyhow!("You do not have that item."))?;
     if entry.amount() < amount {
@@ -54,25 +54,17 @@ pub async fn run(
     let mut response_content = String::new();
 
     //TODO: make the response not be just the response messages one after another.
-    while amount > 0 {
-        let use_result = use_item(command.user.id, item_, &http).await?;
+    let use_result = use_item(command.user.id, user_inventory_, item_, amount, &http).await?;
 
-        if !use_result.success {
-            response_content.push_str(
-                use_result.message.unwrap_or(Cow::Borrowed("Failed to use item.")).as_ref()
-            );
-            response_content.push('\n');
-            break;
-        }
-        user_inventory_.take_item(&item_name, None).await?;
-        amount -= 1;
-        if response_content.chars().count() >= MESSAGE_CODE_LIMIT {
-            continue;
-        }
+    if !use_result.success {
+        response_content.push_str(
+            use_result.message.unwrap_or(Cow::Borrowed("Failed to use item.")).as_ref()
+        );
+    } else {
+        user_inventory_.take_item(&item_name, amount, None).await?;
         response_content.push_str(
             use_result.message.unwrap_or_else(|| Cow::Owned(format!("Used {}", item_name))).as_ref()
         );
-        response_content.push('\n');
     }
 
     // keep only the first 2000 chars

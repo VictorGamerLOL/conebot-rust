@@ -54,7 +54,7 @@ pub async fn run(
     let mut paginator = Paginator::new(drop_table_parts, 10)?;
     let (row, [button_first_id, button_previous_id, button_next_id, button_last_id]) =
         create_buttons();
-    let mut embed = create_embed(paginator.current_page(), &name);
+    let embed = create_embed(paginator.current_page(), &name);
 
     let message = command.edit_response(
         &http,
@@ -86,11 +86,11 @@ pub async fn run(
 
         let msg_clone = msg.clone();
         let http_clone = http.clone();
-        let handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             msg_clone.create_response(http_clone, CreateInteractionResponse::Acknowledge).await
         });
 
-        let mut embed = match msg.data.custom_id.as_str() {
+        let embed = match msg.data.custom_id.as_str() {
             id if id == button_first_id => create_embed(paginator.first_page(), &name),
             id if id == button_previous_id => {
                 if let Some(p) = paginator.prev_page() {
@@ -113,6 +113,7 @@ pub async fn run(
                 break;
             }
         };
+        command.edit_response(http, EditInteractionResponse::new().embed(embed)).await?;
         paged_count += 1;
     }
 
@@ -139,25 +140,25 @@ fn create_embed(parts: &[&DropTablePart], drop_table_name: &str) -> CreateEmbed 
 }
 
 fn create_buttons() -> (CreateActionRow, [String; 4]) {
-    let mut current_time = Utc::now();
-    let mut button_first_id = format!("btn_first_{}", current_time);
-    let mut button_previous_id = format!("btn_previous_{}", current_time);
-    let mut button_next_id = format!("btn_next_{}", current_time);
-    let mut button_last_id = format!("btn_last_{}", current_time);
-    let mut button_first = CreateButton::new(button_first_id.clone())
+    let current_time = Utc::now();
+    let button_first_id = format!("btn_first_{}", current_time);
+    let button_previous_id = format!("btn_previous_{}", current_time);
+    let button_next_id = format!("btn_next_{}", current_time);
+    let button_last_id = format!("btn_last_{}", current_time);
+    let button_first = CreateButton::new(button_first_id.clone())
         .emoji(ReactionType::Unicode("⏮️".to_owned()))
         .style(serenity::all::ButtonStyle::Primary);
-    let mut button_previous = CreateButton::new(button_previous_id.clone())
+    let button_previous = CreateButton::new(button_previous_id.clone())
         .emoji(ReactionType::Unicode("◀️".to_owned()))
         .style(serenity::all::ButtonStyle::Primary);
-    let mut button_next = CreateButton::new(button_next_id.clone())
+    let button_next = CreateButton::new(button_next_id.clone())
         .emoji(ReactionType::Unicode("▶️".to_owned()))
         .style(serenity::all::ButtonStyle::Primary);
-    let mut button_last = CreateButton::new(button_last_id.clone())
+    let button_last = CreateButton::new(button_last_id.clone())
         .emoji(ReactionType::Unicode("⏭️".to_owned()))
         .style(serenity::all::ButtonStyle::Primary);
 
-    let mut row = CreateActionRow::Buttons(
+    let row = CreateActionRow::Buttons(
         vec![button_first, button_previous, button_next, button_last]
     );
     (row, [button_first_id, button_previous_id, button_next_id, button_last_id])

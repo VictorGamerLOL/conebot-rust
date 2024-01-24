@@ -38,7 +38,7 @@ pub async fn run(
 
     match field_name.as_str() {
         "name" => {
-            possible_fut = Some(Item::update_name(item.clone(), value.clone()));
+            possible_fut = Some(Item::update_name(item.clone(), value.clone(), None));
         }
         "description" | "desc" => item__.update_description(value, None).await?,
         "sellable" | "sell" => item__.update_sellable(value.parse()?, None).await?,

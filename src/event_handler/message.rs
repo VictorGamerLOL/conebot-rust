@@ -8,6 +8,7 @@ use serenity::all::ChannelId;
 use serenity::client::Context;
 use serenity::model::channel::Message;
 use serenity::model::prelude::{ Channel, GuildId, Member, RoleId, UserId };
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -96,7 +97,9 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 
         drop(currency);
 
-        let balance = balances_.ensure_has_currency(currency_name.as_ref()).await?;
+        let balance = balances_.ensure_has_currency(
+            Cow::from(currency_name.as_ref().as_str())
+        ).await?;
         // get a number between earn_min and earn_max
         let amount = truncate_2dp(rand.gen_range(earn_min..=earn_max));
         balance.add_amount(amount, None).await?;
@@ -159,7 +162,7 @@ fn check_can_earn(
 }
 
 fn check_contains_channel(
-    guild_id: GuildId,
+    _guild_id: GuildId,
     current_channel: impl Into<ChannelId>,
     channels: &[DbChannelId]
 ) -> bool {
@@ -172,8 +175,7 @@ fn check_contains_channel(
     false
 }
 
-fn check_contains_role(guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[DbRoleId]) -> bool {
-    let t = 0;
+fn check_contains_role(_guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[DbRoleId]) -> bool {
     for role in current_roles.iter().copied() {
         if roles.contains(&role.into()) {
             return true;

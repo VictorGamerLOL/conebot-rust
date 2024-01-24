@@ -1,9 +1,9 @@
 #![allow(clippy::module_name_repetitions)] // *no*.
 
-use std::{ borrow::Cow, num::NonZeroUsize, sync::Arc };
+use std::{ borrow::Cow, collections::HashMap, num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, bail, Result };
-use futures::StreamExt;
+use futures::{ StreamExt, TryStreamExt };
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession, Collection };
@@ -63,7 +63,7 @@ impl Inventory {
     ///
     /// # Errors
     /// - Any mongodb error occurs.
-    pub async fn from_user(
+    pub async fn try_from_user(
         guild_id: DbGuildId,
         user_id: DbUserId
     ) -> Result<ArcTokioMutexOption<Self>> {
@@ -85,6 +85,88 @@ impl Inventory {
         cache.put(key, inventory.to_owned());
         drop(cache);
         Ok(inventory)
+    }
+
+    pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioMutexOption<Self>>> {
+        let mut cache = CACHE_INVENTORY.lock().await;
+        let mut inventory_entries = InventoryEntry::from_guild(guild_id).await?;
+        let mut inventories = Vec::new();
+        let entries_iter = inventory_entries.keys().copied().collect::<Vec<_>>().into_iter();
+        for k in entries_iter {
+            if let Some(inv) = cache.get(&(guild_id, k)) {
+                inventories.push(inv.to_owned());
+            } else {
+                let inv = Arc::new(
+                    Mutex::new(
+                        Some(Self {
+                            guild_id,
+                            user_id: k,
+                            inventory: inventory_entries.remove(&k).unwrap(),
+                        })
+                    )
+                );
+                cache.put((guild_id, k), inv.clone());
+                inventories.push(inv);
+            }
+        }
+        drop(cache);
+        Ok(inventories)
+    }
+
+    pub async fn bulk_update_item_name(
+        guild_id: DbGuildId,
+        old_name: &str,
+        new_name: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let mut cache = CACHE_INVENTORY.lock().await;
+
+        let cache_iter = cache
+            .iter_mut()
+            .filter(|(k, _)| k.0 == guild_id)
+            .map(|(_, v)| v.to_owned())
+            .collect::<Vec<_>>();
+
+        drop(cache);
+
+        for v in cache_iter {
+            let mut lock_res = v.lock().await;
+            if let Some(inv) = lock_res.as_mut() {
+                for entry in inv.inventory.iter_mut() {
+                    if entry.item_name == old_name {
+                        entry.item_name = new_name.to_owned();
+                    }
+                }
+            }
+            drop(lock_res);
+        }
+
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<InventoryEntry> = db.collection("inventories");
+
+        let filterdoc =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "ItemName": old_name,
+        };
+        let updatedoc =
+            doc! {
+            "$set": {
+                "ItemName": new_name,
+            }
+        };
+
+        if let Some(s) = session {
+            coll
+                .update_many_with_session(filterdoc, updatedoc, None, s).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        } else {
+            coll
+                .update_many(filterdoc, updatedoc, None).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        }
+
+        Ok(())
     }
 
     /// Gets the inventory entry matching the item name provided.
@@ -142,11 +224,12 @@ impl Inventory {
     pub async fn take_item(
         &mut self,
         item_name: &str,
+        count: i64,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         if let Some(entry) = self.get_item(item_name) {
             entry.sub_amount(
-                1,
+                count,
                 // Since the option itself is owned, passing it would move it. Calling as_mut() on it
                 // will return a Option<&mut &mut ClientSession>, but sub_amount() expects a Option<&mut ClientSession>.
                 // No they are not the same thing apparently. So I need to map the &mut &mut ClientSession to &mut ClientSession
@@ -211,7 +294,7 @@ impl Inventory {
     ) -> Result<()> {
         // don't forget to delete it from the cache as well
         let mut cache = CACHE_INVENTORY.lock().await;
-        let mut cache_iter = cache.iter_mut();
+        let cache_iter = cache.iter_mut();
         for (k, v) in cache_iter {
             if k.0 != guild_id {
                 continue;
@@ -366,6 +449,32 @@ impl InventoryEntry {
         Ok(items)
     }
 
+    async fn from_guild(guild_id: DbGuildId) -> Result<HashMap<DbUserId, Vec<Self>>> {
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
+
+        let filterdoc = doc! {
+            "GuildId": guild_id.as_i64(),
+        };
+
+        let mut res = coll.find(filterdoc, None).await?;
+
+        let mut users_with_inventories: HashMap<DbUserId, Vec<Self>> = HashMap::new();
+
+        while let Some(inv_entry) = res.try_next().await? {
+            if
+                let Some(user_inventory_entries) = users_with_inventories.get_mut(
+                    &inv_entry.user_id
+                )
+            {
+                user_inventory_entries.push(inv_entry);
+            } else {
+                users_with_inventories.insert(inv_entry.user_id, vec![inv_entry]);
+            }
+        }
+        Ok(users_with_inventories)
+    }
+
     // I do not understand how this can be a const Fn because DbGuildId just holds a string, and
     // string borrows are not allowed in const fns.
     pub const fn guild_id(&self) -> DbGuildId {
@@ -382,6 +491,42 @@ impl InventoryEntry {
 
     pub const fn amount(&self) -> i64 {
         self.amount
+    }
+
+    pub async fn set_name(
+        &mut self,
+        new_name: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let coll: Collection<Self> = db.collection("inventories");
+
+        let filterdoc =
+            doc! {
+            "GuildId": self.guild_id.as_i64(),
+            "UserId": self.user_id.as_i64(),
+            "ItemName": &self.item_name,
+        };
+        let updatedoc =
+            doc! {
+            "$set": {
+                "ItemName": new_name,
+            }
+        };
+
+        if let Some(s) = session {
+            coll
+                .update_one_with_session(filterdoc, updatedoc, None, s).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        } else {
+            coll
+                .update_one(filterdoc, updatedoc, None).await
+                .map_err(|e| InventoryError::Other(e.into()))?;
+        }
+
+        self.item_name = new_name.to_owned();
+
+        Ok(())
     }
 
     /// Sets the amount of the item in the inventory.

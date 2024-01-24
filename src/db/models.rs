@@ -3,7 +3,6 @@ pub mod currency;
 pub mod drop_table;
 mod inventory;
 pub mod item;
-mod multipliers;
 mod role_rewards;
 mod store_entry;
 
@@ -13,7 +12,6 @@ pub use currency::Currency;
 pub use drop_table::DropTable;
 pub use inventory::{ Inventory, InventoryEntry };
 pub use item::{ Item, ItemError };
-pub use multipliers::{ Multiplier, Multipliers };
 pub use role_rewards::{ RoleReward, RoleRewards };
 use serde::Serialize;
 use serde_json::Value;

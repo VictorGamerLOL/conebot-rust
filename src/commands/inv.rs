@@ -32,7 +32,7 @@ pub async fn run(
     let username = command.user.name.as_str();
     let icon = command.user.face();
 
-    let user_inv = Inventory::from_user(guild_id.into(), user_id.into()).await?;
+    let user_inv = Inventory::try_from_user(guild_id.into(), user_id.into()).await?;
     let user_inv = user_inv.lock().await;
 
     let user_inv_ = user_inv
@@ -118,7 +118,7 @@ pub async fn run(
 
 fn make_embed(data: &[(String, i64)], username: &str, icon: &str) -> CreateEmbed {
     let author = CreateEmbedAuthor::new(username).icon_url(icon);
-    let mut embed = CreateEmbed::default().title("Inventory").author(author);
+    let embed = CreateEmbed::default().title("Inventory").author(author);
     let mut description = String::new();
     for (item, amount) in data {
         description.push_str(&format!("**{}** *x{}*\n", item, amount));
@@ -140,21 +140,19 @@ fn inv_controls() -> InvControls {
     let next_id = format!("{}next_page", now);
     let prev_id = format!("{}prev_page", now);
     let last_id = format!("{}last_page", now);
-    let mut first_button = CreateButton::new(first_id.clone())
+    let first_button = CreateButton::new(first_id.clone())
         .emoji(ReactionType::Unicode("⏮️".to_owned()))
         .style(ButtonStyle::Primary);
-    let mut last_button = CreateButton::new(last_id.clone())
+    let last_button = CreateButton::new(last_id.clone())
         .emoji(ReactionType::Unicode("⏭️".to_owned()))
         .style(ButtonStyle::Primary);
-    let mut next_button = CreateButton::new(next_id.clone())
+    let next_button = CreateButton::new(next_id.clone())
         .emoji(ReactionType::Unicode("⏩".to_owned()))
         .style(ButtonStyle::Primary);
-    let mut prev_button = CreateButton::new(prev_id.clone())
+    let prev_button = CreateButton::new(prev_id.clone())
         .emoji(ReactionType::Unicode("⏪".to_owned()))
         .style(ButtonStyle::Primary);
-    let mut row = CreateActionRow::Buttons(
-        vec![first_button, prev_button, next_button, last_button]
-    );
+    let row = CreateActionRow::Buttons(vec![first_button, prev_button, next_button, last_button]);
     InvControls {
         row,
         first_button_id: first_id,

@@ -35,8 +35,9 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Create loot tables
   - [x] Delete loot tables
   - [ ] Make loot tables generate drops
-    - [ ] Of items
-    - [ ] Of currencies
+    - [x] Of items
+    - [x] Of currencies
+    - [ ] And give them
   - [x] Associate loot tables to lootboxes
 - [ ] Shops
   - [ ] Make listings

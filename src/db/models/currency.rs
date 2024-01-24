@@ -19,6 +19,7 @@
 //! and also a configurable timeout between earning currency. This is to prevent spamming and to make it more
 //! fair for everyone.
 pub mod builder;
+mod name_updates_handler;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
@@ -1303,7 +1304,7 @@ impl Currency {
         };
 
         // Remove the currency from the cache.
-        let popped = cache.pop(&(self__.guild_id, self__.curr_name.clone()));
+        cache.pop(&(self__.guild_id, self__.curr_name.clone()));
         // Keep the cache past this point so that another task
         // will not try to get the currency from the db while we're deleting it.
 
@@ -1334,7 +1335,7 @@ impl Currency {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
         };
 
-        let popped = cache.pop(&(self__.guild_id, self__.curr_name));
+        cache.pop(&(self__.guild_id, self__.curr_name));
 
         drop(self_);
         drop(cache);

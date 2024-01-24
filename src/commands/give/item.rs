@@ -31,7 +31,7 @@ pub async fn run(
     // just checking if the item exists.
     let _ = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
 
-    let member_inv = Inventory::from_user(guild_id.into(), member.into()).await?;
+    let member_inv = Inventory::try_from_user(guild_id.into(), member.into()).await?;
     let mut member_inv = member_inv.lock().await;
     let member_inv_ = member_inv
         .as_mut()

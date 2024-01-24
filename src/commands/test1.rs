@@ -14,10 +14,7 @@ pub async fn run(
     command: &CommandInteraction,
     http: impl AsRef<Http> + Send + Sync + CacheHttp
 ) -> Result<()> {
-    let future = command.edit_response(
-        &http,
-        EditInteractionResponse::new().content("177013")
-    ).await?;
+    command.edit_response(&http, EditInteractionResponse::new().content("177013")).await?;
     Ok(())
 }
 

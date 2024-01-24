@@ -133,8 +133,8 @@ impl DropTablePartBuilder {
             weight: self.weight.unwrap_or(1),
         };
 
-        if let Some(session) = session {
-            collection.insert_one(&part, None).await?;
+        if let Some(s) = session {
+            collection.insert_one_with_session(&part, None, s).await?;
         } else {
             collection.insert_one(&part, None).await?;
         }
@@ -153,7 +153,7 @@ impl DropTableBuilder {
 
     #[must_use]
     pub fn new_part(&mut self) -> &mut DropTablePartBuilder {
-        let mut part = DropTablePartBuilder::new()
+        let part = DropTablePartBuilder::new()
             .guild_id(self.guild_id)
             .drop_table_name(self.drop_table_name.clone());
         self.drop_table_parts.push(part);
@@ -206,7 +206,7 @@ impl DropTableBuilder {
     }
 
     pub async fn build(
-        mut self,
+        self,
         mut session: Option<&mut ClientSession>
     ) -> Result<ArcTokioRwLockOption<DropTable>> {
         let Some(guild_id) = self.guild_id else {
@@ -249,7 +249,7 @@ impl DropTableBuilder {
         if let Some(mut session) = owned_session {
             session.commit_transaction().await?;
         }
-        let mut table = DropTable {
+        let table = DropTable {
             guild_id,
             drop_table_name: drop_table_name.clone(),
             drop_table_parts: parts,

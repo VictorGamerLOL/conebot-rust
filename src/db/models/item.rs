@@ -3,14 +3,16 @@
 
 pub mod builder;
 pub mod fieldless;
+pub mod name_updates_handler;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
-use self::fieldless::ItemActionTypeFieldless;
+use self::{ fieldless::ItemActionTypeFieldless, name_updates_handler::handle_name_updates };
 use crate::db::{
     uniques::{ DbGuildId, DbRoleId, DropTableName, DropTableNameRef },
     ArcTokioRwLockOption,
     TokioMutexCache,
+    CLIENT,
 };
 use anyhow::{ anyhow, bail, Result };
 use fieldless::ItemTypeFieldless;
@@ -550,7 +552,19 @@ impl Item {
         }
     }
 
-    pub async fn update_name(self_: ArcTokioRwLockOption<Self>, new_name: String) -> Result<()> {
+    /// Updates the name of the item. Since name updates are a sensitive operation,
+    /// this function instead takes an Arc, and also tries to lock several other things
+    /// in order to ensure everything is updated. ***MUST*** not have locks of the following
+    /// before calling this in the same function:
+    /// - [`crate::db::models::inventory::Inventory`]
+    /// - [`crate::db::models::drop_table::DropTable`]
+    /// - [`crate::db::models::store_entry::StoreEntry`]
+    /// - The item itself.
+    pub async fn update_name(
+        self_: ArcTokioRwLockOption<Self>,
+        new_name: String,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
         let mut self_ = self_.write().await;
         let taken = self_.take(); // this must be a separate line or the linter cries abt it.
         let mut self__ = match taken {
@@ -571,7 +585,24 @@ impl Item {
                 "ItemName": &new_name,
             }
         };
-        collection.update_one(filter, update, None).await?;
+
+        let mut maybe_session: Option<ClientSession>;
+
+        if session.is_none() {
+            maybe_session = Some(CLIENT.get().await.start_session(None).await?);
+            session = maybe_session.as_mut();
+        }
+
+        let session = session.unwrap();
+
+        collection.update_one_with_session(filter, update, None, session).await?;
+
+        handle_name_updates(
+            self__.guild_id,
+            self__.item_name.clone(),
+            new_name.clone(),
+            session
+        ).await?;
 
         self__.item_name = new_name;
 
@@ -681,7 +712,7 @@ impl Item {
         let update =
             doc! {
             "$set": {
-                "CurrencyValue": &new_currency_value,
+                "Currency": &new_currency_value,
             }
         };
         if let Some(s) = session {
@@ -804,6 +835,56 @@ impl Item {
             collection.update_one(filter, update, None).await?;
         }
         self.item_type = new_item_type;
+        Ok(())
+    }
+
+    pub async fn bulk_update_currency_value_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let mut cache = CACHE_ITEM.lock().await;
+
+        let rw_locks = cache
+            .iter_mut()
+            .filter_map(|(k, v)| {
+                if k.0 == guild_id { Some(v.to_owned()) } else { None }
+            })
+            .collect::<Vec<_>>();
+
+        drop(cache);
+
+        for rw_lock in rw_locks {
+            let mut lock = rw_lock.write().await;
+            if let Some(item) = lock.as_mut() {
+                if item.currency == before {
+                    item.currency = after.clone();
+                }
+            }
+        }
+
+        let db = crate::db::CLIENT.get().await.database("conebot");
+        let collection = db.collection::<Self>("items");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "Currency": before,
+        };
+        let update =
+            doc! {
+            "$set": {
+                "Currency": &after,
+            }
+        };
+
+        if let Some(s) = session {
+            collection.update_many_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_many(filter, update, None).await?;
+        }
+
         Ok(())
     }
 

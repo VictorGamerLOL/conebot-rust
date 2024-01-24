@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::{ anyhow, bail, Result };
 use serenity::model::prelude::Member;
 use tracing::error;
@@ -66,8 +68,8 @@ pub async fn exchange(
         .as_mut()
         .ok_or_else(|| anyhow!("Balances are being used in a breaking operation."))?;
 
-    balances_.ensure_has_currency(input.curr_name()).await?;
-    balances_.ensure_has_currency(output.curr_name()).await?;
+    balances_.ensure_has_currency(Cow::from(input.curr_name().as_str())).await?;
+    balances_.ensure_has_currency(Cow::from(output.curr_name().as_str())).await?;
 
     let mut balance_in: Option<&mut Balance> = None; // Yes yes I know I made `ensure_has_currency` return a &mut Balance, but the thing is
     let mut balance_out: Option<&mut Balance> = None; // I can't use it twice in a row because that would mean mutably borrowing from the same place twice.
@@ -102,9 +104,6 @@ pub async fn exchange(
     if amount_after.is_infinite() || amount_after.is_nan() {
         bail!("Invalid exchange rate result.");
     }
-
-    let old_amount1 = balance_in.amount();
-    let old_amount2 = balance_out.amount();
 
     // need the thing below to do this as a transaction.
     let mut session = CLIENT.get().await.start_session(None).await?;

@@ -32,7 +32,7 @@ impl<T> Paginator<T> {
             return Err(anyhow::anyhow!("Cannot paginate with 0 items per page"));
         }
         let mut end = per_page - 1;
-        let mut hit_end = if data.len() < per_page {
+        let hit_end = if data.len() < per_page {
             end = data.len() - 1;
             true
         } else {

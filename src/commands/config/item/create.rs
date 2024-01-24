@@ -15,7 +15,6 @@ pub async fn run(
     command: &CommandInteraction,
     http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
-    let command_author = command.user.id;
     let name = options
         .get_string_value(NAME_OPTION_NAME)
         .ok_or_else(|| anyhow!("Name is required."))??;
@@ -58,8 +57,6 @@ pub async fn run(
     item_type_builder.role(role.map(|r| r.into())).drop_table_name(drop_table);
 
     let item_type = item_type_builder.build()?;
-
-    let item_type_string = item_type.to_string();
 
     item_builder.item_type(Some(item_type));
 

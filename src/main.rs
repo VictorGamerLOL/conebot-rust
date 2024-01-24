@@ -1,6 +1,6 @@
 // lints to be enabled when finishing code:
 #![allow(dead_code)]
-#![allow(unused_variables)]
+// #![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(unused_imports)]
 #![allow(clippy::await_holding_lock)]
@@ -34,8 +34,7 @@ async fn main() {
     let filter = EnvFilter::from_default_env();
     let subscriber = fmt().event_format(format().pretty()).with_env_filter(filter).finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-    let sp = span!(tracing::Level::TRACE, "main");
-    let g = sp.enter();
+    span!(tracing::Level::TRACE, "main");
     init_env().await;
     error!("test");
     warn!("test");

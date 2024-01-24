@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // no.
 
-use std::{ borrow::Cow, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
+use std::{ borrow::Cow, collections::HashMap, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
 
 use anyhow::{ anyhow, Result };
 use futures::{ future::{ self }, StreamExt, TryStreamExt };
@@ -56,22 +56,19 @@ lazy_static! {
         Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()));
 }
 
-impl From<DropTable> for DropGenerator<RangeInclusive<i64>> {
-    fn from(drop_table: DropTable) -> Self {
+impl From<&DropTable> for DropGenerator<RangeInclusive<i64>> {
+    fn from(drop_table: &DropTable) -> Self {
         let mut drop_gen = Self::new();
 
-        for part in drop_table.drop_table_parts {
-            let (name, kind) = match part.drop {
+        for part in drop_table.drop_table_parts.iter() {
+            let (name, kind) = match part.drop.clone() {
                 DropTablePartOption::Item { item_name } => (item_name, DroppableKind::Item),
                 DropTablePartOption::Currency { currency_name } => {
                     (currency_name, DroppableKind::Currency)
                 }
             };
 
-            let range = match part.max {
-                Some(max) => part.min..=max,
-                None => part.min..=part.min,
-            };
+            let range = part.max.map_or(part.min..=part.min, |max| part.min..=max);
 
             let droppable = Droppable::new(name, kind, range, part.weight);
 
@@ -124,6 +121,128 @@ impl DropTable {
         Ok(arc)
     }
 
+    pub async fn bulk_update_part_item_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: &str,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let cache = DROP_TABLES_CACHE.lock().await;
+
+        let rw_locks = cache
+            .iter()
+            .filter(|(k, _)| k.0 == guild_id)
+            .map(|(_, v)| v.clone())
+            .collect::<Vec<_>>();
+
+        // better to use a bit more memory than hold the ***entire cache*** hostage.
+
+        drop(cache);
+
+        // update drop tables
+        for v in rw_locks {
+            let mut v_lock = v.write().await;
+            if let Some(v) = v_lock.as_mut() {
+                for drop_table_part in &mut v.drop_table_parts {
+                    match &mut drop_table_part.drop {
+                        DropTablePartOption::Item { item_name } => {
+                            if item_name == before {
+                                *item_name = after.to_string();
+                            }
+                        }
+                        DropTablePartOption::Currency { .. } => {}
+                    }
+                }
+            }
+            drop(v_lock);
+        }
+        // magically nothing above returns an error.
+
+        let db = CLIENT.get().await.database("conebot");
+        let collection = db.collection::<DropTablePart>("dropTables");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "ItemName": before,
+        };
+
+        let update =
+            doc! {
+            "$set": {
+                "ItemName": after,
+            },
+        };
+
+        if let Some(s) = session {
+            collection.update_many_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_many(filter, update, None).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn bulk_update_part_currency_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let cache = DROP_TABLES_CACHE.lock().await;
+
+        let rw_locks = cache
+            .iter()
+            .filter(|(k, _)| k.0 == guild_id)
+            .map(|(_, v)| v.clone())
+            .collect::<Vec<_>>();
+
+        drop(cache);
+
+        // update drop tables
+        for v in rw_locks {
+            let mut v_lock = v.write().await;
+            if let Some(v) = v_lock.as_mut() {
+                for drop_table_part in &mut v.drop_table_parts {
+                    match &mut drop_table_part.drop {
+                        DropTablePartOption::Item { .. } => {}
+                        DropTablePartOption::Currency { currency_name } => {
+                            if currency_name == before {
+                                *currency_name = after.to_owned();
+                            }
+                        }
+                    }
+                }
+            }
+            drop(v_lock);
+        }
+        // magically nothing above returns an error.
+
+        let db = CLIENT.get().await.database("conebot");
+        let collection = db.collection::<DropTablePart>("dropTables");
+
+        let filter =
+            doc! {
+            "GuildId": guild_id.as_i64(),
+            "CurrencyName": before,
+        };
+
+        let update =
+            doc! {
+            "$set": {
+                "CurrencyName": after,
+            },
+        };
+
+        if let Some(s) = session {
+            collection.update_many_with_session(filter, update, None, s).await?;
+        } else {
+            collection.update_many(filter, update, None).await?;
+        }
+
+        Ok(())
+    }
+
     pub const fn guild_id(&self) -> DbGuildId {
         self.guild_id
     }
@@ -154,7 +273,7 @@ impl DropTable {
     /// - Any mongodb error.
     pub async fn add_part(
         &mut self,
-        mut drop_table_part: DropTablePartBuilder,
+        drop_table_part: DropTablePartBuilder,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
         if let Some(guild_id) = drop_table_part.guild_id {
@@ -226,7 +345,7 @@ impl DropTable {
             return Err(anyhow!("Drop table part not found."));
         };
         let part = self.drop_table_parts.swap_remove(i);
-        part.delete().await?;
+        part.delete(session).await?;
         Ok(())
     }
 
@@ -236,30 +355,30 @@ impl DropTable {
         currency_name: &str,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut cache = DROP_TABLES_CACHE.lock().await;
+        let cache = DROP_TABLES_CACHE.lock().await;
+
+        let rw_locks = cache
+            .iter()
+            .filter(|(k, _)| k.0 == guild_id)
+            .map(|(_, v)| v.clone())
+            .collect::<Vec<_>>();
+
+        drop(cache);
 
         // remove currency from drop tables
-        futures::stream
-            ::iter(cache.iter())
-            .filter(|(k, _)| future::ready(k.0 == guild_id))
-            .map(|(k, v)| async {
-                let mut v_lock = v.write().await;
-                let Some(v) = v_lock.as_mut() else {
-                    return;
-                };
+        for v in rw_locks {
+            let mut v_lock = v.write().await;
+            if let Some(v) = v_lock.as_mut() {
                 v.drop_table_parts.retain(|drop_table_part| {
                     match &drop_table_part.drop {
                         DropTablePartOption::Item { .. } => true,
                         DropTablePartOption::Currency { currency_name: c } => c != currency_name,
                     }
                 });
-                drop(v_lock);
-            })
-            .buffer_unordered(10)
-            .collect::<()>().await;
+            }
+            drop(v_lock);
+        }
         // magically nothing above returns an error.
-
-        drop(cache);
 
         let db = CLIENT.get().await.database("conebot");
         let collection = db.collection::<DropTablePart>("dropTables");
@@ -285,13 +404,13 @@ impl DropTable {
         item_name: &str,
         session: Option<&mut ClientSession>
     ) -> Result<()> {
-        let mut cache = DROP_TABLES_CACHE.lock().await;
+        let cache = DROP_TABLES_CACHE.lock().await;
 
         // remove item from drop tables
         futures::stream
             ::iter(cache.iter())
             .filter(|(k, _)| future::ready(k.0 == guild_id))
-            .map(|(k, v)| async {
+            .map(|(_, v)| async {
                 let mut v_lock = v.write().await;
                 let Some(v) = v_lock.as_mut() else {
                     return;
@@ -410,7 +529,7 @@ impl DropTablePart {
         self.weight
     }
 
-    pub async fn delete(self) -> Result<()> {
+    pub async fn delete(self, session: Option<&mut ClientSession>) -> Result<()> {
         let db = CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("dropTables");
 
@@ -420,7 +539,11 @@ impl DropTablePart {
             "DropTableName": self.drop_table_name,
         };
 
-        collection.delete_one(filter, None).await?;
+        if let Some(s) = session {
+            collection.delete_one_with_session(filter, None, s).await?;
+        } else {
+            collection.delete_one(filter, None).await?;
+        }
 
         Ok(())
     }
