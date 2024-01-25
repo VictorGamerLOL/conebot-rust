@@ -552,6 +552,14 @@ impl Item {
         }
     }
 
+    pub const fn is_instant(&self) -> bool {
+        matches!(self.item_type, ItemType::InstantConsumable { .. })
+    }
+
+    pub const fn is_trophy(&self) -> bool {
+        matches!(self.item_type, ItemType::Trophy)
+    }
+
     /// Updates the name of the item. Since name updates are a sensitive operation,
     /// this function instead takes an Arc, and also tries to lock several other things
     /// in order to ensure everything is updated. ***MUST*** not have locks of the following

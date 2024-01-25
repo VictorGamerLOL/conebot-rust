@@ -1,7 +1,7 @@
 pub mod balances;
 pub mod currency;
 pub mod drop_table;
-mod inventory;
+pub mod inventory;
 pub mod item;
 mod store_entry;
 

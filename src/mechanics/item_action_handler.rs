@@ -1,13 +1,16 @@
-use std::borrow::Cow;
+use std::{ borrow::Cow, time::Duration };
 
 use anyhow::{ anyhow, Result };
+use async_recursion::async_recursion;
 use lazy_static::lazy_static;
 use mongodb::ClientSession;
 use serenity::{ all::{ GuildId, Mention, RoleId, UserId }, http::{ CacheHttp, Http } };
+use tokio::{ sync::{ RwLock, RwLockReadGuard }, time::timeout };
 
 use crate::{
     db::{
         models::{
+            inventory::INVENTORY_RECURSION_DEPTH_LIMIT,
             item::{ ItemActionType, ItemType },
             Balances,
             DropTable,
@@ -15,6 +18,7 @@ use crate::{
             InventoryEntry,
             Item,
         },
+        ArcTokioRwLockOption,
         CLIENT,
     },
     mechanics::drop_generator::DropGenerator,
@@ -47,32 +51,42 @@ pub enum UseResultContent {
 /// This function will attempt to lock the user's balances. It ***WILL***
 /// cause a deadlock if the balances are already locked before this function
 /// is called.
+#[async_recursion]
 pub async fn use_item<'a>(
     user: UserId,
     user_inv: &mut Inventory,
-    item: &'a Item,
+    item: ArcTokioRwLockOption<Item>,
     times: i64,
-    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone
+    rec_depth: u8,
+    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
 ) -> Result<UseResult<'a>> {
-    if matches!(item.item_type(), ItemType::Trophy) {
+    if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
+        anyhow::bail!("Recursion depth exceeded.");
+    }
+    let item_ = item.read().await;
+    let item__ = item_
+        .as_ref()
+        .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
+    if matches!(item__.item_type(), ItemType::Trophy) {
         return Ok(UseResult {
             success: false,
             message: Some(Cow::Borrowed("You cannot use trophies.")),
             content: UseResultContent::Nothing,
         });
     }
-    let action_type = item.action_type().ok_or_else(|| anyhow!("Item has no action type"))?;
-    let message: Option<&str> = item.message().map(|s| s.as_str());
+    let action_type = item__.action_type().ok_or_else(|| anyhow!("Item has no action type"))?;
+    let message: Option<String> = item__.message().map(|s| s.as_str().to_owned());
+    let guild_id = item__.guild_id();
     match action_type {
         ItemActionType::Role { role_id } => {
             // if the user uses a role item multiple times it's their own fault.
-            give_role(user, (*role_id).into(), item.guild_id().into(), http).await?;
+            give_role(user, (*role_id).into(), item__.guild_id().into(), http).await?;
             Ok(UseResult {
                 success: true,
                 message: Some(
                     Cow::Owned({
                         let msg_with_count = message
-                            .unwrap_or("You were given the role {{ROLE}}")
+                            .unwrap_or_else(|| "You were given the role {{ROLE}}".to_owned())
                             .replace(
                                 "{{ROLE}}",
                                 &Mention::from(RoleId::from(*role_id)).to_string()
@@ -89,7 +103,7 @@ pub async fn use_item<'a>(
         }
         ItemActionType::Lootbox { drop_table_name, count } => {
             let drop_table = DropTable::try_from_name(
-                item.guild_id(),
+                item__.guild_id(),
                 Cow::from(drop_table_name),
                 None
             ).await?;
@@ -100,11 +114,16 @@ pub async fn use_item<'a>(
             let dropper = DropGenerator::from(drop_table_);
             drop(drop_table);
             let drops = dropper.generate(*count * times)?;
-            give_drops(item.guild_id().into(), user, user_inv, drops.clone()).await?;
+
+            // DANGER don't delete this, or dead locks may occur.
+            drop(item_);
+            // DANGER don't delete this, or dead locks may occur.
+
+            give_drops(guild_id.into(), user, user_inv, drops.clone(), rec_depth + 1, http).await?;
             // extract the string that is between %% in the message
-            let mut message = message
-                .unwrap_or("Got %%*{{ITEM_CURRENCY_NAME}}*x{{AMOUNT}} %%")
-                .to_owned();
+            let mut message = message.unwrap_or_else(||
+                "Got %%*{{ITEM_CURRENCY_NAME}}*x{{AMOUNT}} %%".to_owned()
+            );
             if message.is_empty() {
                 message = "Got %%*{{ITEM_CURRENCY_NAME}}*x{{AMOUNT}} %%".to_owned();
             }
@@ -137,7 +156,9 @@ pub async fn use_item<'a>(
         ItemActionType::None =>
             Ok(UseResult {
                 success: true,
-                message: Some(Cow::Borrowed(message.unwrap_or("You used the item."))),
+                message: Some(
+                    Cow::Owned(message.unwrap_or_else(|| "You used the item.".to_owned()))
+                ),
                 content: UseResultContent::Nothing,
             }),
     }
@@ -154,12 +175,18 @@ pub async fn give_role(
     Ok(())
 }
 
+#[async_recursion]
 pub async fn give_drops(
     guild: GuildId,
     user: UserId,
     user_inv: &mut Inventory,
-    drops: Vec<DropResult<'_>>
+    drops: Vec<DropResult<'async_recursion>>,
+    rec_depth: u8,
+    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
 ) -> Result<()> {
+    if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
+        anyhow::bail!("Recursion depth exceeded.");
+    }
     let currency_drops = drops
         .iter()
         .copied()
@@ -191,7 +218,7 @@ pub async fn give_drops(
         }
         if !item_drops.is_empty() {
             for item in item_drops {
-                give_items(item, user_inv, &mut session).await?;
+                give_items(item, user_inv, &mut session, rec_depth + 1, http.clone()).await?;
             }
         }
         Ok(())
@@ -205,15 +232,24 @@ pub async fn give_drops(
     Ok(())
 }
 
+#[async_recursion]
 pub async fn give_items(
-    items: DropResult<'_>,
+    items: DropResult<'async_recursion>,
     inventory: &mut Inventory,
-    session: &mut ClientSession
+    session: &mut ClientSession,
+    rec_depth: u8,
+    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
 ) -> Result<()> {
+    if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
+        anyhow::bail!("Recursion depth exceeded.");
+    }
     if !matches!(items.result, DropResultKind::Item(_)) {
         anyhow::bail!("DropResult is not an item.");
     }
-    inventory.give_item(Cow::from(items.name()), items.quantity, Some(session)).await?;
+
+    let item = Item::try_from_name(inventory.guild_id(), items.name().to_owned()).await?;
+
+    inventory.give_item(item, items.quantity, Some(session), rec_depth + 1, http).await?;
     Ok(())
 }
 

@@ -22,22 +22,22 @@ This bot aims to make everything highly configurable and be as feature packed as
   - [x] Exchanging between currencies
 - [ ] Items
   - [x] Trophies
-  - [ ] Consumables
+  - [x] Consumables
     - [x] Message
     - [x] Role giving
-    - [ ] Lootboxes (must complete below)
-  - [ ] Instant consumables
-    - [ ] Same as above
+    - [x] Lootboxes (must complete below)
+  - [x] Instant consumables
+    - [x] Same as above
   - [x] Changing config values
   - [x] Inventories for each member
   - [ ] Sell to the void
-- [ ] Lootboxes
+- [x] Lootboxes
   - [x] Create loot tables
   - [x] Delete loot tables
-  - [ ] Make loot tables generate drops
+  - [x] Make loot tables generate drops
     - [x] Of items
     - [x] Of currencies
-    - [ ] And give them
+    - [x] And give them
   - [x] Associate loot tables to lootboxes
 - [ ] Shops
   - [ ] Make listings

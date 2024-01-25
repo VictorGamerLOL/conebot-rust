@@ -3,15 +3,29 @@
 use std::{ borrow::Cow, collections::HashMap, num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, bail, Result };
+use async_recursion::async_recursion;
 use futures::{ StreamExt, TryStreamExt };
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
+use serenity::http::{ CacheHttp, Http };
 use thiserror::Error;
 use tokio::sync::Mutex;
 
-use crate::db::{ uniques::{ DbGuildId, DbUserId }, ArcTokioMutexOption, TokioMutexCache };
+use crate::{
+    db::{
+        uniques::{ DbGuildId, DbUserId },
+        ArcTokioMutexOption,
+        ArcTokioRwLockOption,
+        TokioMutexCache,
+    },
+    mechanics::item_action_handler::use_item,
+};
+
+use super::Item;
+
+pub const INVENTORY_RECURSION_DEPTH_LIMIT: u8 = 35;
 
 #[derive(Debug, Clone)]
 pub struct Inventory {
@@ -195,28 +209,65 @@ impl Inventory {
 
     /// Gives the user the specified amount of an item. If the user has 0 of the item,
     /// it will attempt to create an inventory entry for the item.
+    #[async_recursion]
     pub async fn give_item(
         &mut self,
-        item_name: Cow<'_, str>, // Clone on write. Neat little performance improvement.
+        item: ArcTokioRwLockOption<Item>, // Clone on write. Neat little performance improvement.
         // It more serves as a signal that "This function may or may not clone the str."
         amount: i64,
-        session: Option<&mut ClientSession>
+        mut session: Option<&'async_recursion mut ClientSession>,
+        rec_depth: u8,
+        http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
     ) -> Result<()> {
+        if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
+            bail!("Recursion depth exceeded.");
+        }
+        let mut item_ = item.read().await;
+        let mut item__ = item_
+            .as_ref()
+            .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
+
+        if item__.is_instant() {
+            // DANGER don't delete this or deadlocks may occur.
+            drop(item_);
+            // DANGER don't delete this or deadlocks may occur.
+
+            self.handle_instant(item.clone(), amount, rec_depth + 1, &http).await?;
+            return Ok(());
+            // Grab hold of the lock again after it's done.
+            // item_ = item.read().await;
+            // item__ = item_
+            //     .as_ref()
+            //     .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
+        }
         //                                                      VVVVVVVVVV get the &str out of the Cow<'_,str>.
-        if let Some(entry) = self.get_item(&item_name) {
+        if let Some(entry) = self.get_item(item__.name()) {
             entry.add_amount(amount, session).await.map_err(Into::into)
         } else {
             let entry = InventoryEntry::new(
                 self.guild_id,
                 self.user_id,
                 // Otherwise clone it and get an entire owned string.
-                item_name.into_owned(),
+                item__.name().to_owned(),
                 amount,
                 session
             ).await?;
+            drop(item_);
             self.inventory.push(entry);
             Ok(())
         }
+    }
+
+    #[async_recursion]
+    async fn handle_instant(
+        &mut self,
+        item: ArcTokioRwLockOption<Item>,
+        amount: i64,
+        rec_depth: u8,
+        http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+    ) -> Result<()> {
+        use_item(self.user_id.into(), self, item, amount, rec_depth, http).await?;
+        Ok(())
     }
 
     /// Takes the specified amount of an item from the user. If the user reaches 0

@@ -39,10 +39,6 @@ pub async fn run(
         .ok_or_else(|| anyhow!("User's inventory is being used in a breaking operation."))?;
 
     let item = Item::try_from_name(guild_id.into(), item_name.clone()).await?;
-    let item = item.read().await;
-    let item_ = item
-        .as_ref()
-        .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
 
     let entry = user_inventory_
         .get_item(&item_name)
@@ -54,7 +50,7 @@ pub async fn run(
     let mut response_content = String::new();
 
     //TODO: make the response not be just the response messages one after another.
-    let use_result = use_item(command.user.id, user_inventory_, item_, amount, &http).await?;
+    let use_result = use_item(command.user.id, user_inventory_, item, amount, 0, &http).await?;
 
     if !use_result.success {
         response_content.push_str(
@@ -71,7 +67,6 @@ pub async fn run(
     response_content = response_content.chars().take(MESSAGE_CODE_LIMIT).collect::<String>();
 
     drop(user_inventory);
-    drop(item);
     command.edit_response(http, EditInteractionResponse::new().content(response_content)).await?;
     Ok(())
 }
