@@ -22,6 +22,7 @@ pub async fn run(
     match subcommand.as_str() {
         "create_entry" => create_entry::run(command_options, command, http).await?,
         "delete_entry" => delete_entry::run(command_options, command, http).await?,
+        "edit_entry" => edit_entry::run(command_options, command, http).await?,
         _ => {
             return Err(anyhow!("Invalid subcommand provided."));
         }

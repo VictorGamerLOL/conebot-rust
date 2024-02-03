@@ -64,6 +64,8 @@ pub async fn run(
 
     let mut session = CLIENT.get().await.start_session(None).await?;
 
+    session.start_transaction(None).await?;
+
     if balance.amount() < to_take {
         anyhow::bail!("Not enough currency to buy the item.");
     }

@@ -36,6 +36,8 @@ impl Handler {
             "buy" => commands::buy::run(options, command, ctx).await?,
             "config_currency" => commands::config_currency::run(options, command, ctx).await?,
             "config_drop_table" => commands::config_drop_table::run(options, command, ctx).await?,
+            "config_item" => commands::config_item::run(options, command, ctx).await?,
+            "config_store" => commands::config_store::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }

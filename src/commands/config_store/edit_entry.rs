@@ -58,6 +58,8 @@ pub async fn run(
 
     drop(store);
 
+    command.edit_response(http, EditInteractionResponse::new().content("Entry edited.")).await?;
+
     Ok(())
 }
 
