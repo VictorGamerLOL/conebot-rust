@@ -31,9 +31,11 @@ impl Handler {
             "balance" => commands::balance::run(options, command, ctx).await?,
             "give" => commands::give::run(options, command, ctx).await?,
             "take" => commands::take::run(options, command, ctx).await?,
-            "config" => commands::config::run(options, command, ctx).await?,
             "use-item" => commands::use_item::run(options, command, ctx).await?,
             "inv" => commands::inv::run(options, command, ctx).await?,
+            "buy" => commands::buy::run(options, command, ctx).await?,
+            "config_currency" => commands::config_currency::run(options, command, ctx).await?,
+            "config_drop_table" => commands::config_drop_table::run(options, command, ctx).await?,
             _ => {
                 return Err(anyhow!("Unknown command: {}", command.data.name));
             }
@@ -70,9 +72,13 @@ impl EventHandler for Handler {
                     commands::balance::command(),
                     commands::give::command(),
                     commands::take::command(),
-                    commands::config::command(),
+                    commands::config_currency::command(),
+                    commands::config_drop_table::command(),
+                    commands::config_item::command(),
+                    commands::config_store::command(),
                     commands::use_item::command(),
-                    commands::inv::command()
+                    commands::inv::command(),
+                    commands::buy::command()
                 ]
             ).await
         {

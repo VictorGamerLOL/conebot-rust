@@ -1,7 +1,7 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
-    builder::CreateCommandOption,
+    builder::{ CreateCommand, CreateCommandOption },
     http::{ CacheHttp, Http },
 };
 
@@ -31,15 +31,14 @@ pub async fn run(
     }
     Ok(())
 }
-pub fn option() -> CreateCommandOption {
-    CreateCommandOption::new(
-        CommandOptionType::SubCommandGroup,
-        "currency",
-        "Configure various things about currencies or view them."
-    )
-        .add_sub_option(list::option())
-        .add_sub_option(edit::option())
-        .add_sub_option(edit_list::option())
-        .add_sub_option(create::option())
-        .add_sub_option(delete::option())
+
+pub fn command() -> CreateCommand {
+    CreateCommand::new("config_currency")
+        .description("Configure various things about currencies or view them.")
+        .dm_permission(false)
+        .add_option(list::option())
+        .add_option(edit::option())
+        .add_option(edit_list::option())
+        .add_option(create::option())
+        .add_option(delete::option())
 }

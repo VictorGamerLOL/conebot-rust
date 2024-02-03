@@ -2,6 +2,7 @@ use anyhow::{ anyhow, Result };
 use serenity::{
     all::CommandInteraction,
     builder::CreateCommand,
+    client::Context,
     http::{ CacheHttp, Http },
     model::Permissions,
 };
@@ -14,7 +15,7 @@ pub mod item;
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
-    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    http: &Context
 ) -> Result<()> {
     let (cmd_name, cmd_options) = options
         .get_subcommand_args_and_name()

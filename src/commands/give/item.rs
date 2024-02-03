@@ -2,6 +2,7 @@ use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
+    client::Context,
     http::{ CacheHttp, Http },
 };
 
@@ -13,7 +14,7 @@ use crate::{
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
-    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    http: &Context
 ) -> Result<()> {
     let member = options
         .get_user_value("member")
@@ -37,7 +38,7 @@ pub async fn run(
         .as_mut()
         .ok_or_else(|| anyhow!("Member's inventory is being used in a breaking operation."))?;
 
-    member_inv_.give_item(item, amount, None, 0, &http).await?;
+    member_inv_.give_item(item, amount, None, 0, http).await?;
 
     drop(member_inv);
 

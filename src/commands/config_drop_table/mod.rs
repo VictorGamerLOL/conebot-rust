@@ -1,7 +1,7 @@
 use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
-    builder::CreateCommandOption,
+    builder::{ CreateCommand, CreateCommandOption },
     client::Context,
 };
 
@@ -32,15 +32,13 @@ pub async fn run(
     Ok(())
 }
 
-pub fn option() -> CreateCommandOption {
-    CreateCommandOption::new(
-        CommandOptionType::SubCommandGroup,
-        "drop_table",
-        "Configure drop tables."
-    )
-        .add_sub_option(create::option())
-        .add_sub_option(add_entry::option())
-        .add_sub_option(delete::option())
-        .add_sub_option(delete_entry::option())
-        .add_sub_option(view_table::option())
+pub fn command() -> CreateCommand {
+    CreateCommand::new("config_drop_table")
+        .description("Configure drop tables.")
+        .dm_permission(false)
+        .add_option(create::option())
+        .add_option(add_entry::option())
+        .add_option(delete::option())
+        .add_option(delete_entry::option())
+        .add_option(view_table::option())
 }

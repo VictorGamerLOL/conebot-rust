@@ -1,7 +1,7 @@
 use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
-    builder::CreateCommandOption,
+    builder::{ CreateCommand, CreateCommandOption },
     http::{ CacheHttp, Http },
 };
 
@@ -28,10 +28,12 @@ pub async fn run(
     Ok(())
 }
 
-pub fn option() -> CreateCommandOption {
-    CreateCommandOption::new(CommandOptionType::SubCommandGroup, "item", "Configure items.")
-        .add_sub_option(create::option())
-        .add_sub_option(delete::option())
-        .add_sub_option(edit::option())
-        .add_sub_option(list::option())
+pub fn command() -> CreateCommand {
+    CreateCommand::new("config_item")
+        .description("Configure various things about items or view them.")
+        .dm_permission(false)
+        .add_option(create::option())
+        .add_option(delete::option())
+        .add_option(edit::option())
+        .add_option(list::option())
 }

@@ -1,6 +1,6 @@
 // lints to be enabled when finishing code:
 #![allow(dead_code)]
-// #![allow(unused_variables)]
+#![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(unused_imports)]
 #![allow(clippy::await_holding_lock)]

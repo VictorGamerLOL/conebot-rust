@@ -2,6 +2,7 @@ use anyhow::{ anyhow, bail, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
+    client::Context,
     constants::MESSAGE_CODE_LIMIT,
     http::{ CacheHttp, Http },
 };
@@ -20,7 +21,7 @@ const AMOUNT_OPTION_NAME: &str = "amount";
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
-    http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
+    http: &Context
 ) -> Result<()> {
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command cannot be done in DMs."))?;
     let item_name = options
@@ -50,7 +51,7 @@ pub async fn run(
     let mut response_content = String::new();
 
     //TODO: make the response not be just the response messages one after another.
-    let use_result = use_item(command.user.id, user_inventory_, item, amount, 0, &http).await?;
+    let use_result = use_item(command.user.id, user_inventory_, item, amount, 0, http).await?;
 
     if !use_result.success {
         response_content.push_str(

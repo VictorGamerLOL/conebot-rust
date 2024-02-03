@@ -3,7 +3,7 @@ pub mod currency;
 pub mod drop_table;
 pub mod inventory;
 pub mod item;
-mod store_entry;
+pub mod store;
 
 use anyhow::{ anyhow, Result };
 pub use balances::{ Balance, Balances };
@@ -13,7 +13,7 @@ pub use inventory::{ Inventory, InventoryEntry };
 pub use item::{ Item, ItemError };
 use serde::Serialize;
 use serde_json::Value;
-pub use store_entry::StoreEntry;
+pub use store::StoreEntry;
 
 // pub struct BotGuild {
 //     guild_id: DbGuildId,

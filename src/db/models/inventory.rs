@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
-use serenity::http::{ CacheHttp, Http };
+use serenity::{ client::Context, http::{ CacheHttp, Http } };
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -217,7 +217,7 @@ impl Inventory {
         amount: i64,
         mut session: Option<&'async_recursion mut ClientSession>,
         rec_depth: u8,
-        http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+        http: &Context
     ) -> Result<()> {
         if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
             bail!("Recursion depth exceeded.");
@@ -232,7 +232,7 @@ impl Inventory {
             drop(item_);
             // DANGER don't delete this or deadlocks may occur.
 
-            self.handle_instant(item.clone(), amount, rec_depth + 1, &http).await?;
+            self.handle_instant(item.clone(), amount, rec_depth + 1, http).await?;
             return Ok(());
             // Grab hold of the lock again after it's done.
             // item_ = item.read().await;
@@ -264,7 +264,7 @@ impl Inventory {
         item: ArcTokioRwLockOption<Item>,
         amount: i64,
         rec_depth: u8,
-        http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+        http: &Context
     ) -> Result<()> {
         use_item(self.user_id.into(), self, item, amount, rec_depth, http).await?;
         Ok(())
@@ -279,6 +279,9 @@ impl Inventory {
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
         if let Some(entry) = self.get_item(item_name) {
+            if entry.amount < count {
+                bail!("User does not have enough of the item.");
+            }
             entry.sub_amount(
                 count,
                 // Since the option itself is owned, passing it would move it. Calling as_mut() on it
@@ -634,7 +637,7 @@ impl InventoryEntry {
     /// - Any mongodb error occurs.
     /// - The amount underflows.
     #[inline]
-    async fn sub_amount(
+    pub async fn sub_amount(
         &mut self,
         amount: i64,
         session: Option<&mut ClientSession>

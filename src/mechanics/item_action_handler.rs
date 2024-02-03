@@ -4,7 +4,11 @@ use anyhow::{ anyhow, Result };
 use async_recursion::async_recursion;
 use lazy_static::lazy_static;
 use mongodb::ClientSession;
-use serenity::{ all::{ GuildId, Mention, RoleId, UserId }, http::{ CacheHttp, Http } };
+use serenity::{
+    all::{ GuildId, Mention, RoleId, UserId },
+    client::Context,
+    http::{ CacheHttp, Http },
+};
 use tokio::{ sync::{ RwLock, RwLockReadGuard }, time::timeout };
 
 use crate::{
@@ -58,7 +62,7 @@ pub async fn use_item<'a>(
     item: ArcTokioRwLockOption<Item>,
     times: i64,
     rec_depth: u8,
-    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+    http: &Context
 ) -> Result<UseResult<'a>> {
     if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
         anyhow::bail!("Recursion depth exceeded.");
@@ -182,7 +186,7 @@ pub async fn give_drops(
     user_inv: &mut Inventory,
     drops: Vec<DropResult<'async_recursion>>,
     rec_depth: u8,
-    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+    http: &Context
 ) -> Result<()> {
     if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
         anyhow::bail!("Recursion depth exceeded.");
@@ -218,7 +222,7 @@ pub async fn give_drops(
         }
         if !item_drops.is_empty() {
             for item in item_drops {
-                give_items(item, user_inv, &mut session, rec_depth + 1, http.clone()).await?;
+                give_items(item, user_inv, &mut session, rec_depth + 1, http).await?;
             }
         }
         Ok(())
@@ -238,7 +242,7 @@ pub async fn give_items(
     inventory: &mut Inventory,
     session: &mut ClientSession,
     rec_depth: u8,
-    http: impl AsRef<Http> + CacheHttp + Send + Sync + Clone + 'async_recursion
+    http: &Context
 ) -> Result<()> {
     if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
         anyhow::bail!("Recursion depth exceeded.");
