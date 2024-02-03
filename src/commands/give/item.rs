@@ -3,7 +3,6 @@ use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
     client::Context,
-    http::{ CacheHttp, Http },
 };
 
 use crate::{
@@ -45,7 +44,7 @@ pub async fn run(
     command.edit_response(
         http,
         EditInteractionResponse::new().content(
-            format!("Gave the user {} amount of {}", item_name, amount)
+            format!("Gave the user {item_name} amount of {amount}")
         )
     ).await?;
     Ok(())

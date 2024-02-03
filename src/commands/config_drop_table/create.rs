@@ -38,7 +38,7 @@ pub async fn run(
 
     let mut drop_table_builder = DropTableBuilder::new()
         .guild_id(Some(guild_id.into()))
-        .drop_table_name(Some(name));
+        .drop_table_name(Some(&name));
 
     let part_builder = drop_table_builder.new_part();
 

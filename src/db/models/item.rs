@@ -334,25 +334,24 @@ impl ItemType {
 
     pub const fn message(&self) -> Option<&String> {
         match self {
-            Self::Consumable { message, .. } => Some(message),
-            Self::InstantConsumable { message, .. } => Some(message),
+            Self::InstantConsumable { message, .. } | Self::Consumable { message, .. } =>
+                Some(message),
             _ => None,
         }
     }
 
     pub const fn action_type(&self) -> Option<&ItemActionType> {
         match self {
-            Self::Consumable { action_type, .. } => Some(action_type),
-            Self::InstantConsumable { action_type, .. } => Some(action_type),
+            Self::InstantConsumable { action_type, .. } | Self::Consumable { action_type, .. } =>
+                Some(action_type),
             _ => None,
         }
     }
 
     pub const fn role_id(&self) -> Option<DbRoleId> {
         match self {
-            Self::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
-                Some(*role_id),
-            Self::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. } =>
+            | Self::InstantConsumable { action_type: ItemActionType::Role { role_id }, .. }
+            | Self::Consumable { action_type: ItemActionType::Role { role_id }, .. } =>
                 Some(*role_id),
             _ => None,
         }
@@ -360,21 +359,22 @@ impl ItemType {
 
     pub const fn drop_table_name_string(&self) -> Option<&String> {
         match self {
-            Self::Consumable { action_type: ItemActionType::Lootbox { drop_table_name, .. }, .. } =>
-                Some(drop_table_name),
-            Self::InstantConsumable {
-                action_type: ItemActionType::Lootbox { drop_table_name, .. },
-                ..
-            } => Some(drop_table_name),
+            | Self::InstantConsumable {
+                  action_type: ItemActionType::Lootbox { drop_table_name, .. },
+                  ..
+              }
+            | Self::Consumable {
+                  action_type: ItemActionType::Lootbox { drop_table_name, .. },
+                  ..
+              } => Some(drop_table_name),
             _ => None,
         }
     }
 
     pub const fn count(&self) -> Option<i64> {
         match self {
-            Self::Consumable { action_type: ItemActionType::Lootbox { count, .. }, .. } =>
-                Some(*count),
-            Self::InstantConsumable { action_type: ItemActionType::Lootbox { count, .. }, .. } =>
+            | Self::InstantConsumable { action_type: ItemActionType::Lootbox { count, .. }, .. }
+            | Self::Consumable { action_type: ItemActionType::Lootbox { count, .. }, .. } =>
                 Some(*count),
             _ => None,
         }
@@ -575,9 +575,8 @@ impl Item {
     ) -> Result<()> {
         let mut self_ = self_.write().await;
         let taken = self_.take(); // this must be a separate line or the linter cries abt it.
-        let mut self__ = match taken {
-            Some(a) => a,
-            None => bail!("Item is already being used in breaking operation."),
+        let Some(mut self__) = taken else {
+            bail!("Item is already being used in breaking operation.")
         };
 
         let db = crate::db::CLIENT.get().await.database("conebot");

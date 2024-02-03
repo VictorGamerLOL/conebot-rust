@@ -25,7 +25,7 @@ lazy_static! {
     static ref TIMEOUTS: Arc<Mutex<HashSet<Timeout>>> = Arc::new(Mutex::new(HashSet::new()));
 }
 
-pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
+pub async fn message(ctx: Context, new_message: Message) -> Result<()> {
     debug!("Got message: {:?}", new_message);
     if new_message.author.bot {
         return Ok(());
@@ -40,9 +40,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 
     let balances = Balances::try_from_user(guild_id.into(), user.into()).await?;
     let mut balances = balances.lock().await;
-    let balances_ = if let Some(b) = balances.as_mut() {
-        b
-    } else {
+    let Some(balances_) = balances.as_mut() else {
         return Ok(());
     };
 
@@ -50,9 +48,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
     // giant for loop moment
     for curr in currencies {
         let currency = curr.read().await;
-        let currency_ = if let Some(c) = currency.as_ref() {
-            c
-        } else {
+        let Some(currency_) = currency.as_ref() else {
             continue;
         };
         if !currency_.earn_by_chat() {
@@ -75,7 +71,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             continue;
         }
 
-        let member = match new_message.member(&_ctx.http).await {
+        let member = match new_message.member(&ctx.http).await {
             Ok(m) => m,
             Err(e) => {
                 warn!("Failed to get member: {}", e);
@@ -83,7 +79,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             }
         };
 
-        let channel = match new_message.channel(&_ctx.http).await {
+        let channel = match new_message.channel(&ctx.http).await {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to get channel: {}", e);
@@ -91,7 +87,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
             }
         };
 
-        if !check_can_earn(guild_id, member.clone(), channel.clone(), currency_) {
+        if !check_can_earn(guild_id, &member, channel.clone(), currency_) {
             continue;
         }
 
@@ -108,9 +104,7 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
         drop(timeouts);
 
         tokio::spawn(async move {
-            let std_duration = if let Ok(timeout_duration) = timeout_duration.to_std() {
-                timeout_duration
-            } else {
+            let Ok(std_duration) = timeout_duration.to_std() else {
                 error!("Failed to convert chrono duration {:?} to std duration", timeout_duration);
                 return;
             };
@@ -129,20 +123,20 @@ pub async fn message(_ctx: Context, new_message: Message) -> Result<()> {
 #[allow(clippy::useless_let_if_seq)]
 fn check_can_earn(
     guild_id: GuildId,
-    member: Member,
+    member: &Member,
     channel: Channel,
     currency: &Currency
 ) -> bool {
     let mut can_earn = true;
     if currency.roles_is_whitelist() {
         let roles = currency.roles_whitelist();
-        if check_contains_role(guild_id, member.roles, roles) {
+        if check_contains_role(guild_id, &member.roles, roles) {
             return true;
         }
         can_earn = false;
     } else {
         let roles = currency.roles_blacklist();
-        if check_contains_role(guild_id, member.roles, roles) {
+        if check_contains_role(guild_id, &member.roles, roles) {
             return false;
         }
     }
@@ -175,7 +169,7 @@ fn check_contains_channel(
     false
 }
 
-fn check_contains_role(_guild_id: GuildId, current_roles: Vec<RoleId>, roles: &[DbRoleId]) -> bool {
+fn check_contains_role(_guild_id: GuildId, current_roles: &[RoleId], roles: &[DbRoleId]) -> bool {
     for role in current_roles.iter().copied() {
         if roles.contains(&role.into()) {
             return true;

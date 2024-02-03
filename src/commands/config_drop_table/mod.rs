@@ -1,9 +1,5 @@
 use anyhow::{ anyhow, Result };
-use serenity::{
-    all::{ CommandInteraction, CommandOptionType },
-    builder::{ CreateCommand, CreateCommandOption },
-    client::Context,
-};
+use serenity::{ all::CommandInteraction, builder::CreateCommand, client::Context };
 
 use crate::event_handler::command_handler::CommandOptions;
 

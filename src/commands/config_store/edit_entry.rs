@@ -10,6 +10,11 @@ use crate::{
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 
+/// Runs the command to edit an entry in the store.
+///
+/// # Errors
+///
+/// This function can return an `anyhow::Error` if there is an error editing the entry.
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
@@ -38,9 +43,9 @@ pub async fn run(
         anyhow::bail!("Both value and amount provided.");
     }
 
-    let mut store = Store::try_from_guild(guild_id.into()).await?;
+    let store = Store::try_from_guild(guild_id.into()).await?;
     let mut store = store.write().await;
-    let mut store_ = store
+    let store_ = store
         .as_mut()
         .ok_or_else(|| anyhow!("Store is being used in a breaking operation."))?;
 

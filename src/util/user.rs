@@ -1,8 +1,8 @@
-use crate::db::models::{ Balance, InventoryEntry, Item, ItemError };
+use crate::db::models::{ InventoryEntry, Item, ItemError };
 use anyhow::Result;
 
 pub async fn is_hanging_item_entry(item: &InventoryEntry) -> Result<bool> {
-    let item = Item::try_from_name(item.guild_id().to_owned(), item.item_name().to_owned()).await;
+    let item = Item::try_from_name(item.guild_id(), item.item_name().to_owned()).await;
     if let Err(item_err) = item {
         match item_err {
             ItemError::ItemNotFound => {

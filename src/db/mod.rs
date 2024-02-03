@@ -65,7 +65,7 @@ pub async fn init() {
 
     for coll in columns {
         match db.create_collection(&coll, None).await {
-            Ok(_) => println!("Created collection {coll }"),
+            Ok(()) => println!("Created collection {coll }"),
             Err(e) => {
                 eprintln!("Error when creating collection {coll}: {e}");
                 panic!();

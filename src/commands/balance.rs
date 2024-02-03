@@ -173,7 +173,7 @@ async fn multi_currency_embed(
             continue;
         }
         let symbol = currency_.symbol();
-        let title = format!("{}{n}", symbol);
+        let title = format!("{symbol}{n}");
         let description = format!("{symbol}{a}");
         field_data.push((title, description, true));
         drop(currency);

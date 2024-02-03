@@ -1,10 +1,6 @@
 // lints to be enabled when finishing code:
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
-#![allow(clippy::await_holding_lock)]
-// #![warn(clippy::pedantic)] // TODO Enable this when finishing code.
+
+#![warn(clippy::pedantic)] // TODO Enable this when finishing code.
 #![allow(clippy::must_use_candidate)] // and keep this off
 #![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
@@ -26,8 +22,7 @@ use std::env;
 use tracing::{ debug, error, info, span, trace, warn };
 use tracing_subscriber::{ fmt, fmt::format, EnvFilter };
 
-const ACCENT_COLOUR: u32 = 0x0375b4;
-const ACCENT_COLOR: u32 = ACCENT_COLOUR;
+const ACCENT_COLOUR: u32 = 0x0003_75b4;
 
 #[tokio::main]
 async fn main() {

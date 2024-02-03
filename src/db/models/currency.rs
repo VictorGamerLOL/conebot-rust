@@ -23,7 +23,7 @@ mod name_updates_handler;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
-use anyhow::{ anyhow, Result };
+use anyhow::{ anyhow, bail, Result };
 use chrono::Duration;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
@@ -41,6 +41,7 @@ use tokio::sync::{ Mutex, RwLock, RwLockWriteGuard };
 
 use crate::db::models::ToKVs;
 use crate::db::uniques::CurrencyNameRef;
+use crate::db::CLIENT;
 use crate::db::{
     uniques::DbChannelId,
     uniques::DbGuildId,
@@ -48,6 +49,8 @@ use crate::db::{
     ArcTokioRwLockOption,
     TokioMutexCache,
 };
+
+use self::name_updates_handler::handle_name_updates;
 
 #[derive(Debug, Error)]
 pub enum CurrencyError {
@@ -310,8 +313,23 @@ impl Currency {
     pub async fn update_name(
         self_: ArcTokioRwLockOption<Self>,
         new_name: String,
-        session: Option<&mut ClientSession> // passing pointer is better than passing value bc pointer is smaller
+        mut session: Option<&mut ClientSession> // passing pointer is better than passing value bc pointer is smaller
     ) -> Result<()> {
+        let mut maybe_session;
+        let mut was_session = false;
+
+        if session.is_none() {
+            maybe_session = Some(CLIENT.get().await.start_session(None).await?);
+            was_session = true;
+            session = maybe_session.as_mut();
+        }
+
+        let session = session.unwrap();
+
+        if was_session {
+            session.start_transaction(None).await?;
+        }
+
         let mut self_ = self_.write().await;
         let mut cache = CACHE_CURRENCY.lock().await;
         // Get the cache so no other task tries to use this while it is being updated.
@@ -337,6 +355,20 @@ impl Currency {
         let db = super::super::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("currencies");
 
+        if
+            let Err(e) = handle_name_updates(
+                self__.guild_id(),
+                self__.curr_name().as_str(),
+                new_name.clone(),
+                session
+            ).await
+        {
+            if was_session {
+                session.abort_transaction().await?;
+            }
+            return Err(e);
+        }
+
         // check if the new name already exists in the guild
         let filterdoc2 =
             doc! {
@@ -353,10 +385,15 @@ impl Currency {
             );
         }
 
-        if let Some(s) = session {
-            coll.update_one_with_session(filterdoc, updatedoc, None, s).await?;
-        } else {
-            coll.update_one(filterdoc, updatedoc, None).await?;
+        if let Err(e) = coll.update_one_with_session(filterdoc, updatedoc, None, session).await {
+            if was_session {
+                session.abort_transaction().await?;
+            }
+            bail!(e);
+        }
+
+        if was_session {
+            session.commit_transaction().await?;
         }
 
         cache.pop(&(self__.guild_id, self__.curr_name.clone()));

@@ -8,6 +8,15 @@ use serenity::{
     http::{ CacheHttp, Http },
 };
 
+/// Delete a currency.
+///
+/// # Panics
+///
+/// It should not, here to please the linter.
+///
+/// # Errors
+///
+/// This function can return an error if the currency is not found or if there is an issue deleting the currency.
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,

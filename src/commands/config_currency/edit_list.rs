@@ -9,6 +9,11 @@ use serenity::{
 
 use crate::{ db::models::Currency, event_handler::command_handler::CommandOptions };
 
+/// Runs the command with the given options, command interaction, and HTTP client.
+///
+/// # Errors
+///
+/// This function can return an error if there is a problem executing the command.
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,

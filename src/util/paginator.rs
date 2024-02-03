@@ -23,7 +23,7 @@ impl<T> Paginator<T> {
     ///
     /// # Errors
     /// - `No data to paginate` if the data is empty
-    /// - `Cannot paginate with 0 items per page` if the per_page is 0
+    /// - `Cannot paginate with 0 items per page` if the `per_page` is 0
     pub fn new(data: Vec<T>, per_page: usize) -> Result<Self> {
         if data.is_empty() {
             return Err(anyhow::anyhow!("No data to paginate"));
@@ -133,7 +133,7 @@ impl<T> Paginator<T> {
     /// # Returns
     /// The last page of data, of length `per_page`
     /// or less if there the total number of items
-    /// mod per_page is less than per_page.
+    /// mod `per_page` is less than `per_page`.
     pub fn last_page(&mut self) -> &[T] {
         self.hit_end = true;
         self.end = self.data.len() - 1;

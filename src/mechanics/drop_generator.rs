@@ -38,8 +38,7 @@ pub enum DropResultKind<'a> {
 impl DropResult<'_> {
     pub const fn name(&self) -> &str {
         match self.result {
-            DropResultKind::Item(name) => name,
-            DropResultKind::Currency(name) => name,
+            DropResultKind::Currency(name) | DropResultKind::Item(name) => name,
         }
     }
 }

@@ -152,6 +152,11 @@ impl DropTableBuilder {
     }
 
     #[must_use]
+    /// Creates a new drop table part builder and adds it to the list of drop table parts.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the vector somehow failed pushing the new part.
     pub fn new_part(&mut self) -> &mut DropTablePartBuilder {
         let part = DropTablePartBuilder::new()
             .guild_id(self.guild_id)
@@ -160,6 +165,7 @@ impl DropTableBuilder {
         self.drop_table_parts.last_mut().unwrap()
     }
 
+    #[must_use]
     pub fn guild_id(mut self, guild_id: Option<DbGuildId>) -> Self {
         self.guild_id = guild_id;
         self.drop_table_parts.iter_mut().for_each(|part| {
@@ -168,14 +174,24 @@ impl DropTableBuilder {
         self
     }
 
-    pub fn drop_table_name(mut self, drop_table_name: Option<String>) -> Self {
-        self.drop_table_name = drop_table_name.clone();
+    #[must_use]
+    pub fn drop_table_name(mut self, drop_table_name: Option<&str>) -> Self {
+        self.drop_table_name = drop_table_name.map(ToOwned::to_owned);
         self.drop_table_parts.iter_mut().for_each(|part| {
-            part.byref_drop_table_name(drop_table_name.clone());
+            part.byref_drop_table_name(drop_table_name.map(ToOwned::to_owned));
         });
         self
     }
 
+    /// Adds a drop table part to the list of drop table parts.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the vector fails to push the new part.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if the guild ID or drop table name does not match.
     pub fn add_drop_table_part(
         mut self,
         mut drop_table_part: DropTablePartBuilder
@@ -200,11 +216,21 @@ impl DropTableBuilder {
         Ok(self)
     }
 
+    #[must_use]
     pub fn clear_drop_table_parts(mut self) -> Self {
         self.drop_table_parts.clear();
         self
     }
 
+    /// Builds the drop table.
+    ///
+    /// # Panics
+    ///
+    /// It will not the linter is stoopid.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if there is a problem building the drop table.
     pub async fn build(
         self,
         mut session: Option<&mut ClientSession>
@@ -224,11 +250,10 @@ impl DropTableBuilder {
             if let Some(drop_table__) = drop_table_.as_ref() {
                 if !drop_table__.drop_table_parts().is_empty() {
                     return Err(anyhow!("Drop table already exists"));
-                } else {
-                    drop_table_.take();
-                    drop(drop_table_);
-                    cache.pop(&(guild_id, drop_table_name.clone()));
                 }
+                drop_table_.take();
+                drop(drop_table_);
+                cache.pop(&(guild_id, drop_table_name.clone()));
             }
         }
 

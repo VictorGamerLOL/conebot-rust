@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // no.
 
-use std::{ borrow::Cow, collections::HashMap, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
+use std::{ borrow::Cow, num::NonZeroUsize, ops::RangeInclusive, sync::Arc };
 
 use anyhow::{ anyhow, Result };
 use futures::{ future::{ self }, StreamExt, TryStreamExt };
@@ -60,7 +60,7 @@ impl From<&DropTable> for DropGenerator<RangeInclusive<i64>> {
     fn from(drop_table: &DropTable) -> Self {
         let mut drop_gen = Self::new();
 
-        for part in drop_table.drop_table_parts.iter() {
+        for part in &drop_table.drop_table_parts {
             let (name, kind) = match part.drop.clone() {
                 DropTablePartOption::Item { item_name } => (item_name, DroppableKind::Item),
                 DropTablePartOption::Currency { currency_name } => {
@@ -82,7 +82,7 @@ impl From<&DropTable> for DropGenerator<RangeInclusive<i64>> {
 impl DropTable {
     /// Tries to get a drop table from the cache. Otherwise, tries to get it from the database.
     /// If nothing is returned from the database, the internal vector is empty. Check the length
-    /// of drop_table_parts to see if it is empty.
+    /// of `drop_table_parts` to see if it is empty.
     ///
     /// # Errors
     /// - Any mongodb error.
@@ -208,7 +208,7 @@ impl DropTable {
                         DropTablePartOption::Item { .. } => {}
                         DropTablePartOption::Currency { currency_name } => {
                             if currency_name == before {
-                                *currency_name = after.to_owned();
+                                *currency_name = after.clone();
                             }
                         }
                     }
@@ -255,7 +255,7 @@ impl DropTable {
         &self.drop_table_parts
     }
 
-    /// Returns a new DropTablePartBuilder with the guild ID and drop table name set to this
+    /// Returns a new `DropTablePartBuilder` with the guild ID and drop table name set to this
     /// drop table's guild ID and drop table name.
     // mut self because why would you want to use this if you're not going to mutate it?
     #[must_use]
@@ -479,6 +479,13 @@ impl DropTable {
 }
 
 impl DropTablePart {
+    /// Tries to fetch a `DropTablePart` instance from the cache or the database.
+    ///
+    /// This function first attempts to fetch a `DropTablePart` from the cache using the provided `guild_id` and `drop_table_name`.
+    /// If the `DropTablePart` is not found in the cache, it then tries to fetch it from the database.
+    ///
+    /// # Errors
+    /// - Any mongodb error occurs.
     pub async fn try_from_name(
         guild_id: DbGuildId,
         drop_table_name: Cow<'_, str>,

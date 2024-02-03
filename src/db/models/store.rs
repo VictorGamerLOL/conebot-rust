@@ -1,7 +1,7 @@
 use std::{ num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, Result };
-use futures::{ StreamExt, TryStreamExt };
+use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession };

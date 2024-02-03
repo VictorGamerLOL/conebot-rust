@@ -5,7 +5,6 @@ use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     client::Context,
-    http::{ CacheHttp, Http },
 };
 
 use crate::{
@@ -29,8 +28,7 @@ pub async fn run(
     let amount: i64 = options
         .get_int_or_number_value(AMOUNT_OPTION_NAME)
         .transpose()?
-        .map(IntOrNumber::cast_to_i64)
-        .unwrap_or(1);
+        .map_or(1, IntOrNumber::cast_to_i64);
 
     let store = Store::try_from_guild(guild_id.into()).await?;
     let store = store.read().await;
@@ -48,19 +46,19 @@ pub async fn run(
 
     let to_give = entry.amount() * amount;
 
-    let mut balances = Balances::try_from_user(guild_id.into(), user_id.into()).await?;
+    let balances = Balances::try_from_user(guild_id.into(), user_id.into()).await?;
     let mut balances = balances.lock().await;
-    let mut balances_ = balances
+    let balances_ = balances
         .as_mut()
         .ok_or_else(|| anyhow!("Balances are being used in a breaking operation."))?;
 
-    let mut inventory = Inventory::try_from_user(guild_id.into(), user_id.into()).await?;
+    let inventory = Inventory::try_from_user(guild_id.into(), user_id.into()).await?;
     let mut inventory = inventory.lock().await;
-    let mut inventory_ = inventory
+    let inventory_ = inventory
         .as_mut()
         .ok_or_else(|| anyhow!("Inventory is being used in a breaking operation."))?;
 
-    let mut balance = balances_.ensure_has_currency(Cow::Borrowed(&currency_name)).await?;
+    let balance = balances_.ensure_has_currency(Cow::Borrowed(&currency_name)).await?;
 
     let mut session = CLIENT.get().await.start_session(None).await?;
 
@@ -82,9 +80,8 @@ pub async fn run(
     if let Err(e) = res {
         session.abort_transaction().await?;
         bail!("Error buying item: {}", e);
-    } else {
-        session.commit_transaction().await?;
     }
+    session.commit_transaction().await?;
 
     command.edit_response(
         http,

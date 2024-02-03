@@ -2,7 +2,6 @@ use anyhow::{ anyhow, Result };
 use serenity::{
     all::{ CommandInteraction, CommandOptionType },
     builder::{ CreateCommandOption, EditInteractionResponse },
-    client::Context,
     http::{ CacheHttp, Http },
 };
 
@@ -40,10 +39,10 @@ pub async fn run(
     Currency::try_from_name(guild_id.into(), currency_name.clone()).await?;
     Item::try_from_name(guild_id.into(), item_name.clone()).await?;
 
-    let mut store = Store::try_from_guild(guild_id.into()).await?;
+    let store = Store::try_from_guild(guild_id.into()).await?;
     let mut store = store.write().await;
 
-    let mut store_ = store
+    let store_ = store
         .as_mut()
         .ok_or_else(|| anyhow!("Store is being used in a breaking operation."))?;
 

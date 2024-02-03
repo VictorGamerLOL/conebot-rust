@@ -1,9 +1,5 @@
 use anyhow::{ anyhow, Result };
-use serenity::{
-    all::{ CommandInteraction, CommandOptionType },
-    builder::{ CreateCommand, CreateCommandOption },
-    http::{ CacheHttp, Http },
-};
+use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
 
 use crate::event_handler::command_handler::CommandOptions;
 
@@ -11,6 +7,11 @@ pub mod create_entry;
 pub mod delete_entry;
 pub mod edit_entry;
 
+/// Runs the `config_store` command.
+///
+/// # Errors
+///
+/// Returns an error if no subcommand is provided or if an invalid subcommand is provided.
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,

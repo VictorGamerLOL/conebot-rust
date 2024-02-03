@@ -4,7 +4,6 @@ use serenity::{
     builder::{ CreateCommand, CreateCommandOption, EditInteractionResponse },
     client::Context,
     constants::MESSAGE_CODE_LIMIT,
-    http::{ CacheHttp, Http },
 };
 
 use crate::{
@@ -53,14 +52,14 @@ pub async fn run(
     //TODO: make the response not be just the response messages one after another.
     let use_result = use_item(command.user.id, user_inventory_, item, amount, 0, http).await?;
 
-    if !use_result.success {
-        response_content.push_str(
-            use_result.message.unwrap_or(Cow::Borrowed("Failed to use item.")).as_ref()
-        );
-    } else {
+    if use_result.success {
         user_inventory_.take_item(&item_name, amount, None).await?;
         response_content.push_str(
-            use_result.message.unwrap_or_else(|| Cow::Owned(format!("Used {}", item_name))).as_ref()
+            use_result.message.unwrap_or_else(|| Cow::Owned(format!("Used {item_name}"))).as_ref()
+        );
+    } else {
+        response_content.push_str(
+            use_result.message.unwrap_or(Cow::Borrowed("Failed to use item.")).as_ref()
         );
     }
 

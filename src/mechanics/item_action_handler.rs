@@ -1,4 +1,4 @@
-use std::{ borrow::Cow, time::Duration };
+use std::borrow::Cow;
 
 use anyhow::{ anyhow, Result };
 use async_recursion::async_recursion;
@@ -9,7 +9,6 @@ use serenity::{
     client::Context,
     http::{ CacheHttp, Http },
 };
-use tokio::{ sync::{ RwLock, RwLockReadGuard }, time::timeout };
 
 use crate::{
     db::{
@@ -19,7 +18,6 @@ use crate::{
             Balances,
             DropTable,
             Inventory,
-            InventoryEntry,
             Item,
         },
         ArcTokioRwLockOption,
@@ -96,7 +94,7 @@ pub async fn use_item<'a>(
                                 &Mention::from(RoleId::from(*role_id)).to_string()
                             );
                         if times > 1 {
-                            format!("{} (x{})", msg_with_count, times)
+                            format!("{msg_with_count} (x{times})")
                         } else {
                             msg_with_count
                         }
@@ -136,7 +134,7 @@ pub async fn use_item<'a>(
             for match_ in repeat_pattern {
                 let match_ = match_.as_str().to_owned();
                 let mut repeat_string = String::new();
-                for drop in drops.iter() {
+                for drop in &drops {
                     repeat_string.push_str(
                         &match_
                             .replace("{{ITEM_CURRENCY_NAME}}", drop.name())
@@ -230,9 +228,9 @@ pub async fn give_drops(
     if res.is_err() {
         session.abort_transaction().await?;
         return res;
-    } else {
-        session.commit_transaction().await?;
     }
+    session.commit_transaction().await?;
+
     Ok(())
 }
 

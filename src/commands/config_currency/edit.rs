@@ -89,7 +89,7 @@ pub async fn run(
     command.edit_response(
         http,
         EditInteractionResponse::new().content(
-            format!("{}'s {} field has been updated to {}", currency_name, field_name, value)
+            format!("{currency_name}'s {field_name} field has been updated to {value}")
         )
     ).await?;
 

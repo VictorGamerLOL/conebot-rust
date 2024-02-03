@@ -7,8 +7,8 @@ use serenity::{
 use tokio::join;
 
 use crate::{
-    db::{ models::{ inventory::InventoryError, Balances, Currency, Inventory, Item }, CLIENT },
-    event_handler::command_handler::CommandOptions,
+    db::{ models::{ Balances, Currency, Inventory, Item }, CLIENT },
+    event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 
 pub async fn run(
@@ -25,21 +25,17 @@ pub async fn run(
     let amount = options
         .get_int_or_number_value("amount")
         .transpose()?
-        .map_or(1, |a| a.cast_to_i64());
+        .map_or(1, IntOrNumber::cast_to_i64);
 
     if amount < 1 {
         bail!("Amount must be greater than 0.");
     }
 
-    let mut balance = Balances::try_from_user(guild_id.into(), user_id.into()).await?;
-    let mut inventory = Inventory::try_from_user(guild_id.into(), user_id.into()).await?;
-    let mut item = Item::try_from_name(guild_id.into(), item).await?;
+    let balance = Balances::try_from_user(guild_id.into(), user_id.into()).await?;
+    let inventory = Inventory::try_from_user(guild_id.into(), user_id.into()).await?;
+    let item = Item::try_from_name(guild_id.into(), item).await?;
 
-    let (mut balance, mut inventory, mut item) = join!(
-        balance.lock(),
-        inventory.lock(),
-        item.read()
-    );
+    let (mut balance, mut inventory, item) = join!(balance.lock(), inventory.lock(), item.read());
 
     let balance_ = balance
         .as_mut()
@@ -55,7 +51,7 @@ pub async fn run(
         bail!("Item cannot be sold.");
     }
 
-    let mut entry = inventory_
+    let entry = inventory_
         .get_item(item_.name())
         .ok_or_else(|| anyhow!("Item not found in inventory."))?;
 

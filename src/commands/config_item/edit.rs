@@ -110,7 +110,7 @@ pub async fn run(
     }
     command.edit_response(
         http,
-        EditInteractionResponse::new().content(format!("Edited item {}.", item_name))
+        EditInteractionResponse::new().content(format!("Edited item {item_name}."))
     ).await?;
     Ok(())
 }

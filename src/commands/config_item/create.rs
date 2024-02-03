@@ -54,7 +54,7 @@ pub async fn run(
         let action_type = ItemActionTypeFieldless::from_string(s)?;
         item_type_builder.action_type(Some(action_type));
     }
-    item_type_builder.role(role.map(|r| r.into())).drop_table_name(drop_table);
+    item_type_builder.role(role.map(Into::into)).drop_table_name(drop_table);
 
     let item_type = item_type_builder.build()?;
 
@@ -67,7 +67,6 @@ pub async fn run(
     Ok(())
 }
 
-const CREATE_OPTION_NAME: &str = "create";
 const NAME_OPTION_NAME: &str = "name";
 const DESCRIPTION_OPTION_NAME: &str = "description";
 const SELLABLE_OPTION_NAME: &str = "sellable";

@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // *no*.
 
-use std::{ borrow::Cow, collections::HashMap, num::NonZeroUsize, sync::Arc };
+use std::{ collections::HashMap, num::NonZeroUsize, sync::Arc };
 
 use anyhow::{ anyhow, bail, Result };
 use async_recursion::async_recursion;
@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use lru::LruCache;
 use mongodb::{ bson::doc, ClientSession, Collection };
 use serde::{ Deserialize, Serialize };
-use serenity::{ client::Context, http::{ CacheHttp, Http } };
+use serenity::client::Context;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -96,11 +96,18 @@ impl Inventory {
                 })
             )
         );
-        cache.put(key, inventory.to_owned());
+        cache.put(key, inventory.clone());
         drop(cache);
         Ok(inventory)
     }
 
+    /// Attempts to fetch all of the inventories of users in a guild and returns them as a vector.
+    ///
+    /// # Panics
+    /// Will not the linter is stoopid.
+    ///
+    /// # Errors
+    /// This function returns an error if any `MongoDB` error occurs.
     pub async fn try_from_guild(guild_id: DbGuildId) -> Result<Vec<ArcTokioMutexOption<Self>>> {
         let mut cache = CACHE_INVENTORY.lock().await;
         let mut inventory_entries = InventoryEntry::from_guild(guild_id).await?;
@@ -127,6 +134,10 @@ impl Inventory {
         Ok(inventories)
     }
 
+    /// Updates the item name in bulk for all the users in a guild.
+    ///
+    /// # Errors
+    /// This function returns an error if any `MongoDB` error occurs.
     pub async fn bulk_update_item_name(
         guild_id: DbGuildId,
         old_name: &str,
@@ -146,7 +157,7 @@ impl Inventory {
         for v in cache_iter {
             let mut lock_res = v.lock().await;
             if let Some(inv) = lock_res.as_mut() {
-                for entry in inv.inventory.iter_mut() {
+                for entry in &mut inv.inventory {
                     if entry.item_name == old_name {
                         entry.item_name = new_name.to_owned();
                     }
@@ -215,15 +226,15 @@ impl Inventory {
         item: ArcTokioRwLockOption<Item>, // Clone on write. Neat little performance improvement.
         // It more serves as a signal that "This function may or may not clone the str."
         amount: i64,
-        mut session: Option<&'async_recursion mut ClientSession>,
+        session: Option<&'async_recursion mut ClientSession>,
         rec_depth: u8,
         http: &Context
     ) -> Result<()> {
         if rec_depth > INVENTORY_RECURSION_DEPTH_LIMIT {
             bail!("Recursion depth exceeded.");
         }
-        let mut item_ = item.read().await;
-        let mut item__ = item_
+        let item_ = item.read().await;
+        let item__ = item_
             .as_ref()
             .ok_or_else(|| anyhow!("Item is being used in a breaking operation."))?;
 
@@ -272,6 +283,9 @@ impl Inventory {
 
     /// Takes the specified amount of an item from the user. If the user reaches 0
     /// of the item, it will delete the inventory entry for the item.
+    ///
+    /// # Errors
+    /// - Any mongodb error occurs.
     pub async fn take_item(
         &mut self,
         item_name: &str,
@@ -468,7 +482,7 @@ impl InventoryEntry {
             "UserId": user_id.as_i64(),
             "ItemName": item_name,
         };
-        coll.find_one(filterdoc, None).await.map_err(|e| e.into())
+        coll.find_one(filterdoc, None).await.map_err(Into::into)
     }
 
     /// Fetches all of the inventory entries matching the search query for a user in a guild and

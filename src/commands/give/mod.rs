@@ -3,7 +3,6 @@ use serenity::{
     all::CommandInteraction,
     builder::CreateCommand,
     client::Context,
-    http::{ CacheHttp, Http },
     model::Permissions,
 };
 

@@ -5,11 +5,13 @@ use serenity::{
     http::{ CacheHttp, Http },
 };
 
-use crate::{
-    db::models::{ store::Store, Currency },
-    event_handler::command_handler::{ CommandOptions, IntOrNumber },
-};
+use crate::{ db::models::store::Store, event_handler::command_handler::CommandOptions };
 
+/// Runs the `delete_entry` command.
+///
+/// # Errors
+///
+/// This function can return an `anyhow::Error` if there is an error deleting the entry from the store.
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
@@ -23,10 +25,10 @@ pub async fn run(
         .get_string_value(CURRENCY_NAME_OPTION_NAME)
         .ok_or_else(|| anyhow!("No currency name provided."))??;
 
-    let mut store = Store::try_from_guild(guild_id.into()).await?;
+    let store = Store::try_from_guild(guild_id.into()).await?;
     let mut store = store.write().await;
 
-    let mut store_ = store
+    let store_ = store
         .as_mut()
         .ok_or_else(|| anyhow!("Store is being used in a breaking operation."))?;
 

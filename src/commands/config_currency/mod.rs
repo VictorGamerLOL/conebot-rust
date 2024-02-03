@@ -1,9 +1,5 @@
 use anyhow::{ anyhow, bail, Result };
-use serenity::{
-    all::{ CommandInteraction, CommandOptionType },
-    builder::{ CreateCommand, CreateCommandOption },
-    http::{ CacheHttp, Http },
-};
+use serenity::{ all::CommandInteraction, builder::CreateCommand, http::{ CacheHttp, Http } };
 
 use crate::event_handler::command_handler::CommandOptions;
 

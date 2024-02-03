@@ -22,11 +22,15 @@
 //! The fact that `MongoDB` uses `BigEndian` and the average `x86_64` CPU uses `LittleEndian`
 //! is trivial because the bson serializer and deserializer will handle that for us.
 
+use std::borrow::Cow;
+
 use anyhow::Result;
 use serde::{ Deserialize, Serialize };
 use serenity::model::prelude::{ ChannelId, GuildId, RoleId, UserId };
 
 use crate::{ db::models::Currency, macros::const_impl };
+
+use super::models::DropTable;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
@@ -588,10 +592,10 @@ impl DropTableName {
         &self.1
     }
 
-    #[allow(clippy::missing_const_for_fn)]
     pub async fn validate(&self) -> Result<bool> {
         // TODO: make this function once the
         // database with the drop tables is implemented.
+        DropTable::try_from_name(self.db_guild_id(), Cow::Borrowed(self.as_str()), None).await?;
         Ok(true)
     }
 
@@ -614,7 +618,7 @@ impl DropTableName {
         Self(guild_id, name)
     }
 
-    /// The actual AsRef trait is not implemented because
+    /// The actual `AsRef` trait is not implemented because
     /// "`Borrow` (and `AsRef`) can only return _references to something that already exists_" and
     /// "a `FooRef` is a new thing; there is no preexisting memory that has a `FooRef` in it"
     pub const fn as_ref(&self) -> DropTableNameRef<'_> {
@@ -638,8 +642,8 @@ impl<'a> DropTableNameRef<'a> {
         self.1
     }
 
-    #[allow(clippy::missing_const_for_fn)]
     pub async fn validate(&self) -> Result<bool> {
+        DropTable::try_from_name(self.0, Cow::Borrowed(self.1), None).await?;
         Ok(true)
     }
 
@@ -653,7 +657,7 @@ impl<'a> DropTableNameRef<'a> {
         Self(guild_id, name)
     }
 
-    /// The actual ToOwned trait is not implemented because
+    /// The actual `ToOwned` trait is not implemented because
     /// "`Borrow` (and `AsRef`) can only return _references to something that already exists_" and
     /// "a `FooRef` is a new thing; there is no preexisting memory that has a `FooRef` in it"
     pub fn to_owned(&self) -> DropTableName {

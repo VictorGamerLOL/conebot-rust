@@ -141,10 +141,10 @@ fn create_embed(parts: &[&DropTablePart], drop_table_name: &str) -> CreateEmbed 
 
 fn create_buttons() -> (CreateActionRow, [String; 4]) {
     let current_time = Utc::now();
-    let button_first_id = format!("btn_first_{}", current_time);
-    let button_previous_id = format!("btn_previous_{}", current_time);
-    let button_next_id = format!("btn_next_{}", current_time);
-    let button_last_id = format!("btn_last_{}", current_time);
+    let button_first_id = format!("btn_first_{current_time}");
+    let button_previous_id = format!("btn_previous_{current_time}");
+    let button_next_id = format!("btn_next_{current_time}");
+    let button_last_id = format!("btn_last_{current_time}");
     let button_first = CreateButton::new(button_first_id.clone())
         .emoji(ReactionType::Unicode("⏮️".to_owned()))
         .style(serenity::all::ButtonStyle::Primary);

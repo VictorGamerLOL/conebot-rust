@@ -22,6 +22,11 @@ use crate::{
 };
 
 #[allow(clippy::option_if_let_else)]
+/// Run the command.
+///
+/// # Errors
+///
+/// This function can return an error if there is a problem executing the command.
 pub async fn run(
     _options: CommandOptions,
     command: &CommandInteraction,
@@ -121,7 +126,7 @@ fn make_embed(data: &[(String, i64)], username: &str, icon: &str) -> CreateEmbed
     let embed = CreateEmbed::default().title("Inventory").author(author);
     let mut description = String::new();
     for (item, amount) in data {
-        description.push_str(&format!("**{}** *x{}*\n", item, amount));
+        description.push_str(&format!("**{item}** *x{amount}*\n"));
     }
     embed.description(description).colour(ACCENT_COLOUR)
 }
@@ -136,10 +141,10 @@ struct InvControls {
 
 fn inv_controls() -> InvControls {
     let now = chrono::Utc::now();
-    let first_id = format!("{}first_page", now);
-    let next_id = format!("{}next_page", now);
-    let prev_id = format!("{}prev_page", now);
-    let last_id = format!("{}last_page", now);
+    let first_id = format!("{now}first_page");
+    let next_id = format!("{now}next_page");
+    let prev_id = format!("{now}prev_page");
+    let last_id = format!("{now}last_page");
     let first_button = CreateButton::new(first_id.clone())
         .emoji(ReactionType::Unicode("⏮️".to_owned()))
         .style(ButtonStyle::Primary);
