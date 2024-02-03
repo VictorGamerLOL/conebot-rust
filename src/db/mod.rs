@@ -59,12 +59,7 @@ pub async fn init() {
         "dropTables".to_owned(),
         "storeEntries".to_owned(),
         "balances".to_owned(),
-        "inventories".to_owned(),
-        "roleRewards".to_owned(),
-        "multipliers".to_owned(),
-        "globalCurrencies".to_owned(),
-        "globalParticipatingGuilds".to_owned(),
-        "globalBalances".to_owned()
+        "inventories".to_owned()
     ];
     collections.into_iter().for_each(|coll| columns.retain(|x| x != &coll));
 

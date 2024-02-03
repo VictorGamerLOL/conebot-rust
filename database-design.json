@@ -23,7 +23,7 @@
     "Visible": "Boolean",
     "Base": "Boolean",
     "BaseValue": "Number | Null", // Null if it is the base currency
-    "Pay": "Boolean", // If the members can pay eachother with it
+    "Pay": "Boolean", // If the members can pay each other with it
     "EarnByChat": "Boolean", // Whether the currency can be earned by chatting
     "ChannelsIsWhitelist": "Boolean", // This is done to allow for roles and channels to be whitelist-based or blacklist-based
     "RolesIsWhitelist": "Boolean",
@@ -94,56 +94,6 @@
     "GuildId": "String",
     "UserId": "String",
     "ItemName": "String",
-    "Amount": "Number"
-  },
-  "roleRewards": {
-    // TODO: Cache this
-    /**
-     * For this make sure to implement a system where it caches roles that must be paid out soon,
-     * so it does not have to keep everything in the RAM.
-     */
-    "GuildId": "String",
-    "RoleId": "String",
-    "CurrName": "String",
-    "Amount": "Number",
-    "Interval": "Number", // In minutes
-    "LastGiven": "Date",
-    "NextGive": "Date"
-  },
-  "multipliers": {
-    // TODO: Also caching for this one.
-
-    "GuildId": "String",
-    "CurrName": "String",
-    "Multiplier": "Number",
-    "ExpiryDate": "Date"
-  },
-  "globalCurrencies": {
-    /**
-     * Need this for currencies that will be shared across servers
-     */
-    // TODO: Find a way to use the unique id mongodb provides for each record instead of GlobalCurrId
-    "GlobalCurrId": "Number",
-    "GlobalCurrName": "String",
-    "GlobalSymbol": "String",
-    "CreatorGuildId": "String" // This is to determine who has access to modify it
-  },
-  "globalParticipatingGuilds": {
-    // Which guild participates in which currency
-    // TODO: Make a system to randomly pick new currency owner if creator guild decides to leave
-    "GlobalCurrId": "Number",
-    "GuildId": "String"
-  },
-  "globalValues": {
-    // The value of each global currency in participating guild's base currency
-    "GlobalCurrId": "Number",
-    "GuildId": "String",
-    "BaseValue": "Number"
-  },
-  "globalBalances": {
-    // Self explanatory, member balances of global currencies
-    "UserId": "String",
-    "GlobalCurrId": "Number",
     "Amount": "Number"
   }
 }
