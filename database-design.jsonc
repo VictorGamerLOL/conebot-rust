@@ -51,7 +51,7 @@
     "ActionType": "Number",
     // 0 = None, 1 = Role, 2 = Lootbox
     // They must be consumable / instant consumable to have an action.
-    "Message": "String", //TODO: Formatting
+    "Message": "String",
     // ------ Begin Role ------
     "RoleId": "String",
     // ------ End Role ------

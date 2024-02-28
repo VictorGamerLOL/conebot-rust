@@ -12,7 +12,6 @@ pub async fn run(
     command: &CommandInteraction,
     http: impl AsRef<Http> + CacheHttp + Clone + Send + Sync
 ) -> Result<()> {
-    //TODO: Pretty print the output to the user.
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command cannot be performed in DMs."))?;
 
     let item_name = options
@@ -26,7 +25,15 @@ pub async fn run(
     let item_ = item.as_ref().ok_or_else(|| anyhow!("Item not found."))?;
 
     for (key, value) in item_.try_to_kvs()? {
-        embed = embed.field(key, value, true);
+        match key.as_str() {
+            "GuildId" => {}
+            "ItemName" => {
+                embed = embed.title(format!("Configuration for {value}"));
+            }
+            _ => {
+                embed = embed.field(key, value, true);
+            }
+        }
     }
 
     drop(item);

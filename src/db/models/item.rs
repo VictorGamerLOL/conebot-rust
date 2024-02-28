@@ -29,6 +29,7 @@ use super::ToKVs;
 
 /// Represents an item a user can hold in their inventory. May or may not
 /// be worth something or be used in return for something.
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, PartialOrd)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct Item {
@@ -334,16 +335,18 @@ impl ItemType {
 
     pub const fn message(&self) -> Option<&String> {
         match self {
-            Self::InstantConsumable { message, .. } | Self::Consumable { message, .. } =>
-                Some(message),
+            Self::InstantConsumable { message, .. } | Self::Consumable { message, .. } => {
+                Some(message)
+            }
             _ => None,
         }
     }
 
     pub const fn action_type(&self) -> Option<&ItemActionType> {
         match self {
-            Self::InstantConsumable { action_type, .. } | Self::Consumable { action_type, .. } =>
-                Some(action_type),
+            Self::InstantConsumable { action_type, .. } | Self::Consumable { action_type, .. } => {
+                Some(action_type)
+            }
             _ => None,
         }
     }
@@ -763,8 +766,6 @@ impl Item {
         new_item_type: ItemType,
         mut session: Option<&mut ClientSession>
     ) -> Result<()> {
-        // TODO: make a smarter update function that only updates the fields that have changed.
-        // So it does not need to do 2 updates.
         let db = crate::db::CLIENT.get().await.database("conebot");
         let collection = db.collection::<Self>("items");
         let filter =
@@ -933,7 +934,39 @@ impl Item {
     }
 }
 
-impl ToKVs for Item {}
+impl ToKVs for Item {
+    fn try_to_kvs(&self) -> Result<Vec<(String, String)>> {
+        let mut kvs = vec![
+            ("GuildId".to_owned(), self.guild_id.as_i64().to_string()),
+            ("ItemName".to_owned(), self.item_name.clone()),
+            ("Description".to_owned(), self.description.clone()),
+            ("Sellable".to_owned(), self.sellable.to_string()),
+            ("Tradeable".to_owned(), self.tradeable.to_string()),
+            ("Currency".to_owned(), self.currency.clone()),
+            ("Value".to_owned(), self.value.to_string()),
+            ("ItemType".to_owned(), self.item_type.to_string())
+        ];
+        match &self.item_type {
+            ItemType::Trophy => {}
+            | ItemType::Consumable { message, action_type }
+            | ItemType::InstantConsumable { message, action_type } => {
+                kvs.push(("Message".to_owned(), message.clone()));
+                kvs.push(("ActionType".to_owned(), action_type.to_fieldless().to_string()));
+                match action_type {
+                    ItemActionType::None => {}
+                    ItemActionType::Role { role_id } => {
+                        kvs.push(("RoleId".to_owned(), role_id.as_i64().to_string()));
+                    }
+                    ItemActionType::Lootbox { drop_table_name, count } => {
+                        kvs.push(("DropTableName".to_owned(), drop_table_name.clone()));
+                        kvs.push(("Count".to_owned(), count.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(kvs)
+    }
+}
 
 #[cfg(test)]
 mod test {

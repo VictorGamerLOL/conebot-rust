@@ -80,14 +80,10 @@ impl Store {
         Ok(())
     }
 
-    pub async fn get_entry(&self, item_name: &str, curr_name: &str) -> Option<&StoreEntry> {
-        for entry in &self.entries {
-            if entry.item_name == item_name && entry.curr_name == curr_name {
-                return Some(entry);
-            }
-        }
-
-        None
+    pub fn get_entry(&self, item_name: &str, curr_name: &str) -> Option<&StoreEntry> {
+        self.entries
+            .iter()
+            .find(|&entry| entry.item_name == item_name && entry.curr_name == curr_name)
     }
 
     pub const fn entries(&self) -> &Vec<StoreEntry> {
@@ -158,6 +154,58 @@ impl Store {
             let entry = self.entries.swap_remove(index);
             entry.delete(session).await?;
         }
+
+        Ok(())
+    }
+
+    pub async fn bulk_update_item_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: &str,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let store = Self::try_from_guild(guild_id).await?;
+        let mut store = store.write().await;
+        let store_ = store
+            .as_mut()
+            .ok_or_else(|| anyhow!("Store being used in breaking operation."))?;
+
+        for entry in &mut store_.entries {
+            if entry.item_name == before {
+                entry.set_item_name(
+                    after.to_owned(),
+                    session.as_mut().map(|s| s as &mut ClientSession)
+                ).await?;
+            }
+        }
+
+        drop(store);
+
+        Ok(())
+    }
+
+    pub async fn bulk_update_currency_name(
+        guild_id: DbGuildId,
+        before: &str,
+        after: &str,
+        mut session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let store = Self::try_from_guild(guild_id).await?;
+        let mut store = store.write().await;
+        let store_ = store
+            .as_mut()
+            .ok_or_else(|| anyhow!("Store being used in breaking operation."))?;
+
+        for entry in &mut store_.entries {
+            if entry.curr_name == before {
+                entry.set_currency_name(
+                    after.to_owned(),
+                    session.as_mut().map(|s| s as &mut ClientSession)
+                ).await?;
+            }
+        }
+
+        drop(store);
 
         Ok(())
     }
@@ -263,6 +311,72 @@ impl StoreEntry {
 
     pub const fn amount(&self) -> i64 {
         self.amount
+    }
+
+    async fn set_item_name(
+        &mut self,
+        item_name: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let db = CLIENT.get().await.database("conebot");
+        let coll = db.collection::<Self>("storeEntries");
+
+        let filter =
+            doc! {
+            "GuildId": self.guild_id.as_i64(),
+            "ItemName": &self.item_name,
+            "CurrName": &self.curr_name,
+        };
+
+        let update =
+            doc! {
+            "$set": {
+                "ItemName": &item_name,
+            },
+        };
+
+        if let Some(s) = session {
+            coll.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            coll.update_one(filter, update, None).await?;
+        }
+
+        self.item_name = item_name;
+
+        Ok(())
+    }
+
+    async fn set_currency_name(
+        &mut self,
+        curr_name: String,
+        session: Option<&mut ClientSession>
+    ) -> Result<()> {
+        let db = CLIENT.get().await.database("conebot");
+        let coll = db.collection::<Self>("storeEntries");
+
+        let filter =
+            doc! {
+            "GuildId": self.guild_id.as_i64(),
+            "ItemName": &self.item_name,
+            "CurrName": &self.curr_name,
+        };
+
+        let update =
+            doc! {
+            "$set": {
+                "CurrName": &curr_name,
+            },
+        };
+
+        if let Some(s) = session {
+            coll.update_one_with_session(filter, update, None, s).await?;
+        } else {
+            coll.update_one(filter, update, None).await?;
+        }
+
+        self.curr_name = curr_name;
+
+        Ok(())
     }
 
     pub async fn set_value(

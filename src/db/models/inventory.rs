@@ -463,60 +463,6 @@ impl InventoryEntry {
         Ok(items)
     }
 
-    /// Fetches an inventory entry for a user in a guild and returns it.
-    ///
-    /// # Errors
-    /// - Any mongodb error occurs, with `Err(e)`.
-    /// - The item entry does not exist, with `Ok(None)`.
-    async fn from_user_and_item(
-        guild_id: DbGuildId,
-        user_id: DbUserId,
-        item_name: &str
-    ) -> Result<Option<Self>> {
-        let db = crate::db::CLIENT.get().await.database("conebot");
-        let coll: Collection<Self> = db.collection("inventories");
-
-        let filterdoc =
-            doc! {
-            "GuildId": guild_id.as_i64(),
-            "UserId": user_id.as_i64(),
-            "ItemName": item_name,
-        };
-        coll.find_one(filterdoc, None).await.map_err(Into::into)
-    }
-
-    /// Fetches all of the inventory entries matching the search query for a user in a guild and
-    /// returns them as a vector.
-    ///
-    /// ***!! THE VECTOR CAN BE EMPTY IF THE USER HAS NO ITEMS MATCHING THE QUERY !!***
-    ///
-    /// # Errors
-    /// - Any mongodb error occurs.
-    /// - Invalid regex is provided.
-    async fn from_user_and_search_query(
-        guild_id: DbGuildId,
-        user_id: DbUserId,
-        search_query: &str
-    ) -> Result<Vec<Self>> {
-        let db = crate::db::CLIENT.get().await.database("conebot");
-        let coll: Collection<Self> = db.collection("inventories");
-
-        let filterdoc =
-            doc! {
-            "GuildId": guild_id.as_i64(),
-            "UserId": user_id.as_i64(),
-            "ItemName": { "$regex": search_query, "$options": "i" },
-        };
-        let mut res = coll.find(filterdoc, None).await?;
-
-        let mut items = Vec::new();
-
-        while let Some(item) = res.next().await {
-            items.push(item?);
-        }
-        Ok(items)
-    }
-
     async fn from_guild(guild_id: DbGuildId) -> Result<HashMap<DbUserId, Vec<Self>>> {
         let db = crate::db::CLIENT.get().await.database("conebot");
         let coll: Collection<Self> = db.collection("inventories");

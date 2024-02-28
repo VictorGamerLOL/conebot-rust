@@ -11,6 +11,7 @@ use crate::{
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 
+#[allow(clippy::cast_precision_loss)]
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,

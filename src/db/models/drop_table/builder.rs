@@ -35,6 +35,7 @@ impl DropTablePartBuilder {
         }
     }
 
+    #[must_use]
     pub const fn guild_id(mut self, guild_id: Option<DbGuildId>) -> Self {
         self.guild_id = guild_id;
         self
@@ -45,6 +46,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    #[must_use]
     pub fn drop_table_name(mut self, drop_table_name: Option<String>) -> Self {
         self.drop_table_name = drop_table_name;
         self
@@ -55,6 +57,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    #[must_use]
     pub fn drop(mut self, drop: Option<DropTablePartOption>) -> Self {
         self.drop = drop;
         self
@@ -65,6 +68,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    #[must_use]
     pub const fn min(mut self, min: Option<i64>) -> Self {
         self.min = min;
         self
@@ -75,6 +79,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    #[must_use]
     pub const fn max(mut self, max: Option<i64>) -> Self {
         self.max = max;
         self
@@ -85,6 +90,7 @@ impl DropTablePartBuilder {
         self
     }
 
+    #[must_use]
     pub const fn weight(mut self, weight: Option<i64>) -> Self {
         self.weight = weight;
         self

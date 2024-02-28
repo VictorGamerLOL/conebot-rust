@@ -1,7 +1,7 @@
 use anyhow::Result;
 use mongodb::ClientSession;
 
-use crate::db::{ models::{ Balances, DropTable, Item }, uniques::DbGuildId };
+use crate::db::{ models::{ store::Store, Balances, DropTable, Item }, uniques::DbGuildId };
 
 pub async fn handle_name_updates(
     guild_id: DbGuildId,
@@ -16,7 +16,7 @@ pub async fn handle_name_updates(
         after.clone(),
         Some(session)
     ).await?;
-    Item::bulk_update_currency_value_name(guild_id, before, after, Some(session)).await?;
-    // TODO: The rest
+    Item::bulk_update_currency_value_name(guild_id, before, after.clone(), Some(session)).await?;
+    Store::bulk_update_currency_name(guild_id, before, &after, Some(session)).await?;
     Ok(())
 }

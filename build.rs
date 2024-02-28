@@ -2,12 +2,16 @@ use std::env;
 
 fn main() {
     let rust_toolchain = env::var("RUSTUP_TOOLCHAIN").unwrap();
-    if rust_toolchain.starts_with("stable") {
+    dbg!(&rust_toolchain);
+    if rust_toolchain.contains("stable") {
         // do nothing
-    } else if rust_toolchain.starts_with("nightly") {
+    } else if rust_toolchain.contains("nightly") {
         //enable the 'nightly-features' feature flag
         println!("cargo:rustc-cfg=feature=\"is-nightly\"");
     } else {
-        panic!("Unexpected value for rustc toolchain")
+        panic!(
+            "Unexpected value for rustc toolchain, got {}",
+            rust_toolchain
+        )
     }
 }

@@ -32,8 +32,6 @@ lazy_static! {
     static ref REPEAT_PATTERN_REGEX: regex::Regex = regex::Regex::new(r"%%(.*)%%").unwrap();
 }
 
-//TODO: Fill this in with drop tables once they are implemented.
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UseResult<'a> {
     pub success: bool,
@@ -255,6 +253,7 @@ pub async fn give_items(
     Ok(())
 }
 
+#[allow(clippy::cast_precision_loss)]
 pub async fn give_currency(
     currency: DropResult<'_>,
     balances: &mut Balances,

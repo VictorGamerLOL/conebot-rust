@@ -27,11 +27,7 @@ use crate::{
 /// # Errors
 ///
 /// This function can return an error if there is a problem executing the command.
-pub async fn run(
-    _options: CommandOptions,
-    command: &CommandInteraction,
-    ctx: &Context
-) -> Result<()> {
+pub async fn run(_: CommandOptions, command: &CommandInteraction, ctx: &Context) -> Result<()> {
     let guild_id = command.guild_id.ok_or_else(|| anyhow!("Command cannot be used in DMs"))?;
     let user_id = command.user.id;
     let username = command.user.name.as_str();
@@ -157,9 +153,11 @@ fn inv_controls() -> InvControls {
     let prev_button = CreateButton::new(prev_id.clone())
         .emoji(ReactionType::Unicode("⏪".to_owned()))
         .style(ButtonStyle::Primary);
-    let row = CreateActionRow::Buttons(vec![first_button, prev_button, next_button, last_button]);
+    let action_row = CreateActionRow::Buttons(
+        vec![first_button, prev_button, next_button, last_button]
+    );
     InvControls {
-        row,
+        row: action_row,
         first_button_id: first_id,
         next_button_id: next_id,
         prev_button_id: prev_id,

@@ -1,9 +1,9 @@
-// lints to be enabled when finishing code:
-
-#![warn(clippy::pedantic)] // TODO Enable this when finishing code.
+#![warn(clippy::pedantic)]
 #![allow(clippy::must_use_candidate)] // and keep this off
 #![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)] // cant be asked
+#![allow(clippy::missing_errors_doc)] // cant be asked
+#![allow(clippy::missing_panics_doc)] // cant be asked
 #![deny(elided_lifetimes_in_paths)]
 #![cfg_attr(feature = "is-nightly", feature(const_trait_impl))]
 
@@ -19,7 +19,7 @@ pub mod macros;
 use dotenv::dotenv;
 use serenity::{ model::gateway::GatewayIntents, Client };
 use std::env;
-use tracing::{ debug, error, info, span, trace, warn };
+use tracing::{ span, warn };
 use tracing_subscriber::{ fmt, fmt::format, EnvFilter };
 
 const ACCENT_COLOUR: u32 = 0x0003_75b4;
@@ -31,11 +31,6 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
     span!(tracing::Level::TRACE, "main");
     init_env().await;
-    error!("test");
-    warn!("test");
-    info!("test");
-    debug!("test");
-    trace!("test");
 
     if cfg!(feature = "is-nightly") {
         warn!("Rust nightly detected. Enabling nightly exclusive features.");

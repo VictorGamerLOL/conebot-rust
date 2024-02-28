@@ -49,7 +49,6 @@ pub async fn run(
 
     let mut response_content = String::new();
 
-    //TODO: make the response not be just the response messages one after another.
     let use_result = use_item(command.user.id, user_inventory_, item, amount, 0, http).await?;
 
     if use_result.success {

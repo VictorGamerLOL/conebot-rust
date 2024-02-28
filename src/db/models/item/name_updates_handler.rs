@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use mongodb::ClientSession;
 
-use crate::db::{ models::{ DropTable, Inventory }, uniques::DbGuildId };
+use crate::db::{ models::{ store::Store, DropTable, Inventory }, uniques::DbGuildId };
 
 /// Handles the name updates for items.
 ///
@@ -18,13 +18,12 @@ pub async fn handle_name_updates(
 ) -> Result<()> {
     // INVENTORIES
     Inventory::bulk_update_item_name(guild_id, &before, &after, Some(session)).await?;
-    // END INVENTORIES
 
     // DROP TABLES
     DropTable::bulk_update_part_item_name(guild_id, &before, &after, Some(session)).await?;
 
     // STORE ENTRIES
-    // TODO
+    Store::bulk_update_item_name(guild_id, &before, &after, Some(session)).await?;
 
     Ok(())
 }

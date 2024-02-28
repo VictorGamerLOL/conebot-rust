@@ -26,6 +26,7 @@ pub struct DropTable {
     drop_table_parts: Vec<DropTablePart>,
 }
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "PascalCase"))]
 pub struct DropTablePart {
@@ -350,6 +351,7 @@ impl DropTable {
     }
 
     /// Deletes all occurrences of a currency from all drop tables within a guild.
+    ///
     pub async fn purge_currency(
         guild_id: DbGuildId,
         currency_name: &str,

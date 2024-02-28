@@ -19,11 +19,6 @@ use crate::{
     ACCENT_COLOUR,
 };
 
-/// # Errors
-/// TODO
-///
-/// # Panics
-/// TODO
 #[allow(clippy::unused_async)]
 pub async fn run<'a>(
     options: CommandOptions,

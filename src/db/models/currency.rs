@@ -19,7 +19,7 @@
 //! and also a configurable timeout between earning currency. This is to prevent spamming and to make it more
 //! fair for everyone.
 pub mod builder;
-mod name_updates_handler;
+pub mod name_updates_handler;
 
 use std::{ num::NonZeroUsize, sync::Arc };
 
@@ -1366,9 +1366,7 @@ impl Currency {
     /// Use this in case a transaction fails and you want to invalidate the cache.
     pub async fn invalidate_cache(mut self_: RwLockWriteGuard<'_, Option<Self>>) -> Result<()> {
         let mut cache = CACHE_CURRENCY.lock().await;
-        let self__ = if let Some(c) = self_.take() {
-            c
-        } else {
+        let Some(self__) = self_.take() else {
             return Err(anyhow!("Currency is already being used in a breaking operation."));
         };
 

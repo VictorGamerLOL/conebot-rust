@@ -26,7 +26,6 @@ impl Handler {
         let options: CommandOptions = command.data.options.clone().into();
         match command.data.name.as_str() {
             "ping" => commands::ping::run(options, command, ctx).await?,
-            "test" => commands::test1::run(options, command, ctx).await?,
             "currency" => commands::currency::run(options, command, ctx).await?,
             "balance" => commands::balance::run(options, command, ctx).await?,
             "give" => commands::give::run(options, command, ctx).await?,
@@ -34,6 +33,7 @@ impl Handler {
             "use-item" => commands::use_item::run(options, command, ctx).await?,
             "inv" => commands::inv::run(options, command, ctx).await?,
             "buy" => commands::buy::run(options, command, ctx).await?,
+            "sell" => commands::sell::run(options, command, ctx).await?,
             "config_currency" => commands::config_currency::run(options, command, ctx).await?,
             "config_drop_table" => commands::config_drop_table::run(options, command, ctx).await?,
             "config_item" => commands::config_item::run(options, command, ctx).await?,
@@ -69,7 +69,6 @@ impl EventHandler for Handler {
                 &ctx.http,
                 vec![
                     commands::ping::command(),
-                    commands::test1::command(),
                     commands::currency::command(),
                     commands::balance::command(),
                     commands::give::command(),
@@ -80,7 +79,8 @@ impl EventHandler for Handler {
                     commands::config_store::command(),
                     commands::use_item::command(),
                     commands::inv::command(),
-                    commands::buy::command()
+                    commands::buy::command(),
+                    commands::sell::command()
                 ]
             ).await
         {

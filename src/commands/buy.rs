@@ -12,6 +12,7 @@ use crate::{
     event_handler::command_handler::{ CommandOptions, IntOrNumber },
 };
 
+#[allow(clippy::cast_precision_loss)]
 pub async fn run(
     options: CommandOptions,
     command: &CommandInteraction,
@@ -37,7 +38,7 @@ pub async fn run(
         .ok_or_else(|| anyhow!("Store is being used in a breaking operation."))?;
 
     let entry = store_
-        .get_entry(&item_name, &currency_name).await
+        .get_entry(&item_name, &currency_name)
         .ok_or_else(|| anyhow!("No such entry in the store."))?;
 
     let item = Item::try_from_name(guild_id.into(), entry.item_name().to_owned()).await?;

@@ -51,7 +51,6 @@ pub async fn run(
             // count.
             possible_fut = Some(Currency::update_name(currency.clone(), value.clone(), None));
         }
-        //TODO: Generate nicer error messages for users.
         "symbol" => currency__.update_symbol(&value, None).await?,
         "visible" => currency__.update_visible(value.parse()?, None).await?,
         "base" => currency__.update_base(value.parse()?, None).await?,

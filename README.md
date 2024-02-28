@@ -20,7 +20,7 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [x] Channels
     - [x] Roles
   - [x] Exchanging between currencies
-- [ ] Items
+- [x] Items
   - [x] Trophies
   - [x] Consumables
     - [x] Message
@@ -30,7 +30,7 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [x] Same as above
   - [x] Changing config values
   - [x] Inventories for each member
-  - [ ] Sell to the void
+  - [x] Sell to the void
 - [x] Lootboxes
   - [x] Create loot tables
   - [x] Delete loot tables
@@ -39,9 +39,9 @@ This bot aims to make everything highly configurable and be as feature packed as
     - [x] Of currencies
     - [x] And give them
   - [x] Associate loot tables to lootboxes
-- [ ] Shops
-  - [ ] Make listings
-  - [ ] Take currency in exchange for item
+- [x] Shops
+  - [x] Make listings
+  - [x] Take currency in exchange for item
 
 ---
 

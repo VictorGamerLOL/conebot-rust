@@ -11,11 +11,6 @@ use crate::{
     util::currency::truncate_2dp,
 };
 
-/// # Errors
-/// TODO
-///
-/// # Panics
-/// will not
 #[allow(clippy::unused_async)]
 #[allow(clippy::cast_precision_loss)]
 pub async fn run(

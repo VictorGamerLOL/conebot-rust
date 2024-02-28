@@ -580,6 +580,7 @@ impl PartialEq<CurrencyNameRef<'_>> for String {
     }
 }
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct DropTableName(#[serde(skip)] DbGuildId, String);
 
@@ -593,8 +594,6 @@ impl DropTableName {
     }
 
     pub async fn validate(&self) -> Result<bool> {
-        // TODO: make this function once the
-        // database with the drop tables is implemented.
         DropTable::try_from_name(self.db_guild_id(), Cow::Borrowed(self.as_str()), None).await?;
         Ok(true)
     }

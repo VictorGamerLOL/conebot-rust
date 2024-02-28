@@ -268,11 +268,8 @@ impl Balances {
 
     pub async fn invalidate_cache(mut self_: MutexGuard<'_, Option<Self>>) -> Result<()> {
         let take_res = self_.take();
-        let self__ = match take_res {
-            Some(s) => s,
-            None => {
-                return Err(anyhow!("Balances are being used in a breaking operation."));
-            }
+        let Some(self__) = take_res else {
+            return Err(anyhow!("Balances are being used in a breaking operation."));
         };
         let mut cache = CACHE_BALANCES.lock().await;
         cache.pop(&(self__.guild_id, self__.user_id));
